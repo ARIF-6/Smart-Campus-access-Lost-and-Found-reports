@@ -1,165 +1,360 @@
-const ClaimRequest = require('../models/ClaimRequest');
+const Claim = require('../models/Claim');
+const LostItem = require('../models/LostItem');
 const FoundItem = require('../models/FoundItem');
-const Notification = require('../models/Notification');
-const User = require('../models/User');
+const Item = require('../models/Item');
 const { logAction } = require('../utils/auditLogger');
+const { createNotification } = require('./notificationController');
+const mongoose = require('mongoose');
+const { emitDashboardRefresh } = require('../socket/events/notificationEvents');
+const asyncHandler = require('../middleware/asyncHandler');
+const { sendSuccess } = require('../utils/responseHandler');
 
-exports.submitClaim = async (req, res) => {
-  try {
-    const { foundItemId, proof } = req.body;
-    
-    // Check if item exists
-    const foundItem = await FoundItem.findById(foundItemId);
-    if (!foundItem) {
-      return res.status(404).json({ message: 'Found Item not found' });
-    }
+// @desc    Create claim
+// @route   POST /api/claims
+// @access  Private
+exports.submitClaim = asyncHandler(async (req, res) => {
+  const { itemId, message } = req.body;
+  const userId = req.user.id;
 
-    if (foundItem.status === 'CLAIMED') {
-      return res.status(400).json({ message: 'This item is already claimed' });
-    }
+  if (!itemId || !message || message.trim() === '') {
+    return res.status(400).json({ success: false, message: "Missing required fields: itemId or message" });
+  }
 
-    // Check duplicate
-    const existingClaim = await ClaimRequest.findOne({ userId: req.user.id, foundItemId });
-    if (existingClaim) {
-      return res.status(400).json({ message: 'You have already submitted a claim for this item' });
-    }
+  if (!mongoose.Types.ObjectId.isValid(itemId)) {
+    return res.status(400).json({ success: false, message: "Invalid item ID format" });
+  }
 
-    let proofUrl = proof || '';
-    if (req.file) {
-      proofUrl = req.file.path; // from Cloudinary
-    }
+  // Check if item exists in any collection
+  let item;
+  let itemModelName;
+  let itemTypeStr;
 
-    const newClaim = await ClaimRequest.create({
-      userId: req.user.id,
-      foundItemId,
-      proof: proofUrl,
-      status: 'PENDING'
-    });
-
-    // Notify Admins
-    const admins = await User.find({ role: 'admin' });
-    const notifications = admins.map(admin => ({
-      userId: admin._id,
-      title: 'New Claim Submitted',
-      message: `A new claim has been submitted for item: ${foundItem.title}`,
-      type: 'CLAIM_SUBMITTED',
-      relatedItemId: foundItemId
-    }));
-    
-    if (notifications.length > 0) {
-      const insertedNotifications = await Notification.insertMany(notifications);
-      const io = require('../utils/socket').getIO();
-      if(io) {
-        insertedNotifications.forEach(notif => {
-          io.to(notif.userId.toString()).emit("notification", notif);
-        });
+  item = await FoundItem.findById(itemId);
+  if (item) {
+    itemModelName = 'FoundItem';
+    itemTypeStr = 'found';
+  } else {
+    item = await LostItem.findById(itemId);
+    if (item) {
+      itemModelName = 'LostItem';
+      itemTypeStr = 'lost';
+    } else {
+      item = await Item.findById(itemId);
+      if (item) {
+        itemModelName = 'Item';
+        itemTypeStr = item.type || 'found';
       }
     }
+  }
 
-    // Log Audit
-    await logAction({
-      userId: req.user.id,
-      action: 'SUBMIT_CLAIM',
-      targetId: newClaim._id,
-      targetType: 'Claim',
-      details: `Submitted a claim for item: ${foundItem.title}`,
-      req
+  if (!item) {
+    return res.status(404).json({ success: false, message: "Item not found" });
+  }
+
+  // Prevent claiming items that are already returned, claimed, or approved
+  if (['returned', 'claimed', 'approved'].includes(item.status)) {
+    return res.status(400).json({ success: false, message: "This item has already been claimed or returned" });
+  }
+
+  // Prevent Duplicate Claim
+  const existingClaim = await Claim.findOne({
+    user: userId,
+    item: itemId,
+    isDeleted: false
+  });
+
+  if (existingClaim) {
+    return res.status(400).json({ success: false, message: "You have already submitted a claim for this item" });
+  }
+
+  // Create new claim
+    const path = require('path');
+    const uploadsRoot = path.join(__dirname, '..', 'uploads');
+    const proofImagePath = req.file ? path.relative(uploadsRoot, req.file.path).replace(/\\/g, '/') : null;
+    const newClaim = new Claim({
+      user: userId,
+      item: itemId,
+      itemType: itemTypeStr,
+      itemModel: itemModelName,
+      message: message.trim(),
+      proofImage: proofImagePath,
+      status: "pending"
     });
 
-    res.status(201).json(newClaim);
-  } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
-  }
-};
+  await newClaim.save();
 
-exports.getMyClaims = async (req, res) => {
-  try {
-    const claims = await ClaimRequest.find({ userId: req.user.id })
-      .populate('foundItemId', 'title locationFound imageUrl status')
-      .sort({ createdAt: -1 });
-    res.status(200).json(claims);
-  } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
-  }
-};
+  // Log audit
+  await logAction({
+    userId: userId,
+    action: 'SUBMIT_CLAIM',
+    targetId: newClaim._id,
+    targetType: 'Claim',
+    details: `Student submitted a claim for ${itemModelName}: ${item.title}`,
+    req
+  });
 
-exports.getAllClaims = async (req, res) => {
+  // Notify Admins & Staff
   try {
-    const claims = await ClaimRequest.find()
-      .populate('foundItemId', 'title locationFound imageUrl')
-      .populate('userId', 'name email')
-      .sort({ createdAt: -1 });
-    res.status(200).json(claims);
-  } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
-  }
-};
+    const notificationData = {
+      title: 'New Claim Request',
+      message: `${req.user.fullName} has submitted a claim for "${item.title}".`,
+      type: 'CLAIM_SUBMITTED',
+      relatedId: newClaim._id
+    };
 
-exports.updateClaimStatus = async (req, res) => {
-  try {
-    const { status, adminNote } = req.body;
+    await createNotification({ ...notificationData, recipientRole: 'admin' });
+    await createNotification({ ...notificationData, recipientRole: 'staff' });
+
+    if (item.createdBy) {
+      await createNotification({
+        userId: item.createdBy,
+        title: 'New Claim for Your Item',
+        message: `${req.user.fullName} has requested a claim for the item "${item.title}" you reported.`,
+        type: 'CLAIM_SUBMITTED',
+        relatedId: newClaim._id
+      });
+    }
+  } catch (err) {
+    console.error('Notification Error:', err);
+  }
+
+  return sendSuccess(res, 'Claim submitted successfully', newClaim, 201);
+});
+
+// @desc    Get all claims
+// @route   GET /api/claims
+// @access  Private (Admin)
+exports.getAllClaims = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  const claims = await Claim.find({ isDeleted: false })
+    .populate('user', 'fullName email studentId')
+    .populate('item')
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+
+  const total = await Claim.countDocuments({ isDeleted: false });
+
+  return sendSuccess(res, 'Claims fetched successfully', {
+    items: claims,
+    total,
+    page,
+    limit
+  });
+});
+
+// @desc    Get current user's claims
+// @route   GET /api/claims/my
+// @access  Private
+exports.getMyClaims = asyncHandler(async (req, res) => {
+  const claims = await Claim.find({ user: req.user.id, isDeleted: false })
+    .populate("item", "title image category location")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return sendSuccess(res, 'My claims fetched successfully', claims);
+});
+
+// @desc    Get claim by ID
+// @route   GET /api/claims/:id
+// @access  Private
+exports.getClaimById = asyncHandler(async (req, res) => {
+  const claim = await Claim.findById(req.params.id)
+    .populate('user', 'fullName email studentId name')
+    .populate('item')
+    .lean();
+      
+  if (!claim) {
+    return res.status(404).json({ success: false, message: 'Claim not found' });
+  }
     
-    if (!['APPROVED', 'REJECTED'].includes(status)) {
-      return res.status(400).json({ message: 'Invalid status' });
-    }
+  return sendSuccess(res, 'Claim fetched successfully', claim);
+});
 
-    const claim = await ClaimRequest.findById(req.params.id);
-    if (!claim) {
-      return res.status(404).json({ message: 'Claim not found' });
-    }
-
-    if (claim.status !== 'PENDING') {
-      return res.status(400).json({ message: 'Claim is already ' + claim.status });
-    }
-
-    claim.status = status;
-    if (adminNote) claim.adminNote = adminNote;
-    await claim.save();
-
-    if (status === 'APPROVED') {
-      // update item to CLAIMED
-      await FoundItem.findByIdAndUpdate(claim.foundItemId, { status: 'CLAIMED' });
-      
-      // Reject all other claims for this item
-      await ClaimRequest.updateMany(
-        { foundItemId: claim.foundItemId, _id: { $ne: claim._id }, status: 'PENDING' },
-        { status: 'REJECTED', adminNote: 'Automatically rejected because another claim was verified.' }
-      );
-
-      const notif = await Notification.create({
-        userId: claim.userId,
-        title: 'Claim Approved',
-        message: 'Your claim request has been verified and approved.',
-        type: 'CLAIM_APPROVED',
-        relatedItemId: claim.foundItemId
-      });
-      const io = require('../utils/socket').getIO();
-      if(io) io.to(claim.userId.toString()).emit('notification', notif);
-      
-    } else if (status === 'REJECTED') {
-      const notif = await Notification.create({
-        userId: claim.userId,
-        title: 'Claim Rejected',
-        message: 'Your claim request has been rejected.',
-        type: 'CLAIM_REJECTED',
-        relatedItemId: claim.foundItemId
-      });
-      const io = require('../utils/socket').getIO();
-      if(io) io.to(claim.userId.toString()).emit('notification', notif);
-    }
-
-    // Log Audit
-    await logAction({
-      userId: req.user.id,
-      action: status === 'APPROVED' ? 'APPROVE_CLAIM' : 'REJECT_CLAIM',
-      targetId: claim._id,
-      targetType: 'Claim',
-      details: `${status} claim request for user ${claim.userId}`,
-      req
-    });
-
-    res.status(200).json(claim);
-  } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
+// @desc    Update claim status (Unified)
+// @route   PUT /api/claims/:id
+// @access  Private (Admin/Staff)
+exports.updateClaimStatus = asyncHandler(async (req, res) => {
+  const { status } = req.body;
+  if (!['approved', 'rejected', 'pending'].includes(status)) {
+    return res.status(400).json({ success: false, message: 'Invalid status' });
   }
-};
+
+  const claim = await Claim.findById(req.params.id).populate('item');
+  if (!claim) {
+    return res.status(404).json({ success: false, message: 'Claim not found' });
+  }
+
+  claim.status = status;
+  await claim.save();
+
+  const itemCollections = {
+    'LostItem': LostItem,
+    'FoundItem': FoundItem,
+    'Item': Item
+  };
+  const Model = itemCollections[claim.itemModel];
+  if (Model) {
+    // If the claim is approved or rejected, update the item status to match the claim status.
+    if (status === 'approved' || status === 'rejected') {
+      await Model.findByIdAndUpdate(claim.item, { status: status });
+    }
+  }
+
+  // Log the update
+  await logAction({
+    userId: req.user.id,
+    action: 'UPDATE_CLAIM_STATUS',
+    targetId: claim._id,
+    targetType: 'Claim',
+    details: `Admin updated claim status to ${status}`,
+    req
+  });
+
+  // Notify Student
+  try {
+    if (status === 'approved') {
+      await createNotification({
+        userId: claim.user,
+        title: 'Claim APPROVED',
+        message: 'your claim was accepted come an take it',
+        type: 'CLAIM_APPROVED',
+        relatedId: claim._id
+      });
+    } else if (status === 'rejected') {
+      await createNotification({
+        userId: claim.user,
+        title: 'Claim REJECTED',
+        message: `Your claim for "${claim.item?.title || 'item'}" has been rejected.`,
+        type: 'CLAIM_REJECTED',
+        relatedId: claim._id
+      });
+    }
+  } catch (err) {
+    console.error('Notification Error:', err);
+  }
+
+  // Trigger dashboard refreshes
+  emitDashboardRefresh('admin');
+  emitDashboardRefresh('staff');
+
+  return sendSuccess(res, `Claim ${status} successfully`, claim);
+});
+
+// @desc    Approve claim
+// @route   PATCH /api/claims/:id/approve
+// @access  Private (Admin)
+exports.approveClaim = asyncHandler(async (req, res) => {
+  const claim = await Claim.findById(req.params.id).populate('item');
+  if (!claim) {
+    return res.status(404).json({ success: false, message: 'Claim not found' });
+  }
+
+  claim.status = "approved";
+  await claim.save();
+
+  // Update related item status
+  const itemCollections = {
+    'LostItem': LostItem,
+    'FoundItem': FoundItem,
+    'Item': Item
+  };
+
+  const Model = itemCollections[claim.itemModel];
+  if (Model) {
+    await Model.findByIdAndUpdate(claim.item, { status: 'approved' });
+  }
+
+  // Log the approval
+  await logAction({
+    userId: req.user.id,
+    action: 'APPROVE_CLAIM',
+    targetId: claim._id,
+    targetType: 'Claim',
+    details: `Admin approved claim for ${claim.itemType} item`,
+    req
+  });
+
+  // Notify Student
+  try {
+    await createNotification({
+      userId: claim.user,
+      title: 'Claim APPROVED',
+      message: 'your claim was accepted come an take it',
+      type: 'CLAIM_APPROVED',
+      relatedId: claim._id
+    });
+  } catch (err) {
+    console.error('Notification Error:', err);
+  }
+
+  return sendSuccess(res, 'Claim approved successfully', claim);
+});
+
+// @desc    Reject claim
+// @route   PATCH /api/claims/:id/reject
+// @access  Private (Admin)
+exports.rejectClaim = asyncHandler(async (req, res) => {
+  const claim = await Claim.findById(req.params.id).populate('item');
+  if (!claim) {
+    return res.status(404).json({ success: false, message: 'Claim not found' });
+  }
+
+  claim.status = "rejected";
+  await claim.save();
+
+  // Update related item status
+  const itemCollections = {
+    'LostItem': LostItem,
+    'FoundItem': FoundItem,
+    'Item': Item
+  };
+
+  const Model = itemCollections[claim.itemModel];
+  if (Model) {
+    await Model.findByIdAndUpdate(claim.item, { status: 'rejected' });
+  }
+
+  // Log the rejection
+  await logAction({
+    userId: req.user.id,
+    action: 'REJECT_CLAIM',
+    targetId: claim._id,
+    targetType: 'Claim',
+    details: `Admin rejected claim for ${claim.itemType} item`,
+    req
+  });
+
+  // Notify Student
+  try {
+    await createNotification({
+      userId: claim.user,
+      title: 'Claim REJECTED',
+      message: `Your claim for "${claim.item?.title || 'item'}" has been rejected.`,
+      type: 'CLAIM_REJECTED',
+      relatedId: claim._id
+    });
+  } catch (err) {
+    console.error('Notification Error:', err);
+  }
+
+  return sendSuccess(res, 'Claim rejected successfully', claim);
+});
+
+// @desc    Get trashed claims
+// @route   GET /api/trash/claims
+// @access  Private/Admin
+exports.getTrashedClaims = asyncHandler(async (req, res) => {
+  const claims = await Claim.find({ isDeleted: true })
+    .populate('user', 'fullName email name')
+    .populate('item')
+    .sort({ deletedAt: -1 })
+    .lean();
+
+  return sendSuccess(res, 'Trashed claims fetched successfully', claims);
+});
+

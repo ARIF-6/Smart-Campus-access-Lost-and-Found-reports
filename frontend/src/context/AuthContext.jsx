@@ -34,7 +34,13 @@ export const AuthProvider = ({ children }) => {
     setUser(userData);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      const { logoutUser } = await import('../services/api');
+      await logoutUser();
+    } catch (e) {
+      console.error('Failed to log logout action on server:', e);
+    }
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);

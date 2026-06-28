@@ -17,10 +17,16 @@ const accessLogSchema = new mongoose.Schema({
     enum: ["IN", "OUT"],
     default: "IN"
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
+  campus: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Campus',
+    default: null
+  },
+  scannedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
   }
-});
+}, { timestamps: true });
 
 module.exports = mongoose.model('AccessLog', accessLogSchema);

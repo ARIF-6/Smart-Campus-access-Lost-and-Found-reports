@@ -1,0 +1,139 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
+import '../services/api_service.dart';
+import '../core/constants.dart';
+import 'package:dio/dio.dart';
+import '../services/socket_service.dart';
+
+class AuthProvider extends ChangeNotifier {
+  final ApiService _apiService = ApiService();
+  final SocketService _socketService = SocketService();
+  String? _token;
+  Map<String, dynamic>? _user;
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
+  String? _errorMessage;
+
+  bool get isAuthenticated => _token != null && !JwtDecoder.isExpired(_token!);
+  String? get role => _user?['role'];
+  Map<String, dynamic>? get user => _user;
+    String? get classId {
+    if (_user == null) return null;
+    // Direct classId field
+    if (_user!['classId'] != null) {
+      return _user!['classId'].toString();
+    }
+    // Nested class object
+    if (_user!['class'] is Map) {
+      final classMap = _user!['class'] as Map<String, dynamic>;
+      if (classMap['id'] != null) {
+        return classMap['id'].toString();
+      }
+    }
+    return null;
+  }
+  String? get errorMessage => _errorMessage;
+
+  Future<void> checkAuthStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    _token = prefs.getString(AppConstants.tokenKey);
+    final userData = prefs.getString(AppConstants.userKey);
+    if (userData != null) {
+      _user = jsonDecode(userData);
+      if (_token != null) {
+        _socketService.connect(_token!);
+      }
+    }
+    notifyListeners();
+  }
+
+  Future<bool> login(String email, String password) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      final response = await _apiService.post('/auth/login', data: {
+        'email': email,
+        'password': password,
+      });
+
+      if (response.statusCode == 200) {
+        if (response.data['token'] == null || response.data['user'] == null) {
+           throw Exception('Invalid server response: Missing token or user data');
+        }
+        _token = response.data['token'];
+        _user = response.data['user'];
+        
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(AppConstants.tokenKey, _token!);
+        await prefs.setString(AppConstants.userKey, jsonEncode(_user));
+        
+        // Connect Socket
+        _socketService.connect(_token!);
+
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      // ... existing error handling ...
+      if (e is DioException) {
+        if (e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.sendTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.connectionError) {
+          _errorMessage = 'Cannot reach server. Check your connection.';
+        } else if (e.response != null && e.response!.data is Map) {
+          _errorMessage = e.response!.data['message'] ?? 'Login failed';
+        } else {
+          _errorMessage = 'Login failed. Please try again.';
+        }
+      } else {
+        _errorMessage = 'An unexpected error occurred';
+      }
+    }
+    _isLoading = false;
+    notifyListeners();
+    return false;
+  }
+
+  Future<void> logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(AppConstants.tokenKey);
+    await prefs.remove(AppConstants.userKey);
+    
+    // Disconnect Socket
+    _socketService.disconnect();
+
+    _token = null;
+    _user = null;
+    notifyListeners();
+  }
+
+  Future<void> updateUserLocally(Map<String, dynamic> updatedUserData) async {
+    // Merge or replace user data
+    if (_user != null) {
+      _user = {..._user!, ...updatedUserData};
+    } else {
+      _user = updatedUserData;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(AppConstants.userKey, jsonEncode(_user));
+
+    // Use addPostFrameCallback to safely notify listeners after the current
+    // frame completes. This prevents the "Trying to render a disposed
+    // EngineFlutterView" crash on Flutter Web when the provider notifies
+    // during widget disposal.
+    if (SchedulerBinding.instance.schedulerPhase != SchedulerPhase.idle) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
+    } else {
+      notifyListeners();
+    }
+  }
+}

@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { getAuditLogs } = require('../controllers/auditController');
 const { protect } = require('../middleware/authMiddleware');
-const { adminOnly } = require('../middleware/roleMiddleware');
 
-router.get('/', protect, adminOnly, getAuditLogs);
+// All authenticated users can access their own audit logs
+// Admin can see all logs
+router.get('/', protect, getAuditLogs);
 
 module.exports = router;
 

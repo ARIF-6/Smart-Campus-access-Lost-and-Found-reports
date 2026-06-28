@@ -4,13 +4,16 @@ const router = express.Router();
 const {
   reportLostItem,
   getAllLostItems,
+  getMyLostItems,
   getLostItemById,
   updateLostItem,
-  deleteLostItem
+  deleteLostItem,
+  restoreLostItem,
+  permanentDeleteLostItem
 } = require('../controllers/lostItemController');
 
 const { protect } = require('../middleware/authMiddleware');
-const { authorizeRoles, adminOnly } = require('../middleware/roleMiddleware');
+const { allowRoles, adminOnly } = require('../middleware/roleMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 
 const { body } = require('express-validator');
@@ -19,24 +22,26 @@ const { validate } = require('../middleware/validator');
 router.route('/')
   .post(
     protect, 
-    authorizeRoles('student', 'admin'), 
+    allowRoles('student', 'admin', 'staff'), 
     upload.single('image'),
     [
       body('title', 'Title is required').notEmpty().trim().escape(),
+      body('description', 'Description is required').notEmpty().trim().escape(),
       body('category', 'Category is required').notEmpty().trim().escape(),
       body('locationLost', 'Location is required').notEmpty().trim().escape(),
-      body('dateLost', 'Date lost is required').notEmpty().isISO8601(),
       validate
     ],
     reportLostItem
   )
   .get(protect, getAllLostItems);
 
+router.get('/my', protect, getMyLostItems);
+
 router.route('/:id')
   .get(protect, getLostItemById)
   .put(
     protect, 
-    authorizeRoles('student', 'admin'), 
+    allowRoles('student', 'admin', 'staff', 'security'), 
     [
       body('title', 'Title is required').optional().notEmpty().trim().escape(),
       body('category', 'Category is required').optional().notEmpty().trim().escape(),
@@ -45,6 +50,9 @@ router.route('/:id')
     ],
     updateLostItem
   )
-  .delete(protect, adminOnly, deleteLostItem);
+  .delete(protect, allowRoles('admin', 'staff', 'security'), deleteLostItem);
+
+router.patch('/:id/restore', protect, adminOnly, restoreLostItem);
+router.delete('/:id/permanent', protect, adminOnly, permanentDeleteLostItem);
 
 module.exports = router;

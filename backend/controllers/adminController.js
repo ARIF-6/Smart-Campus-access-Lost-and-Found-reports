@@ -10,7 +10,7 @@ exports.getDashboardStats = async (req, res) => {
     const totalUsers = await User.countDocuments();
     const totalStudents = await User.countDocuments({ role: 'student' });
     const totalSecurity = await User.countDocuments({ role: 'security' });
-    const totalCleaners = await User.countDocuments({ role: 'cleaner' });
+    const totalCleaners = await User.countDocuments({ role: 'clean' });
     const totalLostItems = await LostItem.countDocuments();
     const totalFoundItems = await FoundItem.countDocuments();
 

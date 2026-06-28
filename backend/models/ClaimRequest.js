@@ -23,6 +23,14 @@ const claimRequestSchema = new mongoose.Schema({
     type: String,
     default: ""
   },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  deletedAt: {
+    type: Date,
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now

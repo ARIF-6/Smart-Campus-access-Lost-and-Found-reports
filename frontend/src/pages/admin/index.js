@@ -1,0 +1,16 @@
+export { default as AdminDashboard } from './AdminDashboard';
+export { default as UserManagement } from './UserManagement';
+export { default as AdminClaims } from './AdminClaims';
+export { default as AdminMatches } from './AdminMatches';
+export { default as AdminAnnouncements } from './AdminAnnouncements';
+export { default as AuditLogs } from './AuditLogs';
+export { default as AccessLogs } from './AccessLogs';
+export { default as ReportsPage } from './ReportsPage';
+export { default as SystemReports } from './SystemReports';
+export { default as TrashPage } from './TrashPage';
+export { default as RoleManagement } from './RoleManagement';
+export { default as Visitors } from './Visitors';
+export { default as Incidents } from './Incidents';
+export { default as Blacklist } from './Blacklist';
+export { default as SecurityShifts } from './SecurityShifts';
+export { default as UniversityManagement } from './UniversityManagement';

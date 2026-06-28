@@ -27,8 +27,8 @@ const calculateScore = (lost, found) => {
   }
 
   // 3. Location Match - +20 points
-  const lostLoc = lost.locationLost.toLowerCase();
-  const foundLoc = found.locationFound.toLowerCase();
+  const lostLoc = lost.location?.toLowerCase() || '';
+  const foundLoc = found.location?.toLowerCase() || '';
   if (lostLoc === foundLoc) {
     score += 20;
   } else if (lostLoc.includes(foundLoc) || foundLoc.includes(lostLoc)) {
@@ -83,16 +83,16 @@ const findMatchesForLostItem = async (lostItemId) => {
       if (!existingMatch) {
         await Match.create({ lostItemId: lostItem._id, foundItemId: foundItem._id, matchScore: score });
         // Create notification for lost item owner
-        if (lostItem.reportedBy) {
+        if (lostItem.createdBy) {
           const notif = await Notification.create({
-            userId: lostItem.reportedBy,
+            userId: lostItem.createdBy,
             title: 'Match Found',
             message: `A possible match was found for your lost item: ${lostItem.title}`,
             type: 'MATCH',
             relatedItemId: lostItem._id
           });
           const io = require('../utils/socket').getIO();
-          if(io) io.to(lostItem.reportedBy.toString()).emit('notification', notif);
+          if(io) io.to(lostItem.createdBy.toString()).emit('notification', notif);
         }
       } else if (existingMatch.matchScore !== score) {
         existingMatch.matchScore = score;
@@ -124,16 +124,16 @@ const findMatchesForFoundItem = async (foundItemId) => {
       if (!existingMatch) {
         await Match.create({ lostItemId: lostItem._id, foundItemId: foundItem._id, matchScore: score });
         // Create notification for lost item owner
-        if (lostItem.reportedBy) {
+        if (lostItem.createdBy) {
           const notif = await Notification.create({
-            userId: lostItem.reportedBy,
+            userId: lostItem.createdBy,
             title: 'Match Found',
             message: `A possible match was found for your lost item: ${lostItem.title}`,
             type: 'MATCH',
             relatedItemId: lostItem._id
           });
           const io = require('../utils/socket').getIO();
-          if(io) io.to(lostItem.reportedBy.toString()).emit('notification', notif);
+          if(io) io.to(lostItem.createdBy.toString()).emit('notification', notif);
         }
       } else if (existingMatch.matchScore !== score) {
         existingMatch.matchScore = score;
@@ -164,16 +164,16 @@ const recalculateAllMatches = async () => {
         if (!existingMatch) {
           await Match.create({ lostItemId: lost._id, foundItemId: found._id, matchScore: score });
           // Create notification for lost item owner
-          if (lost.reportedBy) {
+          if (lost.createdBy) {
             const notif = await Notification.create({
-              userId: lost.reportedBy,
+              userId: lost.createdBy,
               title: 'Match Found',
               message: `A possible match was found for your lost item: ${lost.title}`,
               type: 'MATCH',
               relatedItemId: lost._id
             });
             const io = require('../utils/socket').getIO();
-            if(io) io.to(lost.reportedBy.toString()).emit('notification', notif);
+            if(io) io.to(lost.createdBy.toString()).emit('notification', notif);
           }
         } else if (existingMatch.matchScore !== score) {
           existingMatch.matchScore = score;

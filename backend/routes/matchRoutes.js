@@ -10,15 +10,15 @@ const {
 } = require('../controllers/matchController');
 
 const { protect } = require('../middleware/authMiddleware');
-const { adminOnly } = require('../middleware/roleMiddleware');
+const { adminOnly, allowRoles } = require('../middleware/roleMiddleware');
 
 router.use(protect);
 
-router.get('/', adminOnly, getAllMatches);
-router.post('/recalculate', adminOnly, triggerRecalculate);
+router.get('/', allowRoles('admin', 'staff', 'security'), getAllMatches);
+router.post('/recalculate', allowRoles('admin', 'staff', 'security'), triggerRecalculate);
 router.get('/lost/:lostItemId', getMatchesForLostItem);
 router.get('/found/:foundItemId', getMatchesForFoundItem);
-router.patch('/:id/status', adminOnly, updateMatchStatus);
-router.delete('/:id', adminOnly, deleteMatch);
+router.patch('/:id/status', allowRoles('admin', 'staff', 'security'), updateMatchStatus);
+router.delete('/:id', allowRoles('admin', 'staff', 'security'), deleteMatch);
 
 module.exports = router;

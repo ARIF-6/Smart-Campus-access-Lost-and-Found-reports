@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "prestart": "node scripts/clearPort.js",
     "start": "node server.js",
+    "predev": "node scripts/clearPort.js",
     "dev": "nodemon server.js"
   },
   "keywords": [],
@@ -16,18 +18,23 @@
     "cloudinary": "^1.41.3",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.3.2",
     "express-validator": "^7.3.2",
     "express-xss-sanitizer": "^2.0.2",
     "helmet": "^8.1.0",
     "hpp": "^0.2.3",
+    "json2csv": "^6.0.0-alpha.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.2.4",
     "multer": "^2.1.1",
     "multer-storage-cloudinary": "^4.0.0",
     "node": "^22.22.1",
-    "socket.io": "^4.8.3"
+    "node-cron": "^4.4.1",
+    "pdfkit": "^0.18.0",
+    "socket.io": "^4.8.3",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

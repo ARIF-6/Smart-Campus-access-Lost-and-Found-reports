@@ -13,13 +13,13 @@ const lostItemSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  locationLost: {
+  location: {
     type: String,
     required: true
   },
   dateLost: {
     type: Date,
-    required: true
+    default: Date.now
   },
   image: {
     type: String
@@ -27,18 +27,43 @@ const lostItemSchema = new mongoose.Schema({
   imageUrl: {
     type: String
   },
-  reportedBy: {
+  createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  linkedFoundItem: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'FoundItem',
+    default: null
+  },
   status: {
     type: String,
-    enum: ['lost', 'matched', 'returned'],
-    default: 'lost'
+    enum: ["pending","approved","rejected","claimed","returned"],
+    default: 'pending'
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  deletedAt: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: true
 });
+
+lostItemSchema.index({ title: 1 });
+lostItemSchema.index({ category: 1 });
+lostItemSchema.index({ status: 1 });
+lostItemSchema.index({ location: 1 });
+lostItemSchema.index({ createdBy: 1 });
+lostItemSchema.index({ isDeleted: 1 });
+lostItemSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('LostItem', lostItemSchema);

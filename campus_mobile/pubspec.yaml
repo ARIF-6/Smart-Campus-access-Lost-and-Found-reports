@@ -1,0 +1,47 @@
+name: campus_mobile
+description: "Smart Campus Mobile Application - Security Guard & Cleaner"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  # State management
+  provider: ^6.1.5
+  # Networking
+  dio: ^5.9.2
+  # Storage
+  shared_preferences: ^2.5.5
+  # Routing
+  go_router: ^17.2.0
+  # QR Scanner (for security guard)
+  mobile_scanner: ^7.2.0
+  # QR Display (for student)
+  qr_flutter: ^4.1.0
+  photo_view: ^0.15.0
+  # Date formatting
+  intl: ^0.20.2
+  # JWT decoding
+  jwt_decoder: ^2.0.1
+  # Animations
+  flutter_animate: ^4.5.2
+  # Fonts
+  google_fonts: ^8.0.2
+  # Image picking (for cleaner)
+  image_picker: ^1.1.2
+  http_parser: ^4.1.2
+  socket_io_client: ^3.1.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/

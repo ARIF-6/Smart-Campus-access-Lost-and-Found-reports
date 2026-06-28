@@ -1,52 +1,62 @@
 const mongoose = require('mongoose');
 
 const claimSchema = new mongoose.Schema({
-  itemId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'FoundItem',
-    required: true
-  },
-  claimedBy: {
+  user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  fullName: {
-    type: String,
+  item: {
+    type: mongoose.Schema.Types.ObjectId,
+    refPath: 'itemModel',
     required: true
   },
-  email: {
+  itemType: {
     type: String,
+    enum: ["lost", "found"],
     required: true
   },
-  phone: {
+  itemModel: {
     type: String,
-    required: true
+    enum: ["LostItem", "FoundItem"]
   },
-  proofDescription: {
+  message: {
     type: String,
     required: true
   },
   proofImage: {
     type: String,
-    default: ''
+    default: null
   },
   status: {
     type: String,
-    enum: ['pending', 'approved', 'rejected'],
-    default: 'pending'
+    enum: ["pending", "approved", "rejected"],
+    default: "pending"
   },
-  reviewedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    default: null
+  isDeleted: {
+    type: Boolean,
+    default: false
   },
-  reviewDate: {
+  deletedAt: {
     type: Date,
     default: null
   }
 }, {
   timestamps: true
+});
+
+claimSchema.index({ user: 1 });
+claimSchema.index({ item: 1 });
+claimSchema.index({ status: 1 });
+claimSchema.index({ isDeleted: 1 });
+claimSchema.index({ createdAt: -1 });
+
+claimSchema.pre('validate', function() {
+  if (this.itemType === 'lost') {
+    this.itemModel = 'LostItem';
+  } else if (this.itemType === 'found') {
+    this.itemModel = 'FoundItem';
+  }
 });
 
 module.exports = mongoose.model('Claim', claimSchema);

@@ -1,63 +1,98 @@
 const Notification = require('../models/Notification');
+const asyncHandler = require('../middleware/asyncHandler');
+const { sendSuccess } = require('../utils/responseHandler');
 
-// @desc    Get all notifications for user
-// @route   GET /api/notifications/user
+// @desc    Get user notifications
+// @route   GET /api/notifications
 // @access  Private
-exports.getUserNotifications = async (req, res) => {
-  try {
-    const notifications = await Notification.find({ userId: req.user.id })
-      .sort({ createdAt: -1 });
-    res.status(200).json(notifications);
-  } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
-  }
-};
+exports.getNotifications = asyncHandler(async (req, res) => {
+  const { role, id } = req.user;
 
-// @desc    Mark a notification as read
+  // Build query
+  // Show notifications for the specific user OR for the user's role (where userId is null)
+  const query = {
+    $or: [
+      { userId: id },
+      { userId: null, recipientRole: role },
+      { userId: null, recipientRole: 'all' }
+    ]
+  };
+
+  const notifications = await Notification.find(query)
+    .sort({ createdAt: -1 })
+    .limit(50)
+    .lean();
+
+  return sendSuccess(res, 'Notifications fetched successfully', notifications);
+});
+
+// @desc    Get unread notifications count
+// @route   GET /api/notifications/unread-count
+// @access  Private
+exports.getUnreadCount = asyncHandler(async (req, res) => {
+  const { role, id } = req.user;
+
+  const count = await Notification.countDocuments({
+    $or: [
+      { userId: id },
+      { userId: null, recipientRole: role },
+      { userId: null, recipientRole: 'all' }
+    ],
+    isRead: false
+  });
+
+  return sendSuccess(res, 'Unread count fetched successfully', { count });
+});
+
+// @desc    Mark notification as read
 // @route   PUT /api/notifications/:id/read
 // @access  Private
-exports.markAsRead = async (req, res) => {
-  try {
-    const notification = await Notification.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user.id },
-      { isRead: true },
-      { new: true }
-    );
-    if (!notification) {
-      return res.status(404).json({ message: 'Notification not found' });
-    }
-    res.status(200).json(notification);
-  } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
-  }
-};
+exports.markAsRead = asyncHandler(async (req, res) => {
+  const notification = await Notification.findById(req.params.id);
 
-// @desc    Mark all user notifications as read
+  if (!notification) {
+    return res.status(404).json({ success: false, message: 'Notification not found' });
+  }
+
+  notification.isRead = true;
+  await notification.save();
+
+  return sendSuccess(res, 'Notification marked as read');
+});
+
+// @desc    Mark all notifications as read
 // @route   PUT /api/notifications/read-all
 // @access  Private
-exports.markAllAsRead = async (req, res) => {
-  try {
-    await Notification.updateMany(
-      { userId: req.user.id, isRead: false },
-      { $set: { isRead: true } }
-    );
-    res.status(200).json({ message: 'All notifications marked as read' });
-  } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
-  }
-};
+exports.markAllRead = asyncHandler(async (req, res) => {
+  const { role, id } = req.user;
 
-// @desc    Delete a notification
-// @route   DELETE /api/notifications/:id
-// @access  Private
-exports.deleteNotification = async (req, res) => {
+  await Notification.updateMany(
+    {
+      $or: [
+        { userId: id },
+        { userId: null, recipientRole: role }
+      ],
+      isRead: false
+    },
+    { isRead: true }
+  );
+
+  return sendSuccess(res, 'All notifications marked as read');
+});
+
+const { emitNotification } = require('../socket/events/notificationEvents');
+
+// Helper function to create notifications (internal use)
+exports.createNotification = async (data) => {
   try {
-    const notification = await Notification.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
-    if (!notification) {
-      return res.status(404).json({ message: 'Notification not found' });
-    }
-    res.status(200).json({ message: 'Notification deleted' });
+    const notification = await Notification.create(data);
+    
+    // Emit real-time socket event
+    emitNotification(notification);
+    
+    return notification;
   } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
+    console.error('Notification creation error:', error);
+    return null;
   }
 };

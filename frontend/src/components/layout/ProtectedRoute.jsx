@@ -1,0 +1,23 @@
+import React from 'react';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+
+const ProtectedRoute = ({ children, allowedRoles }) => {
+  const { user, token, loading } = useAuth();
+
+  if (loading) return null; // Or a spinner
+
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(user?.role)) {
+    // If token exists but user object is not yet loaded, wait (avoid premature redirect)
+    if (token && !user) return null; 
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  return children;
+};
+
+export default ProtectedRoute;

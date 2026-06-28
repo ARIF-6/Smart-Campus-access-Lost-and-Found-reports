@@ -2,18 +2,18 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
-  name: {
+  fullName: {
     type: String,
-    required: [true, 'Please add a name']
+    required: [true, 'Please add a full name']
   },
-  email: {
+  name: {
+    type: String
+  },
+  username: {
     type: String,
-    required: [true, 'Please add an email'],
     unique: true,
-    match: [
-      /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
-      'Please add a valid email'
-    ]
+    sparse: true,
+    trim: true
   },
   password: {
     type: String,
@@ -23,17 +23,122 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'student', 'security', 'cleaner'],
-    default: 'student'
+    default: "student"
+  },
+  phone: {
+    type: String
+  },
+  address: {
+    type: String
+  },
+  plainPassword: {
+    type: String
+  },
+  studentId: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true
+  },
+  parentNumber: {
+    type: String,
+    trim: true
+  },
+  qrCode: {
+    type: String,
+    unique: true,
+    sparse: true // Allows multiple null/undefined values
+  },
+  photoUrl: {
+    type: String,
+    default: ''
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  deletedAt: {
+    type: Date,
+    default: null
+  },
+  faculty: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Faculty',
+    default: null,
+    set: v => v === '' ? null : v
+  },
+  department: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Department',
+    default: null,
+    set: v => v === '' ? null : v
+  },
+  class: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Class',
+    default: null,
+    set: v => v === '' ? null : v
+  },
+  isClassLeader: {
+    type: Boolean,
+    default: false
+  },
+  campus: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Campus',
+    default: null,
+    set: v => v === '' ? null : v
+  },
+  assignedShift: {
+    type: String,
+    enum: ['morning', 'afternoon', 'none'],
+    default: 'none'
+  },
+  shiftStartTime: {
+    type: String,
+    default: ''
+  },
+  shiftEndTime: {
+    type: String,
+    default: ''
+  },
+  academicYear: {
+    type: String,
+    default: '25/26'
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+    set: v => v === '' ? null : v
   }
 }, {
   timestamps: true
 });
 
+// Added for performance
+userSchema.index({ fullName: 1 });
+userSchema.index({ role: 1 });
+userSchema.index({ isActive: 1 });
+userSchema.index({ faculty: 1 });
+userSchema.index({ department: 1 });
+userSchema.index({ campus: 1 });
+
+// Compatibility hook for legacy documents
+userSchema.pre('validate', function () {
+  if (!this.fullName && this.name) {
+    this.fullName = this.name;
+  }
+});
+
 // Hash password before saving
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function () {
   if (!this.isModified('password')) {
-    next();
+    return;
   }
 
   const salt = await bcrypt.genSalt(10);
@@ -41,7 +146,7 @@ userSchema.pre('save', async function(next) {
 });
 
 // Match user entered password to hashed password in database
-userSchema.methods.matchPassword = async function(enteredPassword) {
+userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 

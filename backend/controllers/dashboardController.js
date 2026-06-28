@@ -139,9 +139,9 @@ exports.getRecentActivity = async (req, res) => {
     const recentNots = await Notification.find().sort({ createdAt: -1 }).limit(10).populate('userId', 'name');
     
     // Also fetch latest items directly to supplement
-    const latestLost = await LostItem.find().sort({ createdAt: -1 }).limit(5).populate('reportedBy', 'name');
-    const latestFound = await FoundItem.find().sort({ createdAt: -1 }).limit(5).populate('reportedBy', 'name');
-    const latestClaims = await Claim.find().sort({ createdAt: -1 }).limit(5).populate('claimedBy', 'name');
+    const latestLost = await LostItem.find().sort({ createdAt: -1 }).limit(5).populate('createdBy', 'name fullName');
+    const latestFound = await FoundItem.find().sort({ createdAt: -1 }).limit(5).populate('createdBy', 'name fullName');
+    const latestClaims = await Claim.find().sort({ createdAt: -1 }).limit(5).populate('user', 'name fullName');
 
     const activityPool = [];
 
@@ -149,7 +149,7 @@ exports.getRecentActivity = async (req, res) => {
     latestLost.forEach(i => {
       activityPool.push({
         type: 'lost',
-        message: `${i.reportedBy?.name || 'A user'} reported a lost item: ${i.title}`,
+        message: `${i.createdBy?.fullName || i.createdBy?.name || 'A user'} reported a lost item: ${i.title}`,
         createdAt: i.createdAt
       });
     });
@@ -158,7 +158,7 @@ exports.getRecentActivity = async (req, res) => {
     latestFound.forEach(i => {
       activityPool.push({
         type: 'found',
-        message: `${i.reportedBy?.name || 'A user'} reported a found item: ${i.title}`,
+        message: `${i.createdBy?.fullName || i.createdBy?.name || 'A user'} reported a found item: ${i.title}`,
         createdAt: i.createdAt
       });
     });
@@ -167,7 +167,7 @@ exports.getRecentActivity = async (req, res) => {
     latestClaims.forEach(i => {
       activityPool.push({
         type: 'claim',
-        message: `${i.claimedBy?.name || 'A user'} submitted a claim request`,
+        message: `${i.user?.fullName || i.user?.name || 'A user'} submitted a claim request`,
         createdAt: i.createdAt
       });
     });
@@ -192,6 +192,14 @@ exports.getRecentActivity = async (req, res) => {
     });
 
     res.json(formattedActivity);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+exports.getSystemStatus = async (req, res) => {
+  try {
+    // Simple health check; could be expanded with DB checks, etc.
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
   } catch (error) {
     res.status(500).json({ message: 'Server Error' });
   }

@@ -9,10 +9,10 @@ const {
 } = require('../controllers/adminController');
 
 const { protect } = require('../middleware/authMiddleware');
-const { adminOnly } = require('../middleware/roleMiddleware');
+const { adminOrStaff } = require('../middleware/roleMiddleware');
 
-/* Route protection: authMiddleware (protect) -> roleMiddleware (adminOnly) */
-router.use(protect, adminOnly);
+/* Route protection: authMiddleware (protect) -> roleMiddleware (adminOrStaff) */
+router.use(protect, adminOrStaff);
 
 router.get('/stats', getDashboardStats);
 router.get('/recent-users', getRecentUsers);

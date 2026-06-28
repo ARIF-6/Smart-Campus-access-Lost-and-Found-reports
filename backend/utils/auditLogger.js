@@ -12,7 +12,7 @@ const AuditLog = require('../models/AuditLog');
  */
 const logAction = async ({ userId, action, targetId, targetType, details, req }) => {
   try {
-    const ipAddress = req ? (req.headers['x-forwarded-for'] || req.socket.remoteAddress) : null;
+    const ipAddress = req ? req.ip : null;
     
     const newLog = new AuditLog({
       userId,
