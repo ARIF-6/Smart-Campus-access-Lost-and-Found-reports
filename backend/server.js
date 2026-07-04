@@ -8,6 +8,14 @@ const rateLimit = require("express-rate-limit");
 const http = require('http');
 require("dotenv").config();
 
+// Fix SRV DNS resolution issues on some local routers/DNS servers
+try {
+  const dns = require('dns');
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch (e) {
+  console.warn('Failed to configure custom DNS servers:', e.message);
+}
+
 const connectDB = require("./config/db");
 const createAdmin = require("./utils/createAdmin");
 const { initSocket } = require('./socket');

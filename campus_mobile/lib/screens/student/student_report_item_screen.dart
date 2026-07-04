@@ -29,6 +29,7 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
   final ImagePicker _picker = ImagePicker();
 
   List<String> _categories = [];
+  bool _showCustomTitleField = false;
 
   @override
   void initState() {
@@ -43,20 +44,25 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
     try {
       final response = await _apiService.get('/categories/lost-found');
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data;
+        final List<dynamic> data = response.data is List
+            ? response.data
+            : (response.data['data'] ?? []);
         final List<String> fetched = data.map((item) => item['name'] as String).toList();
-        
+
         setState(() {
           _categories = fetched;
+          // Ensure 'Other' exists in categories list
+          final hasOther = _categories.any((c) => c.toLowerCase() == 'other' || c.toLowerCase() == 'others');
+          if (!hasOther) {
+            _categories.add('Other');
+          }
           if (_categories.isNotEmpty) {
             _selectedCategory = _categories.first;
+            _showCustomTitleField = _selectedCategory!.toLowerCase() == 'other' || _selectedCategory!.toLowerCase() == 'others';
           }
         });
-      } else {
-        // Categories failed to load — silently do nothing
       }
     } catch (e) {
-
       debugPrint('Error loading categories: $e');
     }
   }
@@ -86,6 +92,18 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Image is required
+    if (_imageFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please attach a photo of the item'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       MultipartFile? imageFile;
@@ -109,7 +127,7 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
       final endpoint = isLost ? '/lost-items' : '/found-items';
       
       final Map<String, dynamic> data = {
-        'title': _titleController.text.trim(),
+        'title': _showCustomTitleField ? _titleController.text.trim() : (_selectedCategory ?? 'Item'),
         'description': _descController.text.trim(),
         'category': _selectedCategory?.toLowerCase() ?? '',
       };
@@ -220,15 +238,17 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
                     const SizedBox(height: 24),
                     _buildSectionTitle('Item Information'),
                     _buildFormCard([
-                      _buildTextField(
-                        controller: _titleController,
-                        label: 'Item Title',
-                        hint: 'e.g. Blue Backpack, iPhone 13',
-                        icon: Icons.label_important_rounded,
-                        themeColor: themeColor,
-                      ),
-                      const SizedBox(height: 16),
                       _buildDropdownField(themeColor),
+                      if (_showCustomTitleField) ...[
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _titleController,
+                          label: 'Item Title',
+                          hint: 'e.g. Blue Backpack, iPhone 13',
+                          icon: Icons.label_important_rounded,
+                          themeColor: themeColor,
+                        ),
+                      ],
                     ]),
 
                     const SizedBox(height: 24),
@@ -365,17 +385,18 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
   }
 
   Widget _buildPhotoBox(Color accentColor) {
+    final bool isEmpty = _imageFile == null;
     return GestureDetector(
       onTap: _pickImage,
       child: Container(
         width: double.infinity,
         height: 160,
         decoration: BoxDecoration(
-          color: _imageFile != null ? Colors.white : accentColor.withValues(alpha: 0.04),
+          color: isEmpty ? Colors.red.shade50 : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: _imageFile != null ? accentColor.withValues(alpha: 0.2) : Colors.grey.shade200,
-            width: 1.5,
+            color: isEmpty ? Colors.red.shade300 : accentColor.withValues(alpha: 0.2),
+            width: isEmpty ? 2.0 : 1.5,
           ),
         ),
         child: _imageFile != null
@@ -408,20 +429,20 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: accentColor.withValues(alpha: 0.1),
+                      color: Colors.red.shade100,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.add_a_photo_rounded, color: accentColor, size: 32),
+                    child: Icon(Icons.add_a_photo_rounded, color: Colors.red.shade400, size: 32),
                   ),
                   const SizedBox(height: 12),
                   const Text(
-                    'Attach a Photo',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                    'Attach a Photo (Required)',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.red),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Clear photos help identify faster',
-                    style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                    'A photo is mandatory to submit a report',
+                    style: TextStyle(color: Colors.red.shade300, fontSize: 12),
                   ),
                 ],
               ),
@@ -494,7 +515,12 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
         DropdownButtonFormField<String>(
           value: _selectedCategory,
           items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-          onChanged: (val) => setState(() => _selectedCategory = val),
+          onChanged: (val) {
+            setState(() {
+              _selectedCategory = val;
+              _showCustomTitleField = val != null && (val.toLowerCase() == 'other' || val.toLowerCase() == 'others');
+            });
+          },
           decoration: InputDecoration(
             prefixIcon: Icon(Icons.grid_view_rounded, size: 20, color: themeColor),
             filled: true,

@@ -220,7 +220,14 @@ exports.createUser = async (req, res) => {
         return sendError(res, `Academic year '${academicYear}' is invalid. It must span exactly one year (e.g. 24/25 or 2024/2025).`, 400);
       }
       userData.studentId = studentId;
-      userData.parentNumber = parentNumber;
+      // Parse parentNumber as integer and validate minimum 9 digits
+      if (parentNumber !== undefined && parentNumber !== '') {
+        const parentNumInt = parseInt(parentNumber, 10);
+        if (isNaN(parentNumInt) || parentNumInt < 100000000) {
+          return sendError(res, 'Parent number must be a valid number with at least 9 digits', 400);
+        }
+        userData.parentNumber = parentNumInt;
+      }
       userData.qrCode = generatedQrCode;
       userData.faculty = faculty || null;
       userData.department = department || null;
@@ -307,7 +314,17 @@ exports.updateUser = async (req, res) => {
 
     if (userRole === 'student') {
       if (studentId !== undefined) user.studentId = studentId ? studentId.trim() : user.studentId;
-      if (parentNumber !== undefined) user.parentNumber = parentNumber;
+      if (parentNumber !== undefined) {
+        if (parentNumber === '' || parentNumber === null) {
+          user.parentNumber = undefined;
+        } else {
+          const parentNumInt = parseInt(parentNumber, 10);
+          if (isNaN(parentNumInt) || parentNumInt < 100000000) {
+            return sendError(res, 'Parent number must be a valid number with at least 9 digits', 400);
+          }
+          user.parentNumber = parentNumInt;
+        }
+      }
       if (qrCode) user.qrCode = qrCode;
       user.faculty = faculty !== undefined ? (faculty || null) : user.faculty;
       user.department = department !== undefined ? (department || null) : user.department;
@@ -558,7 +575,7 @@ exports.uploadExcelStudents = async (req, res) => {
         ? rawPassword
         : String(Math.floor(100000 + Math.random() * 900000));
       const studentId = normalizedRow['studentid'] || normalizedRow['id'] || '';
-      const parentNumber = normalizedRow['parentnumber'] || normalizedRow['parent'] || '';
+      const rawParentNumber = normalizedRow['parentnumber'] || normalizedRow['parent'] || '';
       const academicYear = normalizedRow['academicyear'] || normalizedRow['year'] || '';
       const facultyName = normalizedRow['faculty'] || normalizedRow['facultyname'] || '';
       const departmentName = normalizedRow['department'] || normalizedRow['departmentname'] || '';
@@ -573,6 +590,17 @@ exports.uploadExcelStudents = async (req, res) => {
       if (academicYear && !isValidAcademicYear(academicYear)) {
         errors.push(`Row ${rowNum}: Academic year '${academicYear}' is invalid. Use format YY/YY or YYYY/YYYY (e.g. 24/25 or 2024/2025) spanning exactly one year`);
         continue;
+      }
+
+      // ── Validate and parse parentNumber ─────────────────────────────────
+      let parentNumberInt = undefined;
+      if (rawParentNumber) {
+        const parsed = parseInt(rawParentNumber, 10);
+        if (isNaN(parsed) || parsed < 100000000) {
+          errors.push(`Row ${rowNum}: Parent number '${rawParentNumber}' is invalid — must be a number with at least 9 digits`);
+          continue;
+        }
+        parentNumberInt = parsed;
       }
 
       // Resolve faculty
@@ -645,7 +673,7 @@ exports.uploadExcelStudents = async (req, res) => {
         const newStudent = await User.create({
           fullName,
           studentId: studentId || undefined,
-          parentNumber: parentNumber || undefined,
+          parentNumber: parentNumberInt,
           role: 'student',
           password,
           plainPassword: password,

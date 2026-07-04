@@ -136,7 +136,7 @@ const CampusEnvironmentPage = () => {
     pending:   complaints.filter(c => c.status === 'pending').length,
     in_review: complaints.filter(c => c.status === 'in_review').length,
     resolved:  complaints.filter(c => c.status === 'resolved').length,
-    completed: complaints.filter(c => c.status === 'completed').length,
+    // completed: complaints.filter(c => c.status === 'completed').length,
   };
 
   const filters = [
@@ -144,7 +144,7 @@ const CampusEnvironmentPage = () => {
     { key: 'pending',   label: 'Pending',   count: counts.pending },
     { key: 'in_review', label: 'In Review', count: counts.in_review },
     { key: 'resolved',  label: 'Resolved',  count: counts.resolved },
-    { key: 'completed', label: 'Completed', count: counts.completed },
+    // { key: 'completed', label: 'Completed', count: counts.completed },
   ];
 
   return (
@@ -204,7 +204,7 @@ const CampusEnvironmentPage = () => {
                 <tr className="border-b border-gray-200 bg-gray-50">
                   <th className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">STUDENT ID</th>
                   <th className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">STUDENT NAME</th>
-                  <th className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">LOCATION</th>
+                  <th className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">CLASS</th>
                   <th className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">ISSUE NAME</th>
                   <th className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">ACTION</th>
                 </tr>
@@ -236,7 +236,7 @@ const CampusEnvironmentPage = () => {
                         {item.student?.fullName || 'Unknown'}
                       </td>
                       <td className="px-5 py-3 text-gray-600">
-                        {item.location || item.faculty || item.department || '—'}
+                        {item.student?.class?.name || '—'}
                       </td>
                       <td className="px-5 py-3 text-gray-700">
                         {item.title || item.issueType?.issueName || item.category?.name || '—'}
@@ -252,7 +252,7 @@ const CampusEnvironmentPage = () => {
                             <option value="pending">Pending</option>
                             <option value="in_review">In Review</option>
                             <option value="resolved">Resolved</option>
-                            <option value="completed">Completed</option>
+                            
                             <option value="rejected">Rejected</option>
                           </select>
                           <button

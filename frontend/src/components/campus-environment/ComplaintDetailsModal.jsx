@@ -150,8 +150,8 @@ const ComplaintDetailsModal = ({ complaintId, staffUsers, onClose, onUpdate }) =
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Location</span>
-                        <p className="text-sm font-medium text-slate-800">{complaint.location}</p>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Class</span>
+                        <p className="text-sm font-medium text-slate-800">{complaint.reporter?.className || '—'}</p>
                       </div>
                       <div>
                         <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Status</span>

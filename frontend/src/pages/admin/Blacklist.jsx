@@ -142,15 +142,15 @@ const Blacklist = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full table-fixed">
               <thead className="bg-gray-50/50 border-b border-gray-100">
                 <tr>
-                  <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Subject</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Student ID</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Reason</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Added By</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Action</th>
+                  <th className="px-6 py-5 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-[22%]">Subject</th>
+                  <th className="px-6 py-5 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-[15%]">Student ID</th>
+                  <th className="px-6 py-5 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-[22%]">Reason</th>
+                  <th className="px-6 py-5 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-[18%]">Added By</th>
+                  <th className="px-6 py-5 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-[13%]">Status</th>
+                  <th className="px-6 py-5 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest w-[10%]">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -158,24 +158,24 @@ const Blacklist = () => {
                   <tr key={item._id} className="hover:bg-gray-50 transition-colors group">
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs bg-red-100 text-red-700 border border-red-200">
+                        <div className="w-8 h-8 flex-shrink-0 rounded-lg flex items-center justify-center font-bold text-xs bg-red-100 text-red-700 border border-red-200">
                           {item.name.charAt(0)}
                         </div>
-                        <span className="text-sm font-bold text-gray-800">{item.name}</span>
+                        <span className="text-sm font-bold text-gray-800 truncate">{item.name}</span>
                       </div>
                     </td>
                     <td className="px-6 py-5 text-sm font-medium text-gray-500 font-mono">{item.studentId || 'N/A'}</td>
                     <td className="px-6 py-5">
-                      <p className="text-xs text-gray-600 font-medium max-w-xs truncate" title={item.reason}>{item.reason}</p>
+                      <p className="text-xs text-gray-600 font-medium truncate" title={item.reason}>{item.reason}</p>
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex flex-col">
-                        <span className="text-xs font-bold text-gray-700">{item.addedBy?.fullName || 'System'}</span>
+                        <span className="text-xs font-bold text-gray-700 truncate">{item.addedBy?.fullName || 'System'}</span>
                         <span className="text-[10px] text-gray-400">{new Date(item.createdAt).toLocaleDateString()}</span>
                       </div>
                     </td>
                     <td className="px-6 py-5">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                      <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
                         item.status === 'approved' ? 'bg-green-50 text-green-700 border-green-200' :
                         item.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
                         'bg-yellow-50 text-yellow-750 border-yellow-200'

@@ -37,7 +37,7 @@ const createAdmin = async () => {
         const existingAdmin = await User.findOne({ username: adminUsername });
 
         if (existingAdmin) {
-            existingAdmin.fullName = 'System Administrator';
+            existingAdmin.fullName = 'Mohamed Dhuh';
             existingAdmin.username = adminUsername;
             existingAdmin.password = '123456';
             existingAdmin.plainPassword = '123456';
@@ -50,7 +50,7 @@ const createAdmin = async () => {
             console.log('Admin account Caarif updated successfully with password 123456.');
         } else {
             await User.create({
-                fullName: 'System Administrator',
+                fullName: 'Mohamed Dhuh',
                 username: adminUsername,
                 password: '123456',
                 plainPassword: '123456',

@@ -11,6 +11,7 @@ class FoundItem {
   final DateTime dateFound;
   final String foundBy;
   final bool isClaimedByUser;
+  final bool isRejectedByUser;
 
   FoundItem({
     required this.id,
@@ -23,6 +24,7 @@ class FoundItem {
     required this.dateFound,
     required this.foundBy,
     this.isClaimedByUser = false,
+    this.isRejectedByUser = false,
   });
 
   String get fullImageUrl => AppConstants.getImageUrl(imageUrl);
@@ -52,6 +54,7 @@ class FoundItem {
               ? json['createdBy']['_id'] ?? json['createdBy']['id'] 
               : json['foundBy'] ?? json['createdBy'] ?? '').toString(),
       isClaimedByUser: json['isClaimedByUser'] == true,
+      isRejectedByUser: json['isRejectedByUser'] == true,
     );
   }
 
@@ -67,6 +70,7 @@ class FoundItem {
       'dateFound': dateFound.toIso8601String(),
       'foundBy': foundBy,
       'isClaimedByUser': isClaimedByUser,
+      'isRejectedByUser': isRejectedByUser,
     };
   }
 }

@@ -193,7 +193,11 @@ exports.getAllComplaints = asyncHandler(async (req, res) => {
   }
 
   const complaints = await CampusEnvironmentComplaint.find(query)
-    .populate('student', 'fullName email studentId photoUrl')
+    .populate({
+      path: 'student',
+      select: 'fullName email studentId photoUrl class',
+      populate: { path: 'class', select: 'name' }
+    })
     .populate('issueType')
     .populate('assignedTo', 'fullName')
     .sort({ [sortBy]: order === 'desc' ? -1 : 1 })
@@ -512,6 +516,11 @@ exports.getStats = asyncHandler(async (req, res) => {
   // Get highest supported complaints
   formattedStats.hotComplaints = await CampusEnvironmentComplaint.find()
     .populate('issueType')
+    .populate({
+      path: 'student',
+      select: 'fullName class',
+      populate: { path: 'class', select: 'name' }
+    })
     .sort({ supportCount: -1 })
     .limit(5)
     .lean();

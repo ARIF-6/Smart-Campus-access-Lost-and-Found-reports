@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { updateLostItem } from '../../services/api';
+import { fetchLostFoundCategories } from '../../services/categoryService';
 import toast from 'react-hot-toast';
 
 const EditLostItemModal = ({ isOpen, onClose, onSuccess, item }) => {
@@ -13,6 +14,7 @@ const EditLostItemModal = ({ isOpen, onClose, onSuccess, item }) => {
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [categories, setCategories] = useState([]);
   const modalRef = useRef(null);
 
   // Pre-populate data when item changes
@@ -21,13 +23,18 @@ const EditLostItemModal = ({ isOpen, onClose, onSuccess, item }) => {
       setFormData({
         title: item.title || '',
         description: item.description || '',
-        category: item.category || 'electronics',
+        category: item.category || '',
         locationLost: item.locationLost || item.location || '',
         dateLost: item.dateLost ? new Date(item.dateLost).toISOString().split('T')[0] : '',
         status: item.status || 'pending'
       });
     }
   }, [item]);
+
+  // Fetch dynamic categories on mount
+  useEffect(() => {
+    fetchLostFoundCategories().then(cats => setCategories(cats));
+  }, []);
 
   // Close on Escape key
   useEffect(() => {
@@ -124,17 +131,22 @@ const EditLostItemModal = ({ isOpen, onClose, onSuccess, item }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Category</label>
-                <select 
-                  name="category"
-                  value={formData.category}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white transition-all appearance-none cursor-pointer"
-                >
-                  <option value="electronics">Electronics</option>
-                  <option value="clothing">Clothing</option>
-                  <option value="documents">Documents</option>
-                  <option value="others">Other</option>
-                </select>
+                {categories.length === 0 ? (
+                  <div className="w-full px-4 py-2.5 border border-amber-200 bg-amber-50 rounded-xl text-sm text-amber-700 font-medium">
+                    No categories available. Please create a category first.
+                  </div>
+                ) : (
+                  <select 
+                    name="category"
+                    value={formData.category}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white transition-all appearance-none cursor-pointer"
+                  >
+                    {categories.map(cat => (
+                      <option key={cat._id} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Date Lost</label>

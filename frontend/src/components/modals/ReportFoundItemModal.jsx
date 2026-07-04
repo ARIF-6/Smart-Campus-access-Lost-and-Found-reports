@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { reportFoundItem } from '../../services/api';
+import { fetchLostFoundCategories } from '../../services/categoryService';
 import toast from 'react-hot-toast';
 
 const ReportFoundItemModal = ({ isOpen, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    category: 'electronics',
+    category: '',
     locationFound: '',
     dateFound: '',
     storageLocation: '',
@@ -17,8 +18,24 @@ const ReportFoundItemModal = ({ isOpen, onClose, onSuccess }) => {
   const [imagePreview, setImagePreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
   const fileInputRef = useRef(null);
   const modalRef = useRef(null);
+
+  // Load dynamic categories when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setCategoriesLoading(true);
+      fetchLostFoundCategories().then(cats => {
+        setCategories(cats);
+        if (cats.length > 0) {
+          setFormData(prev => ({ ...prev, category: cats[0].name }));
+        }
+        setCategoriesLoading(false);
+      });
+    }
+  }, [isOpen]);
 
   // Close on Escape key
   useEffect(() => {
@@ -149,17 +166,24 @@ const ReportFoundItemModal = ({ isOpen, onClose, onSuccess }) => {
               {/* Category */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Category</label>
-                <select 
-                  name="category"
-                  value={formData.category}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500 bg-white transition-all appearance-none cursor-pointer"
-                >
-                  <option value="electronics">Electronics</option>
-                  <option value="clothing">Clothing</option>
-                  <option value="documents">Documents</option>
-                  <option value="others">Other</option>
-                </select>
+                {categoriesLoading ? (
+                  <div className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-400">Loading categories...</div>
+                ) : categories.length === 0 ? (
+                  <div className="w-full px-4 py-2.5 border border-amber-200 bg-amber-50 rounded-xl text-sm text-amber-700 font-medium">
+                    No categories available. Please create a category first.
+                  </div>
+                ) : (
+                  <select 
+                    name="category"
+                    value={formData.category}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500 bg-white transition-all appearance-none cursor-pointer"
+                  >
+                    {categories.map(cat => (
+                      <option key={cat._id} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
@@ -192,49 +216,7 @@ const ReportFoundItemModal = ({ isOpen, onClose, onSuccess }) => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Storage Location */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Storage Location (Room/Shelf)</label>
-                <input 
-                  type="text"
-                  name="storageLocation"
-                  value={formData.storageLocation}
-                  onChange={handleChange}
-                  placeholder="e.g. Storage Room A, Shelf 2"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500 bg-white transition-all"
-                />
-              </div>
 
-              {/* Priority */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Priority / Importance</label>
-                <select 
-                  name="priority"
-                  value={formData.priority}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500 bg-white transition-all appearance-none cursor-pointer"
-                >
-                  <option value="low">Low Priority</option>
-                  <option value="medium">Medium Priority</option>
-                  <option value="high">High Priority (Valuable)</option>
-                  <option value="urgent">Urgent / Time Sensitive</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Admin Notes */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Admin Notes / Internal Comments</label>
-              <textarea 
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                rows="2"
-                placeholder="Internal notes about the item condition, owner clues, etc."
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500 bg-white transition-all resize-none"
-              ></textarea>
-            </div>
 
             {/* Description */}
             <div>

@@ -126,6 +126,23 @@ const CreateUserModal = ({ isOpen, onClose, onSave, availableRoles = [] }) => {
     setIsLoading(true);
 
     try {
+      // Student-specific front-end validation
+      if (formData.role === 'student') {
+        // Validate parentNumber: must be integer with at least 9 digits
+        const pn = String(formData.parentNumber || '').replace(/\D/g, '');
+        if (!pn || pn.length < 9) {
+          toast.error('Parent number must be at least 9 digits');
+          setIsLoading(false);
+          return;
+        }
+        // Photo is required for students
+        if (!photoFile) {
+          toast.error('Student profile photo is required');
+          setIsLoading(false);
+          return;
+        }
+      }
+
       const submitData = new FormData();
       submitData.append('fullName', formData.fullName.trim());
       submitData.append('password', formData.password);
@@ -137,7 +154,7 @@ const CreateUserModal = ({ isOpen, onClose, onSave, availableRoles = [] }) => {
 
       if (formData.role === 'student') {
         if (formData.studentId) submitData.append('studentId', formData.studentId.trim());
-        if (formData.parentNumber) submitData.append('parentNumber', formData.parentNumber.trim());
+        if (formData.parentNumber) submitData.append('parentNumber', formData.parentNumber);
         if (formData.faculty) submitData.append('faculty', formData.faculty);
         if (formData.department) submitData.append('department', formData.department);
         if (formData.class) submitData.append('class', formData.class);
@@ -244,16 +261,20 @@ const CreateUserModal = ({ isOpen, onClose, onSave, availableRoles = [] }) => {
                             </div>
 
                             <div>
-                              <label className="block text-sm font-medium text-gray-700">Parent Number *</label>
+                              <label className="block text-sm font-medium text-gray-700">Parent Number * <span className="text-xs text-gray-400">(min. 9 digits)</span></label>
                               <input
-                                type="tel"
+                                type="number"
                                 name="parentNumber"
                                 value={formData.parentNumber}
                                 onChange={handleChange}
-                                placeholder="Enter parent contact number"
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                placeholder="e.g. 252345678"
+                                min="100000000"
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 required={isStudent}
                               />
+                              {formData.parentNumber && String(formData.parentNumber).replace(/\D/g,'').length < 9 && (
+                                <p className="mt-1 text-xs text-red-500 font-medium">⚠ Must be at least 9 digits</p>
+                              )}
                             </div>
 
                             <div>
@@ -328,12 +349,19 @@ const CreateUserModal = ({ isOpen, onClose, onSave, availableRoles = [] }) => {
                                 required={isStudent}
                               />
                             </div>
-
-                            {/* Image Upload Field */}
+                            
+                            {/* Image Upload Field - REQUIRED for students */}
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Profile Photo Upload</label>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Profile Photo <span className="text-red-500">*</span>
+                                <span className="text-xs text-gray-400 ml-1">(required for students)</span>
+                              </label>
                               <div 
-                                className={`relative group cursor-pointer border-2 border-dashed rounded-xl p-4 transition-all ${imagePreview ? 'border-indigo-500 bg-indigo-50/30' : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'}`}
+                                className={`relative group cursor-pointer border-2 border-dashed rounded-xl p-4 transition-all ${
+                                  imagePreview 
+                                    ? 'border-indigo-500 bg-indigo-50/30' 
+                                    : 'border-red-300 hover:border-indigo-400 hover:bg-gray-50 bg-red-50/30'
+                                }`}
                                 onClick={() => fileInputRef.current.click()}
                               >
                                 <input 
@@ -360,16 +388,17 @@ const CreateUserModal = ({ isOpen, onClose, onSave, availableRoles = [] }) => {
                                   </div>
                                 ) : (
                                   <div className="text-center py-2">
-                                    <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-2">
-                                      <svg className="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <div className="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-2">
+                                      <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                       </svg>
                                     </div>
-                                    <p className="text-xs font-semibold text-gray-700">Click to upload student photo</p>
+                                    <p className="text-xs font-semibold text-red-600">Click to upload student photo <span className="text-red-500">(required)</span></p>
                                     <p className="text-[10px] text-gray-400 mt-0.5">JPG, PNG or WEBP up to 5MB</p>
                                   </div>
                                 )}
                               </div>
+                              {!imagePreview && <p className="mt-1 text-xs text-red-500 font-medium">⚠ A student photo is required</p>}
                             </div>
                           </>
                         )}

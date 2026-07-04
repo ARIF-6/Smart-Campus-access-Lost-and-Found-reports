@@ -66,26 +66,21 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                   itemCount: _items.length,
                   itemBuilder: (context, index) {
                     final item = _items[index];
-                    final currentUserId = Provider.of<AuthProvider>(context, listen: false).user?['_id'];
+                    final currentUserId =
+                        Provider.of<AuthProvider>(context, listen: false)
+                            .user?['_id'];
                     final bool isOwner = item.foundBy == currentUserId;
-                    final bool isReturned = ['returned', 'claimed', 'approved'].contains(item.status);
+                    final bool isReturned = ['returned', 'claimed', 'approved']
+                        .contains(item.status);
+                    final bool isRejected = item.isRejectedByUser;
 
-                    String buttonText;
-                    if (isOwner) {
-                      buttonText = 'Your Item';
-                    } else if (isReturned) {
-                      buttonText = 'Returned';
-                    } else if (item.isClaimedByUser) {
-                      buttonText = 'Claimed';
-                    } else {
-                      buttonText = 'Claim';
-                    }
-
+                    // ── Tap handler ────────────────────────────────────
                     void handleTap() {
                       if (isOwner) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('You are the one who submitted this item.'),
+                            content:
+                                Text('You are the one who submitted this item.'),
                             backgroundColor: Colors.orange,
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -95,8 +90,20 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                       if (isReturned) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('This item has already been returned.'),
+                            content:
+                                Text('This item has already been returned.'),
                             backgroundColor: Colors.orange,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
+                      if (isRejected) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Your claim for this item was rejected. You cannot re-claim it.'),
+                            backgroundColor: Colors.red,
                             behavior: SnackBarBehavior.floating,
                           ),
                         );
@@ -105,11 +112,12 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                       if (item.isClaimedByUser) return;
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => ClaimRequestScreen(item: item)),
+                        MaterialPageRoute(
+                            builder: (_) => ClaimRequestScreen(item: item)),
                       );
                     }
 
-                    // Status badge
+                    // ── Status badge chip ──────────────────────────────
                     Color badgeColor;
                     String badgeLabel;
                     switch (item.status) {
@@ -121,6 +129,14 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                         badgeColor = Colors.orange;
                         badgeLabel = 'Claimed';
                         break;
+                      case 'returned':
+                        badgeColor = Colors.purple;
+                        badgeLabel = 'Returned';
+                        break;
+                      case 'approved':
+                        badgeColor = Colors.teal;
+                        badgeLabel = 'Approved';
+                        break;
                       default:
                         if (isOwner) {
                           badgeColor = Colors.blue;
@@ -131,8 +147,59 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                         }
                     }
 
+                    // ── Action widget (bottom of card) ─────────────────
+                    // Terminal states → non-interactive label (NO button).
+                    // Only claimable state → blue ElevatedButton.
+                    Widget actionWidget;
+                    if (isOwner) {
+                      actionWidget = _infoLabel(
+                        icon: Icons.person_outline,
+                        text: 'Your Item',
+                        color: Colors.blue,
+                      );
+                    } else if (isReturned) {
+                      actionWidget = _infoLabel(
+                        icon: Icons.check_circle_outline,
+                        text: 'Returned to Owner',
+                        color: Colors.purple,
+                      );
+                    } else if (isRejected) {
+                      actionWidget = _infoLabel(
+                        icon: Icons.cancel_outlined,
+                        text: 'Claim Rejected',
+                        color: Colors.red,
+                      );
+                    } else if (item.isClaimedByUser) {
+                      actionWidget = _infoLabel(
+                        icon: Icons.hourglass_top_rounded,
+                        text: 'Claim Submitted',
+                        color: Colors.amber.shade700,
+                      );
+                    } else {
+                      actionWidget = SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: handleTap,
+                          icon: const Icon(Icons.assignment_outlined, size: 16),
+                          label: const Text(
+                            'Claim This Item',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                        ),
+                      );
+                    }
+
                     return Card(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
                       elevation: 4,
                       margin: const EdgeInsets.only(bottom: 16),
                       child: InkWell(
@@ -143,6 +210,7 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // Item image
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
                                 child: Image.network(
@@ -150,59 +218,75 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                                   width: 100,
                                   height: 100,
                                   fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    width: 100,
+                                    height: 100,
+                                    color: Colors.grey.shade200,
+                                    child: const Icon(
+                                        Icons.image_not_supported_outlined,
+                                        color: Colors.grey,
+                                        size: 32),
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 12),
+                              // Info column
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(item.title,
-                                        style: Theme.of(context).textTheme.titleMedium,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis),
                                     const SizedBox(height: 4),
-                                    Text('Location: ${item.location}',
-                                        style: Theme.of(context).textTheme.bodySmall),
-                                    Text('Reporter: ${item.foundBy}',
-                                        style: Theme.of(context).textTheme.bodySmall),
+                                    Text('📍 ${item.location}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall),
+                                    const SizedBox(height: 2),
                                     Text(item.description,
-                                        style: Theme.of(context).textTheme.bodyMedium,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium,
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis),
                                     const SizedBox(height: 8),
+                                    // Status badge + date row
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
-                                        TextButton(
-                                          onPressed: () {
-                                            // Placeholder for "See More" – navigate to details screen later
-                                            handleTap();
-                                          },
-                                          child: const Text('See More'),
-                                        ),
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 4),
                                           decoration: BoxDecoration(
-                                            color: badgeColor.withValues(alpha: 0.2),
-                                            borderRadius: BorderRadius.circular(12),
+                                            color: badgeColor
+                                                .withValues(alpha: 0.15),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
                                           ),
                                           child: Text(
                                             badgeLabel,
-                                            style: TextStyle(color: badgeColor, fontWeight: FontWeight.bold),
+                                            style: TextStyle(
+                                                color: badgeColor,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12),
                                           ),
                                         ),
-                                        Text(DateFormat.yMMMd().format(item.dateFound),
-                                            style: Theme.of(context).textTheme.bodySmall),
+                                        Text(
+                                            DateFormat.yMMMd()
+                                                .format(item.dateFound),
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall),
                                       ],
                                     ),
-                                    Align(
-                                      alignment: Alignment.centerRight,
-                                      child: ElevatedButton(
-                                        onPressed: handleTap,
-                                        child: Text(buttonText),
-                                      ),
-                                    ),
+                                    const SizedBox(height: 10),
+                                    // Action widget (button or info label)
+                                    actionWidget,
                                   ],
                                 ),
                               ),
@@ -213,6 +297,38 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                     );
                   },
                 ),
+    );
+  }
+
+  /// Non-interactive label shown for terminal states (returned, rejected, etc.)
+  Widget _infoLabel({
+    required IconData icon,
+    required String text,
+    required Color color,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 15),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

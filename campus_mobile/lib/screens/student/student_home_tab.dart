@@ -14,12 +14,14 @@ import 'claims_screen.dart';
 import 'student_main_screen.dart';
 import 'campus_issues_home_screen.dart';
 import 'class_issues_home_screen.dart';
+import 'package:carousel_slider/carousel_slider.dart';
+import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'dart:ui';
 
 // ─────────────────────────────────────────────────────────────────────
 //  Color tokens (banking-app palette)
 // ─────────────────────────────────────────────────────────────────────
 const _navy = Color(0xFF1B3A6B);
-const _navyDark = Color(0xFF0D1F4E);
 const _blue = Color(0xFF2563EB);
 const _bg = Color(0xFFF4F7FB);
 const _cardWhite = Colors.white;
@@ -44,6 +46,18 @@ class _StudentHomeTabState extends State<StudentHomeTab>
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
   bool _isSearchFocused = false;
+  int _carouselIndex = 0;
+  final CarouselSliderController _carouselController =
+      CarouselSliderController();
+
+  final List<String> _sliderImages = [
+    'assets/images/2.jpeg',
+    'assets/images/3.jpeg',
+    'assets/images/4.jpeg',
+    'assets/images/5.jpeg',
+    'assets/images/6.jpeg',
+    'assets/images/7.jpeg',
+  ];
 
   final List<_Feature> _features = const [
     _Feature(Icons.search_off_rounded, 'Lost Items', 'lost'),
@@ -78,10 +92,11 @@ class _StudentHomeTabState extends State<StudentHomeTab>
         setState(() {
           final data = response.data;
           List<dynamic> list = [];
-          if (data is List)
+          if (data is List) {
             list = data;
-          else if (data is Map && data.containsKey('items'))
+          } else if (data is Map && data.containsKey('items')) {
             list = data['items'] ?? [];
+          }
           _foundItems = list
               .map((e) => FoundItem.fromJson(e as Map<String, dynamic>))
               .toList();
@@ -89,7 +104,9 @@ class _StudentHomeTabState extends State<StudentHomeTab>
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
       debugPrint('Error fetching found items: $e');
     }
   }
@@ -150,42 +167,39 @@ class _StudentHomeTabState extends State<StudentHomeTab>
         : '';
 
     return Scaffold(
-      backgroundColor: _navy,
+      backgroundColor: const Color(0xFF0F172A),
       body: GestureDetector(
         onTap: () => _searchFocusNode.unfocus(),
         behavior: HitTestBehavior.opaque,
         child: Stack(
           children: [
-            // Decorative bg circles
-            Positioned(top: -80, right: -80, child: _bgCircle(280, 0.05)),
-            Positioned(top: 80, right: -120, child: _bgCircle(200, 0.04)),
-            Positioned(top: 10, left: -60, child: _bgCircle(160, 0.03)),
-
             RefreshIndicator(
               onRefresh: _fetchRecentFoundItems,
               color: _navy,
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  // ── TOP HEADER ─────────────────────────────────────
+                  // ── DYNAMIC CAROUSEL HEADER ─────────────────────────
                   SliverToBoxAdapter(
-                      child: _buildHeader(fullName, studentId, photoUrl)),
+                    child:
+                        _buildDynamicHeroHeader(fullName, studentId, photoUrl),
+                  ),
 
                   // ── WHITE CONTENT SHEET ────────────────────────────
                   SliverToBoxAdapter(
                     child: Container(
                       constraints: BoxConstraints(
-                        minHeight: MediaQuery.of(context).size.height * 0.72,
+                        minHeight: MediaQuery.of(context).size.height * 0.62,
                       ),
                       decoration: const BoxDecoration(
                         color: _bg,
                         borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(36),
-                          topRight: Radius.circular(36),
+                          topLeft: Radius.circular(30),
+                          topRight: Radius.circular(30),
                         ),
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
+                        padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -225,138 +239,289 @@ class _StudentHomeTabState extends State<StudentHomeTab>
     );
   }
 
-  // ── Header ─────────────────────────────────────────────────────────
-  Widget _buildHeader(String fullName, String studentId, String photoUrl) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 56, 22, 26),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              // Avatar
-              GestureDetector(
-                onTap: () {
-                  final s =
-                      context.findAncestorStateOfType<StudentMainScreenState>();
-                  if (s != null) s.currentIndex = 3;
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.4), width: 2.5),
-                  ),
-                  child: CircleAvatar(
-                    radius: 22,
-                    backgroundColor: Colors.white24,
-                    backgroundImage:
-                        photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
-                    child: photoUrl.isEmpty
-                        ? Text(
-                            fullName.isNotEmpty
-                                ? fullName[0].toUpperCase()
-                                : 'S',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 17),
-                          )
-                        : null,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Greeting
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Good ${_greeting()} 👋',
-                        style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 12)),
-                    Text(fullName,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                  ],
-                ),
-              ),
-              // Bell
-              Consumer<NotificationProvider>(builder: (_, prov, __) {
-                return Stack(
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.14),
-                        shape: BoxShape.circle,
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.notifications_none_rounded,
-                            color: Colors.white, size: 24),
-                        onPressed: () => _nav(const NotificationsScreen()),
+  // ── Dynamic Hero Header ─────────────────────────────────────────────
+  Widget _buildDynamicHeroHeader(
+      String fullName, String studentId, String photoUrl) {
+    final double headerHeight = 310.0;
+
+    return Stack(
+      children: [
+        // Carousel Slider
+        CarouselSlider.builder(
+          carouselController: _carouselController,
+          itemCount: _sliderImages.length,
+          options: CarouselOptions(
+            height: headerHeight,
+            viewportFraction: 1.0,
+            autoPlay: true,
+            autoPlayInterval: const Duration(seconds: 5),
+            autoPlayAnimationDuration: const Duration(milliseconds: 800),
+            autoPlayCurve: Curves.easeInOutCubic,
+            enableInfiniteScroll: true,
+            scrollDirection: Axis.horizontal,
+            onPageChanged: (index, reason) {
+              setState(() {
+                _carouselIndex = index;
+              });
+            },
+          ),
+          itemBuilder: (context, index, realIndex) {
+            final imagePath = _sliderImages[index];
+            final isLocal = !imagePath.startsWith('http');
+            return SizedBox(
+              width: double.infinity,
+              height: headerHeight,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  isLocal
+                      ? Image.asset(imagePath, fit: BoxFit.cover)
+                      : Image.network(imagePath,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Image.asset(
+                              'assets/images/header_bg.jpg',
+                              fit: BoxFit.cover)),
+                  // Dark gradient overlay
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.black.withValues(alpha: 0.65),
+                          Colors.black.withValues(alpha: 0.25),
+                          const Color(0xFF0F172A).withValues(alpha: 0.95),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
                       ),
                     ),
-                    if (prov.unreadCount > 0)
-                      Positioned(
-                        right: 6,
-                        top: 6,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                              color: Color(0xFFEF4444), shape: BoxShape.circle),
-                          constraints:
-                              const BoxConstraints(minWidth: 17, minHeight: 17),
-                          child: Text('${prov.unreadCount}',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold),
-                              textAlign: TextAlign.center),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+
+        // Foreground content on top of slider
+        Container(
+          height: headerHeight,
+          padding: const EdgeInsets.fromLTRB(20, 52, 20, 22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // User Greeting Row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Greeting & Student Info (Left side)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Good ${_greeting()} 👋',
+                          style: const TextStyle(
+                            color: Colors.cyanAccent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          fullName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Bell & Avatar (Right side)
+                  Row(
+                    children: [
+                      // Refresh Icon Button
+                      Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.refresh_rounded,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                          onPressed: () {
+                            _fetchRecentFoundItems();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Data refreshed successfully!'),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          },
                         ),
                       ),
-                  ],
-                );
-              }),
-            ],
-          ),
-          const SizedBox(height: 20),
-          // Student ID badge (like "Available Balance" in banking)
-          Row(
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(20),
-                  border:
-                      Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                            color: Color(0xFF22C55E), shape: BoxShape.circle)),
-                    const SizedBox(width: 6),
-                    Text('ID: $studentId',
-                        style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.88),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600)),
-                  ],
-                ),
+                      // Bell icon
+                      Consumer<NotificationProvider>(builder: (_, prov, __) {
+                        return Stack(
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: IconButton(
+                                icon: const Icon(
+                                    Icons.notifications_none_rounded,
+                                    color: Colors.white,
+                                    size: 22),
+                                onPressed: () =>
+                                    _nav(const NotificationsScreen()),
+                              ),
+                            ),
+                            if (prov.unreadCount > 0)
+                              Positioned(
+                                right: 6,
+                                top: 6,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFEF4444),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: const BoxConstraints(
+                                      minWidth: 16, minHeight: 16),
+                                  child: Text(
+                                    '${prov.unreadCount}',
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.bold),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      }),
+                      const SizedBox(width: 10),
+                      // Avatar
+                      GestureDetector(
+                        onTap: () {
+                          final s = context.findAncestorStateOfType<
+                              StudentMainScreenState>();
+                          if (s != null) s.currentIndex = 3;
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: Colors.cyanAccent.withValues(alpha: 0.6),
+                                width: 2),
+                          ),
+                          child: CircleAvatar(
+                            radius: 20,
+                            backgroundColor: Colors.white24,
+                            backgroundImage: photoUrl.isNotEmpty
+                                ? NetworkImage(photoUrl)
+                                : null,
+                            child: photoUrl.isEmpty
+                                ? Text(
+                                    fullName.isNotEmpty
+                                        ? fullName[0].toUpperCase()
+                                        : 'S',
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15),
+                                  )
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+
+              // Bottom Section of Header: Glassmorphism ID Badge + Smooth Page Indicator
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // Glassmorphic Student ID badge
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              width: 1.2),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Colors.cyanAccent,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'ID: $studentId',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Carousel Smooth Page Indicators
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: AnimatedSmoothIndicator(
+                      activeIndex: _carouselIndex,
+                      count: _sliderImages.length,
+                      effect: const ExpandingDotsEffect(
+                        dotHeight: 6,
+                        dotWidth: 6,
+                        expansionFactor: 3,
+                        spacing: 5,
+                        activeDotColor: Colors.cyanAccent,
+                        dotColor: Colors.white24,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -535,6 +700,8 @@ class _StudentHomeTabState extends State<StudentHomeTab>
         final s = context.findAncestorStateOfType<StudentMainScreenState>();
         s != null ? s.currentIndex = 1 : _nav(const ClaimsScreen());
       }),
+      _Action(Icons.school_outlined, 'Class Issues', const Color(0xFF3B82F6),
+          () => _nav(const ClassIssuesHomeScreen())),
     ];
 
     return Column(
@@ -544,9 +711,17 @@ class _StudentHomeTabState extends State<StudentHomeTab>
             style: TextStyle(
                 fontSize: 16, fontWeight: FontWeight.w800, color: _textDark)),
         const SizedBox(height: 14),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: actions.map((a) => _buildActionButton(a)).toList(),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            children: actions.map((a) {
+              return Padding(
+                padding: const EdgeInsets.only(right: 20),
+                child: _buildActionButton(a),
+              );
+            }).toList(),
+          ),
         ),
       ],
     );
@@ -845,6 +1020,7 @@ class _StudentHomeTabState extends State<StudentHomeTab>
     final isReturned = item.status == 'returned' ||
         item.status == 'claimed' ||
         item.status == 'approved';
+    final isRejected = item.isRejectedByUser;
     final statusColor = isReturned ? const Color(0xFF22C55E) : _blue;
     final statusBg =
         isReturned ? const Color(0xFFDCFCE7) : const Color(0xFFEFF6FF);
@@ -858,6 +1034,14 @@ class _StudentHomeTabState extends State<StudentHomeTab>
               behavior: SnackBarBehavior.floating));
           return;
         }
+        if (isRejected) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Your claim for this item was rejected.'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating));
+          return;
+        }
+        if (item.isClaimedByUser) return;
         _nav(ClaimRequestScreen(item: item));
       },
       child: Container(
@@ -907,7 +1091,7 @@ class _StudentHomeTabState extends State<StudentHomeTab>
                 ],
               ),
             ),
-            // Status badge
+            // Status badge (non-interactive, just a chip)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
@@ -924,13 +1108,6 @@ class _StudentHomeTabState extends State<StudentHomeTab>
     );
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────
-  Widget _bgCircle(double size, double opacity) => Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white.withValues(alpha: opacity)));
 
   Widget _imgPlaceholder(double h) => Container(
       height: h,

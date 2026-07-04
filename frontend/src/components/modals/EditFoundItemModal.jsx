@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { updateFoundItem } from '../../services/api';
+import { fetchLostFoundCategories } from '../../services/categoryService';
 import toast from 'react-hot-toast';
 
 const EditFoundItemModal = ({ isOpen, onClose, onSuccess, item }) => {
@@ -16,6 +17,7 @@ const EditFoundItemModal = ({ isOpen, onClose, onSuccess, item }) => {
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [categories, setCategories] = useState([]);
   const modalRef = useRef(null);
 
   // Pre-populate data when item changes
@@ -24,7 +26,7 @@ const EditFoundItemModal = ({ isOpen, onClose, onSuccess, item }) => {
       setFormData({
         title: item.title || '',
         description: item.description || '',
-        category: item.category || 'electronics',
+        category: item.category || '',
         locationFound: item.locationFound || item.location || '',
         dateFound: item.dateFound ? new Date(item.dateFound).toISOString().split('T')[0] : '',
         status: item.status || 'pending',
@@ -34,6 +36,11 @@ const EditFoundItemModal = ({ isOpen, onClose, onSuccess, item }) => {
       });
     }
   }, [item]);
+
+  // Fetch dynamic categories on mount
+  useEffect(() => {
+    fetchLostFoundCategories().then(cats => setCategories(cats));
+  }, []);
 
   // Close on Escape key
   useEffect(() => {
@@ -113,55 +120,60 @@ const EditFoundItemModal = ({ isOpen, onClose, onSuccess, item }) => {
         </div>
 
         {/* Body */}
-        <form onSubmit={handleSubmit} className="px-8 py-8 space-y-6">
-          <div className="space-y-4">
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-3">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Item Title</label>
+              <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Item Title *</label>
               <input 
                 type="text"
                 name="title"
                 value={formData.title}
                 onChange={handleChange}
-                className={`w-full px-4 py-2.5 border rounded-xl outline-none transition-all focus:ring-2 ${errors.title ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-blue-500 focus:ring-blue-100'}`}
+                className={`w-full px-4 py-2 border rounded-xl outline-none transition-all text-sm focus:ring-2 ${errors.title ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-blue-500 focus:ring-blue-100'}`}
               />
               {errors.title && <p className="mt-1 text-xs text-red-500 font-medium">{errors.title}</p>}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Category</label>
-                <select 
-                  name="category"
-                  value={formData.category}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white transition-all appearance-none cursor-pointer"
-                >
-                  <option value="electronics">Electronics</option>
-                  <option value="clothing">Clothing</option>
-                  <option value="documents">Documents</option>
-                  <option value="others">Other</option>
-                </select>
+                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Category</label>
+                {categories.length === 0 ? (
+                  <div className="w-full px-4 py-2 border border-amber-200 bg-amber-50 rounded-xl text-xs text-amber-700 font-medium">
+                    No categories available.
+                  </div>
+                ) : (
+                  <select 
+                    name="category"
+                    value={formData.category}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white transition-all appearance-none cursor-pointer"
+                  >
+                    {categories.map(cat => (
+                      <option key={cat._id} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Date Found</label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Date Found</label>
                 <input 
                   type="date"
                   name="dateFound"
                   value={formData.dateFound}
                   onChange={handleChange}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Status</label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Status</label>
                 <select 
                   name="status"
                   value={formData.status}
                   onChange={handleChange}
-                  className={`w-full px-4 py-2.5 border rounded-xl outline-none focus:ring-2 transition-all appearance-none cursor-pointer ${
+                  className={`w-full px-4 py-2 border rounded-xl outline-none text-sm focus:ring-2 transition-all appearance-none cursor-pointer ${
                     formData.status === 'pending' ? 'border-yellow-200 text-yellow-700 bg-yellow-50 focus:ring-yellow-100' :
                     formData.status === 'approved' ? 'border-blue-200 text-blue-700 bg-blue-50 focus:ring-blue-100' :
                     formData.status === 'claimed' ? 'border-green-200 text-green-700 bg-green-50 focus:ring-green-100' :
@@ -179,67 +191,26 @@ const EditFoundItemModal = ({ isOpen, onClose, onSuccess, item }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Priority</label>
-                <select 
-                  name="priority"
-                  value={formData.priority}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white transition-all appearance-none cursor-pointer"
-                >
-                  <option value="low">Low Priority</option>
-                  <option value="medium">Medium Priority</option>
-                  <option value="high">High Priority (Valuable)</option>
-                  <option value="urgent">Urgent / Time Sensitive</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Storage Location (Room/Shelf)</label>
-                <input 
-                  type="text"
-                  name="storageLocation"
-                  value={formData.storageLocation}
-                  onChange={handleChange}
-                  placeholder="e.g. Room 101, Shelf B"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none transition-all focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Location Found</label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Location Found</label>
                 <input 
                   type="text"
                   name="locationFound"
                   value={formData.locationFound}
                   onChange={handleChange}
-                  className={`w-full px-4 py-2.5 border rounded-xl outline-none transition-all focus:ring-2 ${errors.locationFound ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-blue-500 focus:ring-blue-100'}`}
+                  className={`w-full px-4 py-2 border rounded-xl outline-none text-sm focus:ring-2 ${errors.locationFound ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-blue-500 focus:ring-blue-100'}`}
                 />
                 {errors.locationFound && <p className="mt-1 text-xs text-red-500 font-medium">{errors.locationFound}</p>}
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Admin Notes / Internal Comments</label>
-              <textarea 
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                rows="2"
-                placeholder="Internal tracking notes..."
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white transition-all resize-none"
-              ></textarea>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
+              <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Description</label>
               <textarea 
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
-                rows="3"
-                className={`w-full px-4 py-2.5 border rounded-xl outline-none transition-all focus:ring-2 resize-none ${errors.description ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-blue-500 focus:ring-blue-100'}`}
+                rows="2"
+                className={`w-full px-4 py-2 border rounded-xl outline-none text-sm focus:ring-2 resize-none ${errors.description ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-blue-500 focus:ring-blue-100'}`}
               ></textarea>
               {errors.description && <p className="mt-1 text-xs text-red-500 font-medium">{errors.description}</p>}
             </div>

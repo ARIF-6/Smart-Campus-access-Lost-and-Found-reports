@@ -56,14 +56,18 @@ exports.submitClaim = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: "This item has already been claimed or returned" });
   }
 
-  // Prevent Duplicate Claim
+  // Prevent Duplicate Claim (also block users whose previous claim was rejected)
   const existingClaim = await Claim.findOne({
     user: userId,
     item: itemId,
-    isDeleted: false
+    isDeleted: false,
+    status: { $in: ['pending', 'approved', 'rejected'] } // block all – once rejected, cannot re-claim
   });
 
   if (existingClaim) {
+    if (existingClaim.status === 'rejected') {
+      return res.status(400).json({ success: false, message: "Your previous claim for this item was rejected. You cannot submit another claim for the same item." });
+    }
     return res.status(400).json({ success: false, message: "You have already submitted a claim for this item" });
   }
 
@@ -199,9 +203,12 @@ exports.updateClaimStatus = asyncHandler(async (req, res) => {
   };
   const Model = itemCollections[claim.itemModel];
   if (Model) {
-    // If the claim is approved or rejected, update the item status to match the claim status.
-    if (status === 'approved' || status === 'rejected') {
-      await Model.findByIdAndUpdate(claim.item, { status: status });
+    if (status === 'approved') {
+      // Approve: mark item as approved
+      await Model.findByIdAndUpdate(claim.item, { status: 'approved' });
+    } else if (status === 'rejected') {
+      // Reject: reset item back to pending so other users can claim it
+      await Model.findByIdAndUpdate(claim.item, { status: 'pending' });
     }
   }
 
@@ -316,7 +323,8 @@ exports.rejectClaim = asyncHandler(async (req, res) => {
 
   const Model = itemCollections[claim.itemModel];
   if (Model) {
-    await Model.findByIdAndUpdate(claim.item, { status: 'rejected' });
+    // Reset item back to pending so other users can claim it
+    await Model.findByIdAndUpdate(claim.item, { status: 'pending' });
   }
 
   // Log the rejection

@@ -1,6 +1,23 @@
 import api from './api';
 
 /**
+ * Fetch active Lost & Found categories registered in the system.
+ * Uses the dedicated /categories/lost-found endpoint accessible by all authenticated users.
+ * @returns {Promise<Array>} resolves to array of category objects { _id, name }
+ */
+export const fetchLostFoundCategories = async () => {
+  try {
+    const response = await api.get('/categories/lost-found');
+    // api.js interceptor already unwraps { success, data: [...] }
+    // so response.data is the array directly
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (error) {
+    console.error('Error fetching lost & found categories', error);
+    return [];
+  }
+};
+
+/**
  * Fetch categories of a given type.
  * @param {string} categoryType - one of 'campus_issue', 'class_issue', 'lost_found'
  * @param {boolean} includeInactive - whether to include inactive categories

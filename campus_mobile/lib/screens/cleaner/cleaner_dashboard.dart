@@ -49,85 +49,78 @@ class CleanerDashboardState extends State<CleanerDashboard> {
         children: _pages,
       ),
 
-      floatingActionButton: Container(
-        width: 56, height: 56,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF2563EB), Color(0xFF1B3A6B)],
-            begin: Alignment.topLeft, end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(color: const Color(0xFF1B3A6B).withValues(alpha: 0.38),
-                blurRadius: 14, offset: const Offset(0, 6)),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const ReportItemScreen())),
-            borderRadius: BorderRadius.circular(18),
-            child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
-          ),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: Container(
-        height: 78,
+        height: 76,
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 22),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.09),
-              blurRadius: 22, offset: const Offset(0, 8),
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
-        child: BottomAppBar(
-          color: Colors.transparent,
-          elevation: 0,
-          padding: EdgeInsets.zero,
-          notchMargin: 10,
-          shape: const CircularNotchedRectangle(),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(0, Icons.home_filled, Icons.home_outlined, 'Home'),
-              _buildNavItem(1, Icons.inventory_2_rounded, Icons.inventory_2_outlined, 'Items'),
-              const SizedBox(width: 60),
-              _buildNavItem(2, Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
-            ],
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildNavItem(0, Icons.home_filled, Icons.home_outlined, 'Home'),
+            _buildNavItem(1, Icons.inventory_2_rounded, Icons.inventory_2_outlined, 'Items'),
+            GestureDetector(
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const ReportItemScreen())),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF1F2937),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.add_rounded, color: Colors.white, size: 24),
+              ),
+            ),
+            _buildNavItem(2, Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(int index, IconData selectedIcon, IconData unselectedIcon, String label) {
+  Widget _buildNavItem(
+      int index, IconData selectedIcon, IconData unselectedIcon, String label) {
     final isSelected = _currentIndex == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => _onTabTapped(index),
-        behavior: HitTestBehavior.opaque,
-        child: Column(
+    return GestureDetector(
+      onTap: () => _onTabTapped(index),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF1F2937) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
           mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               isSelected ? selectedIcon : unselectedIcon,
-              color: isSelected ? _themeColor : Colors.grey.shade400,
-              size: 26,
+              color: isSelected ? Colors.white : Colors.grey.shade400,
+              size: 22,
             ),
-            const SizedBox(height: 4),
-            Text(label,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                  color: isSelected ? _themeColor : Colors.grey.shade400,
-                )),
+            if (isSelected) ...[
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ]
           ],
         ),
       ),
@@ -214,12 +207,12 @@ class _HomeTabState extends State<_HomeTab> {
     return '${AppConstants.serverUrl}/$p';
   }
 
-  String _greeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  }
+  // String _greeting() {
+  //   final hour = DateTime.now().hour;
+  //   if (hour < 12) return 'Good morning';
+  //   if (hour < 17) return 'Good afternoon';
+  //   return 'Good evening';
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -239,12 +232,16 @@ class _HomeTabState extends State<_HomeTab> {
               padding: const EdgeInsets.fromLTRB(20, 56, 20, 26),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF0D1F4E), Color(0xFF1B3A6B), Color(0xFF1E4080)],
+                  colors: [
+                    Color(0xFF0D1F4E),
+                    Color(0xFF1B3A6B),
+                    Color(0xFF1E4080)
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.only(
-                  bottomLeft:  Radius.circular(36),
+                  bottomLeft: Radius.circular(36),
                   bottomRight: Radius.circular(36),
                 ),
               ),
@@ -256,12 +253,17 @@ class _HomeTabState extends State<_HomeTab> {
                       CircleAvatar(
                         radius: 20,
                         backgroundColor: Colors.white24,
-                        backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+                        backgroundImage:
+                            photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
                         child: photoUrl.isEmpty
                             ? Text(
-                                userName.isNotEmpty ? userName[0].toUpperCase() : 'C',
+                                userName.isNotEmpty
+                                    ? userName[0].toUpperCase()
+                                    : 'C',
                                 style: const TextStyle(
-                                    color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16),
                               )
                             : null,
                       ),
@@ -270,16 +272,42 @@ class _HomeTabState extends State<_HomeTab> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('${_greeting()} 👋',
-                                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11)),
+                            // Text('${_greeting()} 👋',
+                            //     style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11)),
                             Text(
                               userName,
                               style: const TextStyle(
-                                  color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
+                        ),
+                      ),
+                      // Refresh Icon Button
+                      Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.14),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.refresh_rounded,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                          onPressed: () {
+                            _fetchStats();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Data refreshed successfully!'),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          },
                         ),
                       ),
                       Consumer<NotificationProvider>(
@@ -292,10 +320,15 @@ class _HomeTabState extends State<_HomeTab> {
                                   shape: BoxShape.circle,
                                 ),
                                 child: IconButton(
-                                  icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 24),
+                                  icon: const Icon(
+                                      Icons.notifications_none_rounded,
+                                      color: Colors.white,
+                                      size: 24),
                                   onPressed: () => Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                                    MaterialPageRoute(
+                                        builder: (_) =>
+                                            const NotificationsScreen()),
                                   ),
                                 ),
                               ),
@@ -305,11 +338,16 @@ class _HomeTabState extends State<_HomeTab> {
                                   top: 6,
                                   child: Container(
                                     padding: const EdgeInsets.all(4),
-                                    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                    decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle),
+                                    constraints: const BoxConstraints(
+                                        minWidth: 16, minHeight: 16),
                                     child: Text('${provider.unreadCount}',
                                         style: const TextStyle(
-                                            color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                            color: Colors.white,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold),
                                         textAlign: TextAlign.center),
                                   ),
                                 ),
@@ -323,18 +361,24 @@ class _HomeTabState extends State<_HomeTab> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 5),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.14),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.2)),
                         ),
                         child: const Row(
                           children: [
-                            Icon(Icons.circle, color: Color(0xFF22C55E), size: 7),
+                            Icon(Icons.circle,
+                                color: Color(0xFF22C55E), size: 7),
                             SizedBox(width: 6),
-                            Text('Cleaner Portal Active',
-                                style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                            Text('Cleaner Active',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
@@ -355,7 +399,8 @@ class _HomeTabState extends State<_HomeTab> {
                 children: [
                   // Stat Cards (replaces Available balance / stats)
                   _loading
-                      ? const Center(child: CircularProgressIndicator(color: _themeColor))
+                      ? const Center(
+                          child: CircularProgressIndicator(color: _themeColor))
                       : GridView.count(
                           crossAxisCount: 2,
                           shrinkWrap: true,
@@ -364,10 +409,26 @@ class _HomeTabState extends State<_HomeTab> {
                           mainAxisSpacing: 10,
                           childAspectRatio: 1.6,
                           children: [
-                            _StatCard(label: 'Total Items', value: _totalItems, icon: Icons.inventory_2_outlined, color: Colors.blue),
-                            _StatCard(label: 'Stored', value: _storedItems, icon: Icons.store_mall_directory_outlined, color: Colors.amber),
-                            _StatCard(label: 'Returned', value: _returnedItems, icon: Icons.check_circle_outline_rounded, color: Colors.green),
-                            _StatCard(label: 'Claims', value: _claims, icon: Icons.assignment_outlined, color: Colors.purple),
+                            _StatCard(
+                                label: 'Total Items',
+                                value: _totalItems,
+                                icon: Icons.inventory_2_outlined,
+                                color: Colors.blue),
+                            _StatCard(
+                                label: 'Stored',
+                                value: _storedItems,
+                                icon: Icons.store_mall_directory_outlined,
+                                color: Colors.amber),
+                            _StatCard(
+                                label: 'Returned',
+                                value: _returnedItems,
+                                icon: Icons.check_circle_outline_rounded,
+                                color: Colors.green),
+                            _StatCard(
+                                label: 'Claims',
+                                value: _claims,
+                                icon: Icons.assignment_outlined,
+                                color: Colors.purple),
                           ],
                         ),
                 ],

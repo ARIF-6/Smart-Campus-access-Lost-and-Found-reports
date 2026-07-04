@@ -236,7 +236,7 @@ const ClassIssuesPage = () => {
     pending:   issues.filter(i => i.status === 'pending').length,
     in_review: issues.filter(i => i.status === 'in_review').length,
     resolved:  issues.filter(i => i.status === 'resolved').length,
-    completed: issues.filter(i => i.status === 'completed').length,
+    // completed: issues.filter(i => i.status === 'completed').length,
   };
 
   const filters = [
@@ -244,7 +244,7 @@ const ClassIssuesPage = () => {
     { key: 'pending',   label: 'Pending',   count: counts.pending },
     { key: 'in_review', label: 'In Review', count: counts.in_review },
     { key: 'resolved',  label: 'Resolved',  count: counts.resolved },
-    { key: 'completed', label: 'Completed', count: counts.completed },
+    // { key: 'completed', label: 'Completed', count: counts.completed },
   ];
 
   /* ────────────────────── RENDER ────────────────────── */
@@ -354,7 +354,7 @@ const ClassIssuesPage = () => {
                             <option value="pending">Pending</option>
                             <option value="in_review">In Review</option>
                             <option value="resolved">Resolved</option>
-                            <option value="completed">Completed</option>
+                            
                             <option value="rejected">Rejected</option>
                           </select>
                           <button

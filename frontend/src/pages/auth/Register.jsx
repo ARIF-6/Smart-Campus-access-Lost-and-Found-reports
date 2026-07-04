@@ -162,17 +162,10 @@ const Register = () => {
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
           <p className="text-sm text-blue-800 font-medium">
-            <strong>Staff Registration Only</strong> - This form is exclusively for staff members. 
-            Other roles (students, security, cleaners) should register through the mobile app or contact admin.
+            <strong>Staff Registration Only</strong> — This form is exclusively for staff members.
+            Other roles (students, security, cleaners) are registered by an administrator.
           </p>
         </div>
-
-        {/* <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-          <p className="text-sm text-blue-800 font-medium">
-            <strong>Staff Registration Only</strong> - This form is exclusively for staff members. 
-            Other roles (students, security, cleaners) should register through the mobile app or contact admin.
-          </p>
-        </div> */}
 
         <div className="pt-2">
           <button

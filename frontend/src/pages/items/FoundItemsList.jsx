@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import AdminLayout from '../../components/layout/AdminLayout';
 import { getFoundItems, deleteFoundItem, markItemReturned } from '../../services/api';
+import { fetchLostFoundCategories } from '../../services/categoryService';
 import ReportFoundItemModal from '../../components/modals/ReportFoundItemModal';
 import EditFoundItemModal from '../../components/modals/EditFoundItemModal';
 import SearchBar from '../../components/common/SearchBar';
@@ -15,11 +16,12 @@ const FoundItemsList = () => {
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [dynamicCategories, setDynamicCategories] = useState([]);
 
   // Pagination & Filtering State
   const [keyword, setKeyword] = useState('');
-  const [category, setCategory] = useState('all');
-  const [status, setStatus] = useState('all');
+  const [category, setCategory] = useState('');
+  const [status, setStatus] = useState('');
   const [filterDate, setFilterDate] = useState('');
 
   const fetchItems = useCallback(async () => {
@@ -27,8 +29,8 @@ const FoundItemsList = () => {
       setLoading(true);
       const params = {};
       if (keyword) params.keyword = keyword;
-      if (category !== 'all') params.category = category;
-      if (status !== 'all') params.status = status;
+      if (category) params.category = category;
+      if (status) params.status = status;
 
       const data = await getFoundItems(params);
       // Handle both direct array and paginated object { items: [], total: X }
@@ -44,6 +46,11 @@ const FoundItemsList = () => {
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
+
+  // Fetch dynamic categories from the system
+  useEffect(() => {
+    fetchLostFoundCategories().then(cats => setDynamicCategories(cats));
+  }, []);
 
   const handleMarkReturned = async (id) => {
     try {
@@ -74,11 +81,7 @@ const FoundItemsList = () => {
   ];
 
   const categoryOptions = [
-    { value: 'all', label: 'All Categories' },
-    { value: 'electronics', label: 'Electronics' },
-    { value: 'clothing', label: 'Clothing' },
-    { value: 'documents', label: 'Documents' },
-    { value: 'others', label: 'Others' }
+    ...dynamicCategories.map(cat => ({ value: cat.name, label: cat.name }))
   ];
 
   const getStatusBadge = (status) => {
@@ -154,7 +157,7 @@ const FoundItemsList = () => {
             onChange={(val) => { setStatus(val); }} 
           />
           <button 
-            onClick={() => { setKeyword(''); setCategory('all'); setStatus('all'); setFilterDate(''); }}
+            onClick={() => { setKeyword(''); setCategory(''); setStatus(''); setFilterDate(''); }}
             className="px-4 py-3 text-emerald-600 font-bold text-xs uppercase tracking-widest hover:bg-emerald-50 rounded-xl transition-all"
           >
             Reset
@@ -176,7 +179,6 @@ const FoundItemsList = () => {
               <thead className="bg-gray-50/50 border-b border-gray-100 uppercase text-[10px] font-black text-gray-400 tracking-widest">
                 <tr>
                   <th className="px-6 py-5 whitespace-nowrap">Item Details</th>
-                  <th className="px-6 py-5">Category</th>
                   <th className="px-6 py-5">Location</th>
                   <th className="px-6 py-5">Status</th>
                   <th className="px-6 py-5">Date</th>
@@ -185,14 +187,14 @@ const FoundItemsList = () => {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filteredItems.length === 0 ? (
-                  <tr><td colSpan="6" className="px-6 py-20 text-center text-gray-400 font-bold uppercase tracking-widest text-xs italic">No items found</td></tr>
+                  <tr><td colSpan="5" className="px-6 py-20 text-center text-gray-400 font-bold uppercase tracking-widest text-xs italic">No items found</td></tr>
                 ) : (
                   filteredItems.map(item => (
                     <tr key={item._id} className="hover:bg-gray-50/80 transition-colors group">
                       <td className="px-6 py-4">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-12 w-12 bg-gray-100 rounded-xl overflow-hidden flex items-center justify-center border border-gray-100 shadow-inner group-hover:scale-110 transition-transform">
-                            {(item.image || item.imageUrl) && item.status !== 'returned' ? (
+                            {(item.image || item.imageUrl) ? (
                               <img src={getImageUrl(item)} alt={item.title} className="h-full w-full object-cover" />
                             ) : (
                               <svg className="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
@@ -204,7 +206,6 @@ const FoundItemsList = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-xs font-bold text-gray-500 uppercase tracking-tighter">{item.category}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">{item.location}</td>
                       <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(item.status)}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-400 font-mono">

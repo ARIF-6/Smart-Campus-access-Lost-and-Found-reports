@@ -80,18 +80,11 @@ const Incidents = () => {
       <div style={{ background: '#F7F8FC', minHeight: '100vh', padding: '32px 0' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px' }}>
 
-          {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
             <div>
               <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1A202C', margin: 0 }}>Incident Reports</h1>
               <p style={{ color: '#718096', marginTop: 4, fontSize: 14 }}>Review and manage security incidents on campus</p>
             </div>
-            <button
-              onClick={fetchIncidentsData}
-              style={{ background: '#4C3BCF', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 20px', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}
-            >
-              ↻ Refresh
-            </button>
           </div>
 
           {/* Filters */}

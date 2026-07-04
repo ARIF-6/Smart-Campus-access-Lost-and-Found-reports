@@ -41,8 +41,8 @@ const userSchema = new mongoose.Schema({
     trim: true
   },
   parentNumber: {
-    type: String,
-    trim: true
+    type: Number,
+    min: [100000000, 'Parent number must be at least 9 digits']
   },
   qrCode: {
     type: String,

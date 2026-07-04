@@ -103,19 +103,16 @@ exports.updateCategory = asyncHandler(async (req, res, next) => {
   res.status(200).json({ success: true, data: category, message: 'Category updated successfully.' });
 });
 
-// @desc    Delete (soft) a category
+// @desc    Delete a category permanently
 // @route   DELETE /api/categories/:id
 // @access  Private (superadmin, admin)
 exports.deleteCategory = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
-  const category = await Category.findById(id);
+  const category = await Category.findByIdAndDelete(id);
   if (!category) {
     return next(new ErrorResponse('Category not found.', 404));
   }
-  // Soft delete by marking inactive
-  category.status = 'inactive';
-  await category.save();
-  res.status(200).json({ success: true, message: 'Category deactivated successfully.' });
+  res.status(200).json({ success: true, message: 'Category deleted permanently.' });
 });
 
 // @desc    Get temporary category requests (isTemporary:true)
@@ -159,8 +156,9 @@ exports.convertTemporary = asyncHandler(async (req, res, next) => {
 // @route   GET /api/categories/lost-found
 // @access  Private
 exports.getLostFoundCategories = asyncHandler(async (req, res, next) => {
+  // Query both 'lost_found' and 'lostfound' to handle both enum variants in the database
   const categories = await Category.find({
-    categoryType: 'lost_found',
+    categoryType: { $in: ['lost_found', 'lostfound'] },
     status: 'active',
     isTemporary: false
   })

@@ -130,10 +130,8 @@ const UserManagement = () => {
       setAllRoles(allRolesData);
 
       let allowedNames = [];
-      if (currentUser?.role === 'superadmin') {
-        allowedNames = ['superadmin', 'admin', 'staff'];
-      } else if (currentUser?.role === 'admin') {
-        allowedNames = ['admin', 'staff'];
+      if (currentUser?.role === 'superadmin' || currentUser?.role === 'admin') {
+        allowedNames = ['superadmin', 'admin', 'staff', 'student', 'security', 'clean'];
       } else if (currentUser?.role === 'staff') {
         allowedNames = ['student', 'security', 'clean'];
       }
@@ -143,10 +141,8 @@ const UserManagement = () => {
     } catch (err) {
       setAllRoles(fallbackRoles);
       let allowedNames = [];
-      if (currentUser?.role === 'superadmin') {
-        allowedNames = ['superadmin', 'admin', 'staff'];
-      } else if (currentUser?.role === 'admin') {
-        allowedNames = ['admin', 'staff'];
+      if (currentUser?.role === 'superadmin' || currentUser?.role === 'admin') {
+        allowedNames = ['superadmin', 'admin', 'staff', 'student', 'security', 'clean'];
       } else if (currentUser?.role === 'staff') {
         allowedNames = ['student', 'security', 'clean'];
       }
@@ -521,7 +517,7 @@ const UserManagement = () => {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <button
+              {/* <button
                 onClick={() => {
                   const text = recentlyRegistered.map(s => `${s.fullName} | ID: ${s.studentId} | Password: ${s.password}`).join('\n');
                   navigator.clipboard.writeText(text);
@@ -530,7 +526,7 @@ const UserManagement = () => {
                 className="text-xs font-bold text-emerald-700 hover:text-emerald-900 px-3 py-1.5 bg-white/70 hover:bg-white rounded-lg border border-emerald-200 transition-all"
               >
                 📋 Copy All Credentials
-              </button>
+              </button> */}
               <button
                 onClick={() => setRecentlyRegistered([])}
                 className="text-xs font-bold text-emerald-600 hover:text-emerald-800 px-3 py-1.5 bg-white/70 hover:bg-white rounded-lg border border-emerald-200 transition-all"

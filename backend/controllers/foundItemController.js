@@ -125,19 +125,27 @@ exports.getAllFoundItems = asyncHandler(async (req, res) => {
   const items = await features.query.populate('createdBy', 'name fullName email').lean();
   const total = await FoundItem.countDocuments({ isDeleted: { $ne: true }, ...features.filterCriteria });
 
-  // Check claim status for authenticated user
+  // Check claim status for authenticated user (exclude rejected claims so UI shows correct state)
   let claimedItemIds = [];
+  let rejectedItemIds = [];
   if (req.user && req.user.id) {
     const userClaims = await Claim.find({ 
       user: req.user.id, 
       isDeleted: false 
-    }).select('item').lean();
-    claimedItemIds = userClaims.map(c => c.item.toString());
+    }).select('item status').lean();
+    // Only mark as claimed if the claim is pending or approved (not rejected)
+    claimedItemIds = userClaims
+      .filter(c => c.status !== 'rejected')
+      .map(c => c.item.toString());
+    rejectedItemIds = userClaims
+      .filter(c => c.status === 'rejected')
+      .map(c => c.item.toString());
   }
 
   const itemsWithClaimStatus = items.map(item => ({
     ...item,
-    isClaimedByUser: claimedItemIds.includes(item._id.toString())
+    isClaimedByUser: claimedItemIds.includes(item._id.toString()),
+    isRejectedByUser: rejectedItemIds.includes(item._id.toString())
   }));
 
   return sendSuccess(res, 'Found items fetched successfully', {

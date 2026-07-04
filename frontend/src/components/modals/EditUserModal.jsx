@@ -277,15 +277,19 @@ const handleSubmit = async (e) => {
                             </div>
 
                             <div>
-                              <label className="block text-sm font-medium text-gray-700">Parent Number</label>
+                              <label className="block text-sm font-medium text-gray-700">Parent Number <span className="text-xs text-gray-400">(min. 9 digits)</span></label>
                               <input
-                                type="tel"
+                                type="number"
                                 name="parentNumber"
                                 value={formData.parentNumber || ''}
                                 onChange={handleChange}
-                                placeholder="Enter parent contact number"
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                placeholder="e.g. 252345678"
+                                min="100000000"
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 sm:text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
+                              {formData.parentNumber && String(formData.parentNumber).replace(/\D/g,'').length < 9 && (
+                                <p className="mt-1 text-xs text-red-500 font-medium">⚠ Must be at least 9 digits</p>
+                              )}
                             </div>
                           </>
                         )}

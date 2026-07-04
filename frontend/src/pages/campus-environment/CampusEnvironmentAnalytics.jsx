@@ -145,7 +145,7 @@ const CampusEnvironmentAnalytics = () => {
                 </div>
                 <div className="text-right">
                   <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest bg-white border border-slate-200`}>
-                    {complaint.location}
+                    {complaint.student?.class?.name || '—'}
                   </span>
                 </div>
               </div>
