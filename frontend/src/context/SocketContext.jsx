@@ -13,14 +13,17 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     if (token && user) {
-      const newSocket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
+      // Socket connects to the root server URL — strip any trailing /api
+      const SOCKET_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api\/?$/, '');
+      const newSocket = io(SOCKET_URL, {
         auth: { token },
         transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionAttempts: 10,
         reconnectionDelay: 2000,
         forceNew: true,
-        closeOnBeforeunload: true
+        closeOnBeforeunload: true,
+        withCredentials: true,
       });
 
       newSocket.on('connect', () => {

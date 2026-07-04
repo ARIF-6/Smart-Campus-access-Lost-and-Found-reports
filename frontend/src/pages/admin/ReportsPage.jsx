@@ -60,7 +60,7 @@ const ReportsPage = () => {
             setLoading(true);
             const token = localStorage.getItem('token');
             const queryParams = new URLSearchParams({ ...filters, format }).toString();
-            const baseUrl = 'http://localhost:5000/api/reports';
+            const baseUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports`;
 
             const response = await fetch(`${baseUrl}/${type}?${queryParams}`, {
                 method: 'GET',

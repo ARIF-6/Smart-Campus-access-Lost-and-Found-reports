@@ -54,13 +54,30 @@ const app = express();
 // Connect to database
 connectDB();
 
-// 1. Permissive CORS (Must be first)
+// 1. CORS — allow Vercel frontend (production) and localhost (development)
+const ALLOWED_ORIGINS = [
+  process.env.FRONTEND_URL || 'https://smart-campus-access-lost-and-found.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:4173', // Vite preview
+];
+
 app.use(cors({
-  origin: true,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    // Also allow any vercel.app subdomain preview deployments
+    if (/^https:\/\/.*\.vercel\.app$/.test(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
   credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// Respond immediately to all preflight OPTIONS requests
+app.options('*', cors());
 
 // 2. Global Security Headers
 app.use(helmet({
@@ -105,8 +122,15 @@ const limiter = rateLimit({
 app.use('/api', limiter);
 
 // Serve static files from uploads folder
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/profiles', express.static(path.join(__dirname, 'uploads', 'profiles')));
+// Set cross-origin header so images are accessible from the Vercel frontend
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static(path.join(__dirname, 'uploads')));
+app.use('/profiles', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static(path.join(__dirname, 'uploads', 'profiles')));
 
 // Routes
 app.use("/api/auth", authRoutes);
