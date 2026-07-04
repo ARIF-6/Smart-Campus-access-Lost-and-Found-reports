@@ -76,8 +76,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Respond immediately to all preflight OPTIONS requests
-app.options('*', cors());
 
 // 2. Global Security Headers
 app.use(helmet({
