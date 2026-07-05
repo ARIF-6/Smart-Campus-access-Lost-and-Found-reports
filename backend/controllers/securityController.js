@@ -62,10 +62,22 @@ exports.createIncident = asyncHandler(async (req, res) => {
   return sendSuccess(res, 'Incident reported successfully', incident, 201);
 });
 
-// @desc    Get all incidents (security sees own, admin sees all)
+// @desc    Get all incidents (security sees own, admin sees all, staff sees campus-wide)
 // @route   GET /api/security/incidents
 exports.getIncidents = asyncHandler(async (req, res) => {
-  const filter = req.user.role === 'security' ? { reportedBy: req.user.id } : {};
+  let filter = {};
+  if (req.user.role === 'security') {
+    filter = { reportedBy: req.user.id };
+  } else if (req.user.role === 'staff') {
+    if (req.user.campus) {
+      const guards = await User.find({ role: 'security', campus: req.user.campus, isDeleted: false }).select('_id');
+      const guardIds = guards.map(g => g._id);
+      filter = { reportedBy: { $in: guardIds } };
+    } else {
+      filter = { reportedBy: { $in: [] } };
+    }
+  }
+
   const incidents = await Incident.find(filter)
     .populate('reportedBy', 'fullName')
     .sort({ createdAt: -1 })
@@ -146,7 +158,20 @@ exports.visitorExit = asyncHandler(async (req, res) => {
 // @desc    Get all visitors (today or all)
 // @route   GET /api/security/visitors
 exports.getVisitors = asyncHandler(async (req, res) => {
-  const visitors = await Visitor.find()
+  let filter = {};
+  if (req.user.role === 'security') {
+    filter = { registeredBy: req.user.id };
+  } else if (req.user.role === 'staff') {
+    if (req.user.campus) {
+      const guards = await User.find({ role: 'security', campus: req.user.campus, isDeleted: false }).select('_id');
+      const guardIds = guards.map(g => g._id);
+      filter = { registeredBy: { $in: guardIds } };
+    } else {
+      filter = { registeredBy: { $in: [] } };
+    }
+  }
+
+  const visitors = await Visitor.find(filter)
     .populate('registeredBy', 'fullName')
     .sort({ createdAt: -1 })
     .limit(100)
@@ -236,7 +261,19 @@ exports.addToBlacklist = asyncHandler(async (req, res) => {
 // @desc    Get blacklist
 // @route   GET /api/security/blacklist
 exports.getBlacklist = asyncHandler(async (req, res) => {
-  const query = req.user.role === 'security' ? { isActive: true } : {};
+  let query = {};
+  if (req.user.role === 'security') {
+    query = { isActive: true };
+  } else if (req.user.role === 'staff') {
+    if (req.user.campus) {
+      const guards = await User.find({ role: 'security', campus: req.user.campus, isDeleted: false }).select('_id');
+      const guardIds = guards.map(g => g._id);
+      query = { addedBy: { $in: guardIds } };
+    } else {
+      query = { addedBy: { $in: [] } };
+    }
+  }
+
   const list = await Blacklist.find(query)
     .populate('addedBy', 'fullName')
     .sort({ createdAt: -1 })

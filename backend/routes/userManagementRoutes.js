@@ -11,7 +11,8 @@ const {
   changeStatus,
   restoreUser,
   permanentDeleteUser,
-  uploadExcelStudents
+  uploadExcelStudents,
+  updateUserPhoto,
 } = require('../controllers/userManagementController');
 
 const { protect } = require('../middleware/authMiddleware');
@@ -41,12 +42,18 @@ router.route('/')
 
 router.route('/:id')
   .get(getUserById)
-  .put([
-    body('fullName', 'Full Name is required').optional().notEmpty().trim().escape(),
-    body('email', 'Please include a valid email').optional({ checkFalsy: true }).isEmail(),
-    validate
-  ], updateUser)
+  .put(
+    upload.profiles.single('photo'),
+    [
+      body('fullName', 'Full Name is required').optional().notEmpty().trim().escape(),
+      body('email', 'Please include a valid email').optional({ checkFalsy: true }).isEmail(),
+      validate
+    ],
+    updateUser
+  )
   .delete(deleteUser);
+
+router.patch('/:id/photo', upload.profiles.single('photo'), updateUserPhoto);
 
 router.route('/:id/role')
   .patch([

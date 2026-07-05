@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 import '../../models/claim.dart';
 import '../../models/campus_complaint.dart';
 import '../../services/campus_environment_service.dart';
@@ -22,6 +23,7 @@ class _ClaimsScreenState extends State<ClaimsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final ApiService _api = ApiService();
+  final SocketService _socketService = SocketService();
   final CampusEnvironmentService _complaintSvc = CampusEnvironmentService();
   final ClassIssueService _classIssueSvc = ClassIssueService();
 
@@ -41,11 +43,15 @@ class _ClaimsScreenState extends State<ClaimsScreen>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadAll();
+    _socketService.on('claim:updated', (_) {
+      if (mounted) _loadClaims();
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _socketService.off('claim:updated');
     super.dispose();
   }
 

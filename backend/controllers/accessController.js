@@ -113,6 +113,14 @@ exports.scanQRCode = async (req, res) => {
       const message = `${studentPayload.name} has ${actionLabel} the campus.`;
       await createNotification({ recipientRole: 'admin', title, message, type: 'ACCESS_LOG', relatedId: log._id });
       await createNotification({ recipientRole: 'staff', title, message, type: 'ACCESS_LOG', relatedId: log._id });
+      // Notify the student directly
+      await createNotification({
+        userId: user._id,
+        title,
+        message: `You have successfully ${actionLabel} the campus.`,
+        type: 'ACCESS_LOG',
+        relatedId: log._id
+      });
     };
 
     const finishAccess = async (nextStatus) => {
@@ -279,10 +287,16 @@ exports.getLogs = async (req, res) => {
       ];
     }
 
-    // 2. Campus-scoping: staff see only logs from their campus.
+    // 2. Campus-scoping: staff see only logs scanned by security guards assigned to the same campus.
     //    Superadmin and admin see ALL logs.
-    if (req.user.role === 'staff' && req.user.campus) {
-      query.campus = req.user.campus;
+    if (req.user.role === 'staff') {
+      if (req.user.campus) {
+        const guards = await User.find({ role: 'security', campus: req.user.campus, isDeleted: false }).select('_id');
+        const guardIds = guards.map(g => g._id);
+        query.scannedBy = { $in: guardIds };
+      } else {
+        query.scannedBy = { $in: [] };
+      }
     }
 
     const logs = await AccessLog.find(query)
@@ -326,7 +340,18 @@ exports.getLiveStatus = async (req, res) => {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
-    const todayLogs = await AccessLog.find({ createdAt: { $gte: startOfDay } });
+    const query = { createdAt: { $gte: startOfDay } };
+    if (req.user.role === 'staff') {
+      if (req.user.campus) {
+        const guards = await User.find({ role: 'security', campus: req.user.campus, isDeleted: false }).select('_id');
+        const guardIds = guards.map(g => g._id);
+        query.scannedBy = { $in: guardIds };
+      } else {
+        query.scannedBy = { $in: [] };
+      }
+    }
+
+    const todayLogs = await AccessLog.find(query);
 
     let entries = 0;
     let exits = 0;

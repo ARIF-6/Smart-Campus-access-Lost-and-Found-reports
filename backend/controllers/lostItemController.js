@@ -3,6 +3,7 @@ const { findMatchesForLostItem } = require('../services/matchService');
 const { logAction } = require('../utils/auditLogger');
 const APIFeatures = require('../utils/apiFeatures');
 const { createNotification } = require('./notificationController');
+const { emitGlobalEvent } = require('../socket/events/notificationEvents');
 const asyncHandler = require('../middleware/asyncHandler');
 const { sendSuccess } = require('../utils/responseHandler');
 
@@ -63,6 +64,8 @@ exports.reportLostItem = asyncHandler(async (req, res) => {
 
   // Trigger matching in the background
   findMatchesForLostItem(savedItem._id).catch(err => console.error('Matching Error:', err));
+
+  emitGlobalEvent('lostItem:created', savedItem);
 
   return sendSuccess(res, 'Lost item reported successfully', savedItem, 201);
 });

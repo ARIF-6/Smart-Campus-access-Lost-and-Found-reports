@@ -21,6 +21,7 @@ import toast from 'react-hot-toast';
 import { TableSkeleton } from '../../components/common/Skeleton';
 import { useAuth } from '../../context/AuthContext';
 import { useAutoRefreshSignal } from '../../context/AutoRefreshContext';
+import { getImageUrl } from '../../utils/imageUtils';
 
 const UserManagement = () => {
   const { user: currentUser } = useAuth();
@@ -640,8 +641,23 @@ const UserManagement = () => {
                       {/* Name Details */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="h-10 w-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 font-extrabold text-sm uppercase">
-                            {item.fullName ? item.fullName.charAt(0) : 'U'}
+                          <div className="h-10 w-10 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 border border-gray-100">
+                            {item.photoUrl ? (
+                              <img
+                                src={getImageUrl(item.photoUrl)}
+                                alt={item.fullName}
+                                className="h-full w-full object-cover"
+                                onError={e => {
+                                  e.target.style.display = 'none';
+                                  e.target.parentElement.classList.add('bg-indigo-50');
+                                  e.target.insertAdjacentHTML('afterend', `<span class="text-indigo-700 font-extrabold text-sm uppercase">${(item.fullName || 'U')[0]}</span>`);
+                                }}
+                              />
+                            ) : (
+                              <div className="h-full w-full bg-indigo-50 flex items-center justify-center text-indigo-700 font-extrabold text-sm uppercase">
+                                {item.fullName ? item.fullName.charAt(0) : 'U'}
+                              </div>
+                            )}
                           </div>
                           <div className="ml-3">
                             <div className="text-sm font-bold text-gray-900">{item.fullName}</div>
@@ -651,6 +667,7 @@ const UserManagement = () => {
                           </div>
                         </div>
                       </td>
+
 
                       {/* Section Specific columns */}
                       {currentSection === 'students' ? (
@@ -792,17 +809,15 @@ const UserManagement = () => {
               {!excelImportResult ? (
                 <>
                   <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6">
-                    <p className="text-sm font-semibold text-blue-800 mb-2">📋 Required Excel Columns:</p>
-                    <div className="grid grid-cols-3 gap-2 text-xs text-blue-700 font-mono">
-                      <span className="bg-blue-100 rounded px-2 py-1">Student ID</span>
-                      <span className="bg-blue-100 rounded px-2 py-1">Full Name</span>
+                    <p className="text-sm font-semibold text-blue-800 mb-2">📋 Required Excel Columns (exact names, no extras allowed):</p>
+                    <div className="grid grid-cols-3 gap-2 text-xs text-blue-700 font-mono mb-2">
+                      <span className="bg-blue-100 rounded px-2 py-1">StudentID</span>
+                      <span className="bg-blue-100 rounded px-2 py-1">FullName</span>
                       <span className="bg-blue-100 rounded px-2 py-1">Faculty</span>
                       <span className="bg-blue-100 rounded px-2 py-1">Department</span>
                       <span className="bg-blue-100 rounded px-2 py-1">Class</span>
-                      <span className="bg-blue-100 rounded px-2 py-1">Parent Number</span>
-                      <span className="bg-blue-100 rounded px-2 py-1 col-span-3">Academic Year</span>
+                      <span className="bg-blue-100 rounded px-2 py-1">ParentNumber</span>
                     </div>
-                    <p className="text-xs text-blue-600 mt-2">✅ <strong>Class is auto-created</strong> if it doesn't exist. Academic Year format must be e.g. 21/22 or 2021/2022.</p>
                   </div>
 
                   <div
@@ -841,14 +856,36 @@ const UserManagement = () => {
                 </>
               ) : (
                 <>
-                  <div className="space-y-4">
-                    {excelImportResult.registered?.length > 0 && (
+                  <div className="space-y-5">
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-center">
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Rows</p>
+                        <p className="text-2xl font-black text-gray-700 mt-1">
+                          {(excelImportResult.created?.length || 0) + (excelImportResult.errors?.length || 0)}
+                        </p>
+                      </div>
+                      <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-center">
+                        <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Imported</p>
+                        <p className="text-2xl font-black text-emerald-700 mt-1">
+                          {excelImportResult.created?.length || 0}
+                        </p>
+                      </div>
+                      <div className="bg-rose-50 border border-rose-100 rounded-xl p-4 text-center">
+                        <p className="text-xs font-bold text-rose-600 uppercase tracking-wider">Skipped</p>
+                        <p className="text-2xl font-black text-rose-700 mt-1">
+                          {excelImportResult.errors?.length || 0}
+                        </p>
+                      </div>
+                    </div>
+
+                    {excelImportResult.created?.length > 0 && (
                       <div>
                         <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-bold text-gray-800">✅ Registered Students ({excelImportResult.registered.length})</h4>
+                          <h4 className="font-bold text-gray-800 text-sm">✅ Registered Students ({excelImportResult.created.length})</h4>
                           <button
                             onClick={() => {
-                              const text = excelImportResult.registered.map(s => `${s.fullName} | ID: ${s.studentId} | Password: ${s.password}`).join('\n');
+                              const text = excelImportResult.created.map(s => `${s.fullName} | ID: ${s.studentId} | Password: ${s.password}`).join('\n');
                               navigator.clipboard.writeText(text);
                               toast.success('Credentials copied to clipboard!');
                             }}
@@ -858,17 +895,17 @@ const UserManagement = () => {
                           </button>
                         </div>
                         <div className="bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
-                          <div className="max-h-64 overflow-y-auto">
+                          <div className="max-h-60 overflow-y-auto">
                             <table className="w-full text-xs">
                               <thead className="bg-gray-100 sticky top-0">
                                 <tr>
                                   <th className="px-4 py-2 text-left font-bold text-gray-600 uppercase tracking-wider">Full Name</th>
-                                  <th className="px-4 py-2 text-left font-bold text-gray-600 uppercase tracking-wider">Student ID</th>
+                                  <th className="px-4 py-2 text-left font-bold text-gray-600 uppercase tracking-wider">StudentID</th>
                                   <th className="px-4 py-2 text-left font-bold text-gray-600 uppercase tracking-wider">Password</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-100">
-                                {excelImportResult.registered.map((s, i) => (
+                                {excelImportResult.created.map((s, i) => (
                                   <tr key={i} className="hover:bg-white">
                                     <td className="px-4 py-2 font-medium text-gray-800">{s.fullName}</td>
                                     <td className="px-4 py-2 font-mono text-indigo-700">{s.studentId}</td>
@@ -884,10 +921,10 @@ const UserManagement = () => {
 
                     {excelImportResult.errors?.length > 0 && (
                       <div>
-                        <h4 className="font-bold text-red-700 mb-2">⚠️ Errors ({excelImportResult.errors.length})</h4>
-                        <div className="bg-red-50 rounded-xl border border-red-100 p-3 max-h-40 overflow-y-auto space-y-1">
+                        <h4 className="font-bold text-rose-700 text-sm mb-2">⚠️ Skipped Records & Reasons ({excelImportResult.errors.length})</h4>
+                        <div className="bg-rose-50/50 rounded-xl border border-rose-100 p-4 max-h-48 overflow-y-auto space-y-1.5">
                           {excelImportResult.errors.map((err, i) => (
-                            <p key={i} className="text-xs text-red-600">• {err}</p>
+                            <p key={i} className="text-xs text-rose-800 font-medium leading-relaxed">• {err}</p>
                           ))}
                         </div>
                       </div>

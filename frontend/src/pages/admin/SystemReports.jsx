@@ -70,17 +70,57 @@ const SeverityBadge = ({ value }) => {
 
 // ─── Tab configuration ─────────────────────────────────────────────────────────
 
-const TABS = [
-  { key: 'lostItems',   label: 'Lost Items',   icon: '🔍', color: 'from-red-500 to-rose-600' },
-  { key: 'foundItems',  label: 'Found Items',  icon: '✅', color: 'from-green-500 to-emerald-600' },
-  { key: 'claims',      label: 'Claims',       icon: '📋', color: 'from-amber-500 to-orange-600' },
-  { key: 'users',       label: 'Users',        icon: '👥', color: 'from-violet-500 to-purple-600' },
-  { key: 'incidents',   label: 'Incidents',    icon: '⚠️', color: 'from-orange-500 to-red-600' },
-  { key: 'visitors',    label: 'Visitors',     icon: '🚶', color: 'from-sky-500 to-blue-600' },
-  { key: 'accessLogs',  label: 'Access Logs',  icon: '🔐', color: 'from-teal-500 to-cyan-600' },
-  { key: 'noExitReports', label: 'No-Exits',   icon: '⏰', color: 'from-pink-500 to-rose-600' },
-  { key: 'auditLogs',   label: 'Audit Logs',   icon: '📝', color: 'from-indigo-500 to-blue-700' },
+const PARENT_TABS = [
+  {
+    key: 'items-claims',
+    label: 'Lost, Found & Claims',
+    children: ['lostItems', 'foundItems', 'claims']
+  },
+  {
+    key: 'users',
+    label: 'Users',
+    children: ['userAdmins', 'userStaff', 'userStudents', 'userSecurity', 'userCleaners']
+  },
+  {
+    key: 'visitors-incidents',
+    label: 'Visitors & Incidents',
+    children: ['visitors', 'incidents']
+  },
+  {
+    key: 'logs',
+    label: 'Access & Audit Logs',
+    children: ['accessLogs', 'auditLogs']
+  }
 ];
+
+const TABS = [
+  { key: 'lostItems',   label: 'Lost Items',   color: 'from-red-500 to-rose-600' },
+  { key: 'foundItems',  label: 'Found Items',  color: 'from-green-500 to-emerald-600' },
+  { key: 'claims',      label: 'Claims',       color: 'from-amber-500 to-orange-600' },
+  { key: 'userAdmins',  label: 'Admin',        color: 'from-violet-500 to-purple-600' },
+  { key: 'userStaff',   label: 'Staff',        color: 'from-violet-500 to-purple-600' },
+  { key: 'userStudents',label: 'Students',     color: 'from-violet-500 to-purple-600' },
+  { key: 'userSecurity',label: 'Security',     color: 'from-violet-500 to-purple-600' },
+  { key: 'userCleaners',label: 'Cleaners',     color: 'from-violet-500 to-purple-600' },
+  { key: 'visitors',    label: 'Visitors',     color: 'from-sky-500 to-blue-600' },
+  { key: 'incidents',   label: 'Incidents',    color: 'from-orange-500 to-red-600' },
+  { key: 'accessLogs',  label: 'Access Logs',  color: 'from-teal-500 to-cyan-600' },
+  { key: 'auditLogs',   label: 'Audit Logs',   color: 'from-indigo-500 to-blue-700' },
+];
+
+const getChildCount = (childKey, data, summary) => {
+  if (!data) return 0;
+  if (childKey === 'userAdmins') return (data.users || []).filter(u => u.role === 'admin' || u.role === 'superadmin').length;
+  if (childKey === 'userStaff') return (data.users || []).filter(u => u.role === 'staff').length;
+  if (childKey === 'userStudents') return (data.users || []).filter(u => u.role === 'student').length;
+  if (childKey === 'userSecurity') return (data.users || []).filter(u => u.role === 'security').length;
+  if (childKey === 'userCleaners') return (data.users || []).filter(u => u.role === 'clean').length;
+  return summary[childKey] ?? 0;
+};
+
+const getParentCount = (parentTab, data, summary) => {
+  return parentTab.children.reduce((acc, childKey) => acc + getChildCount(childKey, data, summary), 0);
+};
 
 // ─── Summary stat card ─────────────────────────────────────────────────────────
 
@@ -187,7 +227,20 @@ const SystemReports = () => {
 
   const filtered = useMemo(() => {
     if (!data) return [];
-    const raw = data[activeTab];
+    let raw = [];
+    if (activeTab === 'userAdmins') {
+      raw = (data.users || []).filter(u => u.role === 'admin' || u.role === 'superadmin');
+    } else if (activeTab === 'userStaff') {
+      raw = (data.users || []).filter(u => u.role === 'staff');
+    } else if (activeTab === 'userStudents') {
+      raw = (data.users || []).filter(u => u.role === 'student');
+    } else if (activeTab === 'userSecurity') {
+      raw = (data.users || []).filter(u => u.role === 'security');
+    } else if (activeTab === 'userCleaners') {
+      raw = (data.users || []).filter(u => u.role === 'clean');
+    } else {
+      raw = data[activeTab];
+    }
     if (!Array.isArray(raw)) return [];
     const q = search.toLowerCase();
     return raw.filter(row => {
@@ -208,18 +261,18 @@ const SystemReports = () => {
       lostItems:  ['All', 'lost', 'matched', 'returned'],
       foundItems: ['All', 'pending', 'approved', 'claimed', 'returned', 'stored'],
       claims:     ['All', 'PENDING', 'APPROVED', 'REJECTED'],
-      // Staff cannot see admin/superadmin/other-staff users, so hide those filter options
-      users:      isStaff
-        ? ['All', 'student', 'security', 'clean']
-        : ['All', 'admin', 'staff', 'student', 'security', 'clean'],
+      userAdmins: ['All', 'admin', 'superadmin'],
+      userStaff:  ['All', 'staff'],
+      userStudents: ['All', 'student'],
+      userSecurity: ['All', 'security'],
+      userCleaners: ['All', 'clean'],
       incidents:  ['All', 'open', 'in_progress', 'resolved'],
       visitors:   ['All', 'inside', 'exited'],
       accessLogs: ['All', 'IN', 'OUT'],
-      noExitReports: ['All'],
       auditLogs:  ['All', 'LOGIN', 'LOGOUT', 'CREATE_USER', 'UPDATE_USER', 'DELETE_USER', 'SUBMIT_CLAIM', 'APPROVE_CLAIM', 'REJECT_CLAIM', 'CREATE_LOST_ITEM', 'CREATE_FOUND_ITEM', 'DELETE_ITEM', 'SCAN_QR', 'CREATE_ANNOUNCEMENT', 'DELETE_ANNOUNCEMENT'],
     };
     return map[activeTab] || ['All'];
-  }, [activeTab, isStaff]);
+  }, [activeTab]);
 
   // ─── Per-tab CSV rows ───────────────────────────────────────────────────────
 
@@ -232,16 +285,22 @@ const SystemReports = () => {
         return filtered.map(r => ({ Title: r.title, Category: r.category, Status: r.status, Location: r.location, Date: fmtDate(r.createdAt) }));
       case 'claims':
         return filtered.map(r => ({ Item: r.foundItemId?.title || '—', User: r.userId?.fullName || '—', Email: r.userId?.email || '—', Status: r.status, Date: fmtDate(r.createdAt) }));
-      case 'users':
-        return filtered.map(r => ({ Name: r.fullName || r.name || '—', Role: r.role, Joined: fmtDate(r.createdAt) }));
+      case 'userAdmins':
+        return filtered.map(r => ({ Name: r.fullName || r.name || '—', Username: r.username || '—', Role: r.role, Joined: fmtDate(r.createdAt) }));
+      case 'userStaff':
+        return filtered.map(r => ({ Name: r.fullName || r.name || '—', Username: r.username || '—', 'Campus Assigned': r.campus?.name || '—', Role: r.role, Joined: fmtDate(r.createdAt) }));
+      case 'userStudents':
+        return filtered.map(r => ({ ID: r.studentId || '—', Name: r.fullName || r.name || '—', 'Parent Number': r.parentNumber || '—', Faculty: r.faculty?.name || '—', Department: r.department?.name || '—', Class: r.class?.name || '—', Hall: r.hallName || '—', 'Academic Year': r.academicYear || '—', Role: r.role, Joined: fmtDate(r.createdAt) }));
+      case 'userSecurity':
+        return filtered.map(r => ({ Name: r.fullName || r.name || '—', Username: r.username || '—', 'Campus Assigned': r.campus?.name || '—', Shift: r.assignedShift || '—', 'Shift Time': r.shiftStartTime && r.shiftEndTime ? `${r.shiftStartTime} - ${r.shiftEndTime}` : '—', Role: r.role, Joined: fmtDate(r.createdAt) }));
+      case 'userCleaners':
+        return filtered.map(r => ({ Name: r.fullName || r.name || '—', Username: r.username || '—', 'Campus Assigned': r.campus?.name || '—', Role: r.role, Joined: fmtDate(r.createdAt) }));
       case 'incidents':
         return filtered.map(r => ({ Type: r.type, Severity: r.severity, Status: r.status, Location: r.location, ReportedBy: r.reportedBy?.fullName || '—', Date: fmtDate(r.createdAt) }));
       case 'visitors':
         return filtered.map(r => ({ Name: r.name, Purpose: r.purpose, Status: r.status, Entry: fmt(r.entryTime), Exit: fmt(r.exitTime) }));
       case 'accessLogs':
         return filtered.map(r => ({ User: r.userId?.fullName || '—', Role: r.userId?.role || '—', Status: r.status, Entry: fmt(r.entryTime), Exit: fmt(r.exitTime) }));
-      case 'noExitReports':
-        return filtered.flatMap(r => (r.students || []).map(s => ({ Date: fmtDate(r.date), Name: s.fullName, 'Student ID': s.studentId, 'Entry Time': fmt(s.entryTime) })));
       case 'auditLogs':
         return filtered.map(r => ({ Operator: r.userId?.fullName || r.userId?.name || '—', Action: r.action, Target: r.targetType || '—', Details: r.details || '—', Date: fmtDate(r.createdAt) }));
       default: return [];
@@ -297,18 +356,81 @@ const SystemReports = () => {
           />
         );
 
-      case 'users':
+      case 'userAdmins':
         return (
           <DataTable
-            headers={['#', 'Name', 'Role', 'Joined']}
+            headers={['#', 'Full Name', 'Username', 'Role', 'Joined']}
             rows={filtered.map((r, i) => [
               <span className="text-xs text-gray-300 font-mono" key="idx">{i + 1}</span>,
-              <div className="flex items-center gap-2" key="info">
-                <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-xs font-black text-indigo-600">
-                  {(r.fullName || r.name || '?')[0].toUpperCase()}
-                </div>
-                <span className="font-bold text-gray-800" key="name">{r.fullName || r.name || '—'}</span>
-              </div>,
+              <span className="font-bold text-gray-800" key="name">{r.fullName || r.name || '—'}</span>,
+              <span className="text-gray-600 font-mono text-xs" key="username">{r.username || '—'}</span>,
+              <StatusBadge value={r.role} />,
+              <span className="text-gray-400 text-xs" key="joined">{fmtDate(r.createdAt)}</span>,
+            ])}
+          />
+        );
+
+      case 'userStaff':
+        return (
+          <DataTable
+            headers={['#', 'Full Name', 'Username', 'Campus Assigned', 'Role', 'Joined']}
+            rows={filtered.map((r, i) => [
+              <span className="text-xs text-gray-300 font-mono" key="idx">{i + 1}</span>,
+              <span className="font-bold text-gray-800" key="name">{r.fullName || r.name || '—'}</span>,
+              <span className="text-gray-600 font-mono text-xs" key="username">{r.username || '—'}</span>,
+              <span className="text-gray-700" key="campus">{r.campus?.name || '—'}</span>,
+              <StatusBadge value={r.role} />,
+              <span className="text-gray-400 text-xs" key="joined">{fmtDate(r.createdAt)}</span>,
+            ])}
+          />
+        );
+
+      case 'userStudents':
+        return (
+          <DataTable
+            headers={['#', 'ID', 'Full Name', 'Parent Number', 'Faculty', 'Department', 'Class', 'Hall', 'Academic Year', 'Role', 'Joined']}
+            rows={filtered.map((r, i) => [
+              <span className="text-xs text-gray-300 font-mono" key="idx">{i + 1}</span>,
+              <span className="text-indigo-600 font-mono text-xs" key="id">{r.studentId || '—'}</span>,
+              <span className="font-bold text-gray-800" key="name">{r.fullName || r.name || '—'}</span>,
+              <span className="text-gray-600" key="parent">{r.parentNumber || '—'}</span>,
+              <span className="text-gray-600 text-xs" key="faculty">{r.faculty?.name || '—'}</span>,
+              <span className="text-gray-600 text-xs" key="dept">{r.department?.name || '—'}</span>,
+              <span className="text-gray-600 text-xs" key="class">{r.class?.name || '—'}</span>,
+              <span className="text-gray-600 text-xs" key="hall">{r.hallName || '—'}</span>,
+              <span className="text-gray-500 text-xs font-medium" key="year">{r.academicYear || '—'}</span>,
+              <StatusBadge value={r.role} />,
+              <span className="text-gray-400 text-xs" key="joined">{fmtDate(r.createdAt)}</span>,
+            ])}
+          />
+        );
+
+      case 'userSecurity':
+        return (
+          <DataTable
+            headers={['#', 'Full Name', 'Username', 'Campus Assigned', 'Shift Assigned', 'Shift Time Assigned', 'Role', 'Joined']}
+            rows={filtered.map((r, i) => [
+              <span className="text-xs text-gray-300 font-mono" key="idx">{i + 1}</span>,
+              <span className="font-bold text-gray-800" key="name">{r.fullName || r.name || '—'}</span>,
+              <span className="text-gray-600 font-mono text-xs" key="username">{r.username || '—'}</span>,
+              <span className="text-gray-700" key="campus">{r.campus?.name || '—'}</span>,
+              <span className="text-gray-600 capitalize text-xs" key="shift">{r.assignedShift || '—'}</span>,
+              <span className="text-gray-500 text-xs" key="shifttime">{r.shiftStartTime && r.shiftEndTime ? `${r.shiftStartTime} - ${r.shiftEndTime}` : '—'}</span>,
+              <StatusBadge value={r.role} />,
+              <span className="text-gray-400 text-xs" key="joined">{fmtDate(r.createdAt)}</span>,
+            ])}
+          />
+        );
+
+      case 'userCleaners':
+        return (
+          <DataTable
+            headers={['#', 'Full Name', 'Username', 'Campus Assigned', 'Role', 'Joined']}
+            rows={filtered.map((r, i) => [
+              <span className="text-xs text-gray-300 font-mono" key="idx">{i + 1}</span>,
+              <span className="font-bold text-gray-800" key="name">{r.fullName || r.name || '—'}</span>,
+              <span className="text-gray-600 font-mono text-xs" key="username">{r.username || '—'}</span>,
+              <span className="text-gray-700" key="campus">{r.campus?.name || '—'}</span>,
               <StatusBadge value={r.role} />,
               <span className="text-gray-400 text-xs" key="joined">{fmtDate(r.createdAt)}</span>,
             ])}
@@ -362,32 +484,6 @@ const SystemReports = () => {
           />
         );
 
-      case 'noExitReports': {
-        const rows = [];
-        filtered.forEach(report => {
-          (report.students || []).forEach(student => {
-            rows.push({
-              date: report.date,
-              fullName: student.fullName,
-              studentId: student.studentId,
-              entryTime: student.entryTime,
-            });
-          });
-        });
-        return (
-          <DataTable
-            headers={['#', 'Date', 'Student Name', 'Student ID', 'Entry Time']}
-            rows={rows.map((r, i) => [
-              <span className="text-xs text-gray-300 font-mono" key="idx">{i + 1}</span>,
-              <span className="font-bold text-gray-800" key="date">{fmtDate(r.date)}</span>,
-              <span className="text-gray-700" key="name">{r.fullName}</span>,
-              <span className="text-indigo-600 font-mono text-xs" key="id">{r.studentId}</span>,
-              <span className="text-gray-400 text-xs" key="time">{fmt(r.entryTime)}</span>,
-            ])}
-          />
-        );
-      }
-
       case 'auditLogs': {
         const getActionBadge = a => {
           if (!a) return 'bg-gray-100 text-gray-600';
@@ -436,11 +532,11 @@ const SystemReports = () => {
 
         </div>
 
-        {/* ── Summary stat cards ── */}
+        {/* ── Summary stat cards / Tabs ── */}
         {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
-            {TABS.map(t => (
-              <div key={t.key} className="h-28 bg-gray-100 animate-pulse rounded-2xl" />
+          <div className="flex gap-4 border-b border-gray-200">
+            {PARENT_TABS.map(pt => (
+              <div key={pt.key} className="h-14 w-44 bg-gray-100 animate-pulse rounded-t-xl" />
             ))}
           </div>
         ) : error ? (
@@ -449,16 +545,66 @@ const SystemReports = () => {
             <button onClick={fetchData} className="mt-4 px-6 py-2 bg-red-500 text-white rounded-xl font-bold text-sm hover:bg-red-600">Retry</button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
-            {TABS.map(t => (
-              <StatCard
-                key={t.key}
-                tab={t}
-                count={summary[t.key] ?? 0}
-                active={activeTab === t.key}
-                onClick={() => { setActiveTab(t.key); setSearch(''); setStatusFilter('All'); }}
-              />
-            ))}
+          <div className="space-y-4">
+            {/* Parent Tabs */}
+            <div className="border-b border-gray-200">
+              <nav className="flex space-x-8" aria-label="Parent Tabs">
+                {PARENT_TABS.map(pt => {
+                  const isParentActive = pt.children.includes(activeTab);
+                  return (
+                    <button
+                      key={pt.key}
+                      onClick={() => {
+                        setActiveTab(pt.children[0]);
+                        setSearch('');
+                        setStatusFilter('All');
+                      }}
+                      className={`pb-4 px-1 border-b-2 font-bold text-sm transition-all duration-200
+                        ${isParentActive
+                          ? 'border-indigo-600 text-indigo-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }
+                      `}
+                    >
+                      {pt.label}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+
+            {/* Sub-Tabs */}
+            {(() => {
+              const currentParent = PARENT_TABS.find(pt => pt.children.includes(activeTab));
+              if (!currentParent || currentParent.children.length <= 1) return null;
+              return (
+                <div className="flex flex-wrap gap-6 pt-1">
+                  {currentParent.children.map(childKey => {
+                    const childTab = TABS.find(t => t.key === childKey);
+                    if (!childTab) return null;
+                    const isChildActive = activeTab === childKey;
+                    return (
+                      <button
+                        key={childKey}
+                        onClick={() => {
+                          setActiveTab(childKey);
+                          setSearch('');
+                          setStatusFilter('All');
+                        }}
+                        className={`pb-2 px-1 border-b-2 font-semibold text-xs transition-all duration-200
+                          ${isChildActive
+                            ? 'border-indigo-500 text-indigo-600'
+                            : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'
+                          }
+                        `}
+                      >
+                        {childTab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -468,9 +614,8 @@ const SystemReports = () => {
             {/* Panel header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-6 py-5 border-b border-gray-100 bg-gray-50/40">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${currentTab?.color} flex items-center justify-center text-lg shadow-sm`}>{currentTab?.icon}</div>
                 <div>
-                  <h3 className="font-black text-gray-800">{currentTab?.label}</h3>
+                  <h3 className="font-black text-gray-800 text-lg leading-tight">{currentTab?.label}</h3>
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{filtered.length} records</p>
                 </div>
               </div>

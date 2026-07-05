@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 import '../../models/found_item.dart';
 import 'claim_request_screen.dart';
 
@@ -16,6 +17,7 @@ class FoundItemsScreen extends StatefulWidget {
 
 class _FoundItemsScreenState extends State<FoundItemsScreen> {
   final ApiService _apiService = ApiService();
+  final SocketService _socketService = SocketService();
   List<FoundItem> _items = [];
   bool _isLoading = true;
 
@@ -23,6 +25,12 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
   void initState() {
     super.initState();
     _fetchItems();
+    _socketService.on('foundItem:created', (_) {
+      if (mounted) _fetchItems();
+    });
+    _socketService.on('foundItem:updated', (_) {
+      if (mounted) _fetchItems();
+    });
   }
 
   Future<void> _fetchItems() async {
@@ -46,11 +54,16 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching found items: $e')),
-        );
+        debugPrint('Error fetching found items: $e');
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _socketService.off('foundItem:created');
+    _socketService.off('foundItem:updated');
+    super.dispose();
   }
 
   @override

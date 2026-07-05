@@ -7,6 +7,7 @@ const Visitor = require('../models/Visitor');
 const AccessLog = require('../models/AccessLog');
 const AuditLog = require('../models/AuditLog');
 const DailyNoExitReport = require('../models/DailyNoExitReport');
+const Hall = require('../models/Hall');
 const { checkAndGenerateDailyNoExitReports } = require('../utils/reportHelper');
 const { Parser } = require('json2csv');
 const PDFDocument = require('pdfkit');
@@ -271,6 +272,14 @@ exports.getAllSystemReports = async (req, res) => {
       }
     }
 
+    const isStaff = req.user?.role === 'staff';
+    let guardIds = [];
+    if (isStaff && req.user.campus) {
+      // Find IDs of all security guards assigned to the same campus as this staff
+      const guards = await User.find({ role: 'security', campus: req.user.campus, isDeleted: false }).select('_id');
+      guardIds = guards.map(g => g._id);
+    }
+
     const [lostItems, foundItems, claims, users, incidents, visitors, accessLogs, auditLogs, noExitReports] =
       await Promise.all([
         LostItem.find({ isDeleted: false, ...dateFilter })
@@ -296,31 +305,47 @@ exports.getAllSystemReports = async (req, res) => {
         User.find({
           isDeleted: false,
           ...dateFilter,
-          // Staff can only see students, security, and cleaners — not admins or other staff
-          ...(req.user?.role === 'staff' ? { role: { $nin: ['admin', 'superadmin', 'staff'] } } : {}),
+          // Staff can only see students, security, and cleaners they personally registered
+          ...(isStaff ? { createdBy: req.user.id, role: { $nin: ['admin', 'superadmin', 'staff'] } } : {}),
         })
-          .select('fullName name email role createdAt')
+          .populate('faculty', 'name')
+          .populate('department', 'name')
+          .populate('class', 'name')
+          .populate('campus', 'name')
+          .select('fullName name email username studentId parentNumber photoUrl faculty department class campus assignedShift shiftStartTime shiftEndTime academicYear role createdAt')
           .sort({ createdAt: -1 })
           .limit(500)
           .lean(),
 
-        Incident.find({ ...dateFilter })
+        Incident.find({
+          ...dateFilter,
+          // Staff can only see incidents reported by security guards on their campus
+          ...(isStaff ? { reportedBy: { $in: guardIds } } : {}),
+        })
           .populate('reportedBy', 'fullName')
-          .select('type severity status location description createdAt')
+          .select('reportedBy type severity status location description createdAt')
           .sort({ createdAt: -1 })
           .limit(500)
           .lean(),
 
-        Visitor.find({ ...dateFilter })
+        Visitor.find({
+          ...dateFilter,
+          // Staff can only see visitors registered by security guards on their campus
+          ...(isStaff ? { registeredBy: { $in: guardIds } } : {}),
+        })
           .populate('registeredBy', 'fullName')
-          .select('name purpose status entryTime exitTime createdAt')
+          .select('registeredBy name purpose status entryTime exitTime createdAt')
           .sort({ createdAt: -1 })
           .limit(500)
           .lean(),
 
-        AccessLog.find({ ...dateFilter })
+        AccessLog.find({
+          ...dateFilter,
+          // Staff can only see access logs scanned by security guards on their campus
+          ...(isStaff ? { scannedBy: { $in: guardIds } } : {}),
+        })
           .populate('userId', 'fullName name role')
-          .select('status entryTime exitTime createdAt')
+          .select('scannedBy status entryTime exitTime createdAt')
           .sort({ createdAt: -1 })
           .limit(500)
           .lean(),
@@ -333,18 +358,49 @@ exports.getAllSystemReports = async (req, res) => {
           .lean(),
 
         DailyNoExitReport.find({ ...noExitFilter })
-          .populate('students.userId', 'fullName studentId')
+          .populate('students.userId', 'fullName studentId createdBy')
           .sort({ date: -1 })
           .limit(500)
           .lean(),
       ]);
+
+    // If staff, filter students inside noExitReports in-memory to only show their own registered students
+    if (isStaff) {
+      noExitReports.forEach(rep => {
+        if (rep.students) {
+          rep.students = rep.students.filter(
+            s => s.userId && String(s.userId.createdBy) === String(req.user.id)
+          );
+        }
+      });
+    }
+
+    // Resolve halls for users
+    const classIds = users.filter(u => u.class?._id || u.class).map(u => u.class?._id || u.class);
+    const hallsList = classIds.length ? await Hall.find({ classes: { $in: classIds } }).select('name classes').lean() : [];
+    const hallMap = {};
+    hallsList.forEach(h => {
+      if (Array.isArray(h.classes)) {
+        h.classes.forEach(cId => {
+          hallMap[cId.toString()] = h.name;
+        });
+      }
+    });
+
+    const enrichedUsers = users.map(u => {
+      const studentClassId = u.class?._id || u.class;
+      return {
+        ...u,
+        hallName: studentClassId ? (hallMap[studentClassId.toString()] || '—') : '—'
+      };
+    });
 
     // Build summary counts
     const summary = {
       lostItems: lostItems.length,
       foundItems: foundItems.length,
       claims: claims.length,
-      users: users.length,
+      users: enrichedUsers.length,
       incidents: incidents.length,
       visitors: visitors.length,
       accessLogs: accessLogs.length,
@@ -359,7 +415,7 @@ exports.getAllSystemReports = async (req, res) => {
         lostItems,
         foundItems,
         claims,
-        users,
+        users: enrichedUsers,
         incidents,
         visitors,
         accessLogs,

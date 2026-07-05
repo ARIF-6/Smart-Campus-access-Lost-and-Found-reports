@@ -25,10 +25,10 @@ const AdminLayout = ({ children, title = 'Smart Campus' }) => {
   return (
     <AutoRefreshProvider intervalMs={30000}>
       <div className="flex h-screen bg-gray-50 font-sans overflow-hidden">
-        {/* Sidebar */}
+        {/* Sidebar — owns its own width via collapsed state */}
         <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-        {/* Main Content Area */}
+        {/* Main Content Area — fills remaining space */}
         <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
           {/* Top Header */}
           <header className="bg-white border-b border-gray-200 z-10 flex-shrink-0" style={{ height: 56 }}>

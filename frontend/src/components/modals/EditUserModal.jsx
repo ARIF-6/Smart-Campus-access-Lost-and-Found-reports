@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getFaculties, getDepartments, getClasses, getCampuses } from '../../services/api';
+import { getImageUrl } from '../../utils/imageUtils';
+import TimePicker from '../common/TimePicker';
 
 const EditUserModal = ({ isOpen, onClose, user, onSave, availableRoles = [] }) => {
   const { user: currentUser } = useAuth();
@@ -32,6 +34,9 @@ const EditUserModal = ({ isOpen, onClose, user, onSave, availableRoles = [] }) =
   const [filteredDepartments, setFilteredDepartments] = useState([]);
   const [filteredClasses, setFilteredClasses] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState('');
+  const photoInputRef = React.useRef(null);
 
   useEffect(() => {
     if (user && isOpen) {
@@ -55,6 +60,8 @@ const EditUserModal = ({ isOpen, onClose, user, onSave, availableRoles = [] }) =
         shiftStartTime: user.shiftStartTime || '',
         shiftEndTime: user.shiftEndTime || ''
       });
+      setPhotoFile(null);
+      setPhotoPreview('');
       // Load university data
       const fetchData = async () => {
         try {
@@ -107,26 +114,44 @@ const EditUserModal = ({ isOpen, onClose, user, onSave, availableRoles = [] }) =
 const handleSubmit = async (e) => {
   e.preventDefault();
   setIsLoading(true);
-  const submitData = { ...formData };
-  if (submitData.role !== 'student') {
-    submitData.studentId = '';
-    submitData.faculty = '';
-    submitData.department = '';
-    submitData.class = '';
-    submitData.academicYear = '';
-    submitData.qrCode = '';
-    submitData.photoUrl = '';
+
+  // Build either FormData (when photo chosen) or plain object
+  let payload;
+  if (photoFile) {
+    payload = new FormData();
+    Object.entries(formData).forEach(([k, v]) => {
+      if (v !== undefined && v !== null) payload.append(k, v);
+    });
+    payload.append('photo', photoFile);
+  } else {
+    payload = { ...formData };
   }
-  if (!['staff', 'clean', 'security'].includes(submitData.role)) {
-    submitData.campus = '';
+
+  const submitData = photoFile ? payload : { ...formData };
+
+  // Clear student-only fields when not a student
+  if (!photoFile) {
+    if (submitData.role !== 'student') {
+      submitData.studentId = '';
+      submitData.faculty = '';
+      submitData.department = '';
+      submitData.class = '';
+      submitData.academicYear = '';
+      submitData.qrCode = '';
+      submitData.photoUrl = '';
+    }
+    if (!['staff', 'clean', 'security'].includes(submitData.role)) {
+      submitData.campus = '';
+    }
+    if (submitData.role !== 'security') {
+      submitData.assignedShift = 'none';
+      submitData.shiftStartTime = '';
+      submitData.shiftEndTime = '';
+    }
   }
-  if (submitData.role !== 'security') {
-    submitData.assignedShift = 'none';
-    submitData.shiftStartTime = '';
-    submitData.shiftEndTime = '';
-  }
+
   try {
-    await onSave(user._id, submitData);
+    await onSave(user._id, photoFile ? payload : submitData);
   } catch (err) {
     console.error('Error updating user:', err);
   } finally {
@@ -197,6 +222,60 @@ const handleSubmit = async (e) => {
                       <div className="animate-fadeIn space-y-4 pt-2 border-t border-gray-100">
                         {isStudent && (
                           <>
+                            {/* Photo Upload Section */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Student Photo</label>
+                              <div className="flex items-center gap-4">
+                                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gray-200 flex items-center justify-center bg-gray-50 flex-shrink-0">
+                                  {photoPreview ? (
+                                    <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                                  ) : formData.photoUrl ? (
+                                    <img
+                                      src={getImageUrl(formData.photoUrl)}
+                                      alt={formData.fullName}
+                                      className="w-full h-full object-cover"
+                                      onError={e => { e.target.style.display='none'; }}
+                                    />
+                                  ) : (
+                                    <span className="text-lg font-black text-indigo-600">
+                                      {(formData.fullName || '?')[0].toUpperCase()}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                  <input
+                                    ref={photoInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={e => {
+                                      const f = e.target.files[0];
+                                      if (f) {
+                                        setPhotoFile(f);
+                                        setPhotoPreview(URL.createObjectURL(f));
+                                      }
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => photoInputRef.current?.click()}
+                                    className="px-3 py-1.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg transition-all"
+                                  >
+                                    {formData.photoUrl || photoPreview ? 'Change Photo' : 'Upload Photo'}
+                                  </button>
+                                  {(photoFile || photoPreview) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => { setPhotoFile(null); setPhotoPreview(''); }}
+                                      className="px-3 py-1.5 text-xs font-bold bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg transition-all"
+                                    >
+                                      Remove
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
                             <div>
                               <label className="block text-sm font-medium text-gray-700">Student ID *</label>
                               <input
@@ -331,26 +410,18 @@ const handleSubmit = async (e) => {
 
                             {/* Shift Time Window */}
                             <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700">Shift Start Time</label>
-                                <input
-                                  type="time"
-                                  name="shiftStartTime"
-                                  value={formData.shiftStartTime}
-                                  onChange={handleChange}
-                                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700">Shift End Time</label>
-                                <input
-                                  type="time"
-                                  name="shiftEndTime"
-                                  value={formData.shiftEndTime}
-                                  onChange={handleChange}
-                                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                />
-                              </div>
+                              <TimePicker
+                                label="Shift Start Time"
+                                name="shiftStartTime"
+                                value={formData.shiftStartTime}
+                                onChange={(fieldName, val) => setFormData(prev => ({ ...prev, [fieldName]: val }))}
+                              />
+                              <TimePicker
+                                label="Shift End Time"
+                                name="shiftEndTime"
+                                value={formData.shiftEndTime}
+                                onChange={(fieldName, val) => setFormData(prev => ({ ...prev, [fieldName]: val }))}
+                              />
                             </div>
                           </>
                         )}

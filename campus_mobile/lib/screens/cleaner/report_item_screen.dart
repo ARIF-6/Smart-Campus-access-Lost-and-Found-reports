@@ -58,8 +58,8 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
     }
   }
 
-  Future<void> _pickImage() async {
-    final XFile? picked = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1200, imageQuality: 85);
+  Future<void> _pickImage(ImageSource source) async {
+    final XFile? picked = await _picker.pickImage(source: source, maxWidth: 1200, imageQuality: 85);
     if (!mounted || picked == null) return;
     final bytes = await picked.readAsBytes();
     if (!mounted) return;
@@ -143,46 +143,127 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Image Picker
-                    GestureDetector(
-                      onTap: _pickImage,
-                      child: Container(
-                        height: 210,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: _webImage != null ? _themeColor : Colors.grey.shade200, width: _webImage != null ? 2 : 1),
-                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, 4))],
-                        ),
-                        child: _webImage != null
-                            ? Stack(fit: StackFit.expand, children: [
+                    // Image Picker - Side-by-side cards or Preview
+                    _webImage != null
+                        ? Container(
+                            height: 210,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(color: _themeColor, width: 2),
+                              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, 4))],
+                            ),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
                                 ClipRRect(borderRadius: BorderRadius.circular(24), child: Image.memory(_webImage!, fit: BoxFit.cover)),
                                 Positioned(
-                                  bottom: 12, right: 12,
+                                  top: 12,
+                                  right: 12,
                                   child: GestureDetector(
-                                    onTap: _pickImage,
+                                    onTap: () {
+                                      setState(() {
+                                        _imageFile = null;
+                                        _webImage = null;
+                                      });
+                                    },
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(10)),
-                                      child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.edit_rounded, color: Colors.white, size: 14), SizedBox(width: 4), Text('Change', style: TextStyle(color: Colors.white, fontSize: 12))]),
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.black54,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
                                     ),
                                   ),
                                 ),
-                              ])
-                            : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                Container(
-                                  padding: const EdgeInsets.all(18),
-                                  decoration: BoxDecoration(color: _themeColor.withValues(alpha: 0.08), shape: BoxShape.circle),
-                                  child: Icon(Icons.photo_library_rounded, size: 38, color: _themeColor),
+                              ],
+                            ),
+                          )
+                        : Row(
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => _pickImage(ImageSource.gallery),
+                                  child: Container(
+                                    height: 140,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE8E8E8),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          width: 56,
+                                          height: 56,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFFD2D2),
+                                            borderRadius: BorderRadius.circular(14),
+                                          ),
+                                          child: const Icon(
+                                            Icons.photo_library_rounded,
+                                            color: Color(0xFFE53935),
+                                            size: 28,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        const Text(
+                                          'upload photo',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF4B5563),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                                const SizedBox(height: 14),
-                                const Text('Add Item Photo', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
-                                const SizedBox(height: 4),
-                                Text('Tap to choose from gallery', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                              ]),
-                      ),
-                    ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => _pickImage(ImageSource.camera),
+                                  child: Container(
+                                    height: 140,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE8E8E8),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          width: 56,
+                                          height: 56,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFFD2D2),
+                                            borderRadius: BorderRadius.circular(14),
+                                          ),
+                                          child: const Icon(
+                                            Icons.camera_alt_rounded,
+                                            color: Color(0xFFE53935),
+                                            size: 28,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        const Text(
+                                          'take photo',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF4B5563),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                     const SizedBox(height: 24),
 
                     // Item Details

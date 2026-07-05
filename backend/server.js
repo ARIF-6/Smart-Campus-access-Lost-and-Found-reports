@@ -67,6 +67,10 @@ app.use(cors({
     // Allow requests with no origin (mobile apps, Postman, curl, server-to-server)
     if (!origin) return callback(null, true);
     if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    // Allow any localhost or 127.0.0.1 connection (dynamic ports)
+    if (origin.startsWith('http://localhost:') || origin === 'http://localhost' || origin.startsWith('http://127.0.0.1:') || origin === 'http://127.0.0.1') {
+      return callback(null, true);
+    }
     // Also allow any vercel.app subdomain preview deployments
     if (/^https:\/\/.*\.vercel\.app$/.test(origin)) return callback(null, true);
     callback(new Error(`CORS: origin ${origin} not allowed`));

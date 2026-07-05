@@ -20,8 +20,8 @@ const emitNotification = (notification) => {
     };
 
     // If it has a specific recipient (User ID)
-    if (notification.user) {
-      io.to(`user:${notification.user}`).emit('notification:new', eventData);
+    if (notification.userId) {
+      io.to(`user:${notification.userId}`).emit('notification:new', eventData);
     } 
     // If it's targeted at a role
     else if (notification.recipientRole) {
@@ -45,7 +45,33 @@ const emitDashboardRefresh = (role) => {
   }
 };
 
+const emitGlobalEvent = (event, data) => {
+  try {
+    const io = getIO();
+    io.emit(event, data);
+  } catch (err) {
+    console.error('Socket Global Emit Error:', err.message);
+  }
+};
+
+/**
+ * Emit an event to a specific user's socket room
+ * @param {String} userId - The user's MongoDB _id
+ * @param {String} event  - Socket event name
+ * @param {*} data        - Payload to send
+ */
+const emitToUser = (userId, event, data) => {
+  try {
+    const io = getIO();
+    io.to(`user:${userId}`).emit(event, data);
+  } catch (err) {
+    console.error('Socket emitToUser Error:', err.message);
+  }
+};
+
 module.exports = {
   emitNotification,
-  emitDashboardRefresh
+  emitDashboardRefresh,
+  emitGlobalEvent,
+  emitToUser
 };

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 import '../../models/item_model.dart';
 import 'student_report_item_screen.dart';
 import 'item_view_screen.dart';
@@ -16,6 +17,7 @@ class MyItemsScreen extends StatefulWidget {
 
 class _MyItemsScreenState extends State<MyItemsScreen> {
   final ApiService _apiService = ApiService();
+  final SocketService _socketService = SocketService();
   List<ItemModel> _allItems = [];
   List<ItemModel> _filteredItems = [];
   bool _isLoading = true;
@@ -25,6 +27,23 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
   void initState() {
     super.initState();
     _fetchItems();
+    _socketService.on('lostItem:created', (_) {
+      if (mounted) _fetchItems();
+    });
+    _socketService.on('foundItem:created', (_) {
+      if (mounted) _fetchItems();
+    });
+    _socketService.on('claim:updated', (_) {
+      if (mounted) _fetchItems();
+    });
+  }
+
+  @override
+  void dispose() {
+    _socketService.off('lostItem:created');
+    _socketService.off('foundItem:created');
+    _socketService.off('claim:updated');
+    super.dispose();
   }
 
   Future<void> _fetchItems() async {

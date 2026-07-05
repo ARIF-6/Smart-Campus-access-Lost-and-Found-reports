@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { getFaculties, getDepartments, getClasses, getCampuses } from '../../services/api';
+import TimePicker from '../common/TimePicker';
 
 const generatePassword = () => {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -442,26 +443,18 @@ const CreateUserModal = ({ isOpen, onClose, onSave, availableRoles = [] }) => {
 
                             {/* Shift Time Window */}
                             <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700">Shift Start Time</label>
-                                <input
-                                  type="time"
-                                  name="shiftStartTime"
-                                  value={formData.shiftStartTime}
-                                  onChange={handleChange}
-                                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700">Shift End Time</label>
-                                <input
-                                  type="time"
-                                  name="shiftEndTime"
-                                  value={formData.shiftEndTime}
-                                  onChange={handleChange}
-                                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                />
-                              </div>
+                              <TimePicker
+                                label="Shift Start Time"
+                                name="shiftStartTime"
+                                value={formData.shiftStartTime}
+                                onChange={(fieldName, val) => setFormData(prev => ({ ...prev, [fieldName]: val }))}
+                              />
+                              <TimePicker
+                                label="Shift End Time"
+                                name="shiftEndTime"
+                                value={formData.shiftEndTime}
+                                onChange={(fieldName, val) => setFormData(prev => ({ ...prev, [fieldName]: val }))}
+                              />
                             </div>
                           </>
                         )}

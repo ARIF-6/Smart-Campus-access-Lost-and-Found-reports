@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 import '../../models/found_item.dart';
 import 'found_items_screen.dart';
 import 'claim_request_screen.dart';
@@ -38,6 +39,7 @@ class StudentHomeTab extends StatefulWidget {
 class _StudentHomeTabState extends State<StudentHomeTab>
     with SingleTickerProviderStateMixin {
   final ApiService _apiService = ApiService();
+  final SocketService _socketService = SocketService();
   List<FoundItem> _foundItems = [];
   bool _isLoading = true;
   String _activeFilter = 'All'; // All | Found | Lost
@@ -75,12 +77,20 @@ class _StudentHomeTabState extends State<StudentHomeTab>
         () => setState(() => _isSearchFocused = _searchFocusNode.hasFocus));
     _searchController.addListener(() => setState(
         () => _searchQuery = _searchController.text.trim().toLowerCase()));
+    _socketService.on('foundItem:created', (_) {
+      if (mounted) _fetchRecentFoundItems();
+    });
+    _socketService.on('lostItem:created', (_) {
+      if (mounted) _fetchRecentFoundItems();
+    });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _socketService.off('foundItem:created');
+    _socketService.off('lostItem:created');
     super.dispose();
   }
 

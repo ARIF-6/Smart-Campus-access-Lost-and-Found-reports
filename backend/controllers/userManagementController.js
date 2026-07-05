@@ -9,8 +9,11 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const path = require('path');
 const xlsx = require('xlsx');
+const ExcelJS = require('exceljs');
+const fs = require('fs');
 const { logAction } = require('../utils/auditLogger');
 const { isValidObjectId } = require('mongoose');
+const { emitToUser } = require('../socket/events/notificationEvents');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -35,6 +38,22 @@ const isValidAcademicYear = (academicYear) => {
   const endShort   = endNum   > 99 ? endNum   % 100 : endNum;
   return endShort === (startShort + 1) % 100;
 };
+
+/** Returns the current academic year in YY/YY format (e.g. 25/26). Year resets each September. */
+const getCurrentAcademicYear = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1; // 1-indexed
+  const startYear = month >= 9 ? year : year - 1;
+  const endYear = startYear + 1;
+  return `${String(startYear).slice(-2)}/${String(endYear).slice(-2)}`;
+};
+
+// ─── Excel column constants ───────────────────────────────────────────────────
+// Normalized (lowercase, no spaces) column names for Excel student import
+const EXCEL_REQUIRED_COLS = ['studentid', 'fullname', 'faculty', 'department', 'class', 'parentnumber'];
+const EXCEL_OPTIONAL_COLS = ['academicyear', 'image'];
+const EXCEL_ALL_ALLOWED  = new Set([...EXCEL_REQUIRED_COLS, ...EXCEL_OPTIONAL_COLS]);
 
 /** Enrich a plain user object with resolved faculty/department/campus names */
 const enrichUsers = async (users) => {
@@ -368,6 +387,13 @@ exports.updateUser = async (req, res) => {
     delete plain.password;
     const [enriched] = await enrichUsers([plain]);
 
+    // If a security guard's shift was updated, push the fresh profile to their
+    // connected socket so the mobile app refreshes without requiring a re-login.
+    if (updatedUser.role === 'security' &&
+        (assignedShift !== undefined || shiftStartTime !== undefined || shiftEndTime !== undefined)) {
+      emitToUser(updatedUser._id.toString(), 'user:shiftUpdated', enriched);
+    }
+
     return sendSuccess(res, 'User updated successfully', enriched);
   } catch (error) {
     console.error('updateUser error:', error);
@@ -540,154 +566,227 @@ exports.uploadExcelStudents = async (req, res) => {
   try {
     if (!req.file) return sendError(res, 'No Excel file uploaded', 400);
 
-    const workbook = xlsx.readFile(req.file.path);
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
+    // ── Parse with ExcelJS to support embedded images ────────────────────────
+    const ejsWorkbook = new ExcelJS.Workbook();
+    await ejsWorkbook.xlsx.readFile(req.file.path);
+    const ejsSheet = ejsWorkbook.getWorksheet(1);
+
+    // Build a map: rowIndex (0-based, 0=header) -> { buffer, ext }
+    const rowImageMap = {};
+    ejsSheet.getImages().forEach(img => {
+      const media = ejsWorkbook.media[img.imageId];
+      if (!media || !media.buffer) return;
+      const nativeRow = img.range && img.range.tl ? img.range.tl.nativeRow : undefined;
+      if (nativeRow !== undefined && nativeRow >= 1) {
+        // nativeRow 1 = data row 0 (row 2 in Excel, because row 1 is header)
+        rowImageMap[nativeRow - 1] = { buffer: media.buffer, ext: media.extension || 'jpg' };
+      }
+    });
+
+    // Also read row data with xlsx for easier key/value access
+    const xlsxWorkbook = xlsx.readFile(req.file.path);
+    const sheetName = xlsxWorkbook.SheetNames[0];
+    const sheet = xlsxWorkbook.Sheets[sheetName];
     const rows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
 
     if (!rows || rows.length === 0) {
       return sendError(res, 'Excel file is empty or has no data rows', 400);
     }
 
-    const allFaculties = await Faculty.find().lean();
+    // ─── Header presence analysis (do not reject globally, check row-by-row) ──
+    const rawHeaders = Object.keys(rows[0] || {});
+    
+    // Normalization helper mapping synonyms to standard database fields
+    const normalizeHeaderKey = (key) => {
+      const normalized = key.trim().toLowerCase().replace(/\s+/g, '');
+      if (normalized === 'id' || normalized === 'studentid' || normalized === 'student_id') {
+        return 'studentid';
+      }
+      if (normalized === 'parentnumber' || normalized === 'parent_number' || normalized === 'parent' || normalized === 'parentno' || normalized === 'parentphone') {
+        return 'parentnumber';
+      }
+      if (normalized === 'image' || normalized === 'images' || normalized === 'photo' || normalized === 'picture') {
+        return 'image';
+      }
+      if (normalized === 'academicyear' || normalized === 'academic_year' || normalized === 'year') {
+        return 'academicyear';
+      }
+      if (normalized === 'fullname' || normalized === 'full_name' || normalized === 'name') {
+        return 'fullname';
+      }
+      return normalized;
+    };
+
+    const normalizedHeaders = rawHeaders.map(h => normalizeHeaderKey(h));
+    const headerSet = new Set(normalizedHeaders);
+
+    const defaultAcademicYear = getCurrentAcademicYear();
+    const allFaculties   = await Faculty.find().lean();
     const allDepartments = await Department.find().lean();
     // Use a mutable array so auto-created classes are reused for later rows
     let allClasses = await Class.find().lean();
 
     const created = [];
-    const errors = [];
+    const errors  = [];
     const affectedClassIds = new Set();
 
     for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
+      const row    = rows[i];
       const rowNum = i + 2; // row 1 = header
 
-      // Normalize keys
-      const normalizedRow = {};
+      // Normalise keys
+      const norm = {};
       for (const [k, v] of Object.entries(row)) {
-        normalizedRow[k.trim().toLowerCase().replace(/\s+/g, '')] = String(v).trim();
+        norm[normalizeHeaderKey(k)] = String(v).trim();
       }
 
-      const fullName = normalizedRow['fullname'] || normalizedRow['name'] || '';
-      // Generate a unique random 6-digit numeric password if not provided in Excel
-      const rawPassword = normalizedRow['password'];
-      const password = rawPassword
-        ? rawPassword
-        : String(Math.floor(100000 + Math.random() * 900000));
-      const studentId = normalizedRow['studentid'] || normalizedRow['id'] || '';
-      const rawParentNumber = normalizedRow['parentnumber'] || normalizedRow['parent'] || '';
-      const academicYear = normalizedRow['academicyear'] || normalizedRow['year'] || '';
-      const facultyName = normalizedRow['faculty'] || normalizedRow['facultyname'] || '';
-      const departmentName = normalizedRow['department'] || normalizedRow['departmentname'] || '';
-      const className = normalizedRow['class'] || normalizedRow['classname'] || '';
+      const fullName     = norm['fullname']     || '';
+      const studentId    = norm['studentid']    || '';
+      const rawParentNum = norm['parentnumber'] || '';
+      const facultyName  = norm['faculty']      || '';
+      const deptName     = norm['department']   || '';
+      const className    = norm['class']        || '';
+      const academicYear = norm['academicyear'] || '';
+      const imageVal     = norm['image']        || '';
 
-      if (!fullName) {
-        errors.push(`Row ${rowNum}: fullName is required`);
-        continue;
-      }
+      // ── Analyze missing columns vs null cells ───────────────────────────────
+      const missingColumns = [];
+      const nullRows = [];
 
-      // ── Validate academic year ────────────────────────────────────────────
-      if (academicYear && !isValidAcademicYear(academicYear)) {
-        errors.push(`Row ${rowNum}: Academic year '${academicYear}' is invalid. Use format YY/YY or YYYY/YYYY (e.g. 24/25 or 2024/2025) spanning exactly one year`);
-        continue;
-      }
+      // Helper to map keys back to readable display names
+      const getColDisplayName = (col) => {
+        if (col === 'studentid') return 'StudentID';
+        if (col === 'fullname') return 'FullName';
+        if (col === 'faculty') return 'Faculty';
+        if (col === 'department') return 'Department';
+        if (col === 'class') return 'Class';
+        if (col === 'parentnumber') return 'ParentNumber';
+        return col;
+      };
 
-      // ── Validate and parse parentNumber ─────────────────────────────────
-      let parentNumberInt = undefined;
-      if (rawParentNumber) {
-        const parsed = parseInt(rawParentNumber, 10);
-        if (isNaN(parsed) || parsed < 100000000) {
-          errors.push(`Row ${rowNum}: Parent number '${rawParentNumber}' is invalid — must be a number with at least 9 digits`);
-          continue;
-        }
-        parentNumberInt = parsed;
-      }
-
-      // Resolve faculty
-      let facultyId = null;
-      if (facultyName) {
-        const foundFac = allFaculties.find((f) => f.name.trim().toLowerCase() === facultyName.toLowerCase());
-        if (foundFac) facultyId = String(foundFac._id);
-        else errors.push(`Row ${rowNum}: Faculty '${facultyName}' not found in database`);
-      }
-
-      // Resolve department
-      let departmentId = null;
-      if (departmentName) {
-        const foundDept = allDepartments.find(
-          (d) =>
-            d.name.trim().toLowerCase() === departmentName.toLowerCase() &&
-            (!facultyId || String(d.facultyId) === facultyId)
-        );
-        if (foundDept) {
-          departmentId = String(foundDept._id);
-          if (!facultyId) facultyId = String(foundDept.facultyId);
+      // Check each required column
+      EXCEL_REQUIRED_COLS.forEach(col => {
+        if (!headerSet.has(col)) {
+          missingColumns.push(getColDisplayName(col));
         } else {
-          errors.push(`Row ${rowNum}: Department '${departmentName}' not found`);
-        }
-      }
-
-      // ── Resolve class — auto-create if not registered in the system ───────
-      let classId = null;
-      if (className) {
-        const foundClass = allClasses.find(
-          (c) =>
-            c.name.trim().toLowerCase() === className.toLowerCase() &&
-            (!departmentId || String(c.departmentId) === departmentId)
-        );
-
-        if (foundClass) {
-          classId = String(foundClass._id);
-        } else {
-          // Auto-create class — only possible when a department is available
-          if (!departmentId) {
-            errors.push(`Row ${rowNum}: Class '${className}' not found and cannot be auto-created without a valid department`);
-          } else {
-            try {
-              const newClass = await Class.create({
-                name: className,
-                departmentId,
-                academicYear: academicYear || '25/26',
-              });
-              classId = String(newClass._id);
-              // Push into the in-memory list so subsequent rows reuse it
-              allClasses.push(newClass.toObject ? newClass.toObject() : { ...newClass._doc });
-            } catch (classErr) {
-              errors.push(`Row ${rowNum}: Failed to auto-create class '${className}': ${classErr.message}`);
-            }
+          // Column header is present, check if cell value is empty
+          const val = norm[col];
+          if (!val) {
+            nullRows.push(getColDisplayName(col));
           }
         }
+      });
+
+      if (missingColumns.length > 0) {
+        errors.push(`Row ${rowNum}: there is a missing column ${missingColumns.join(', ')}`);
+        continue;
       }
 
-      // Check duplicate studentId
-      if (studentId) {
-        const exists = await User.findOne({ studentId });
-        if (exists) {
-          errors.push(`Row ${rowNum}: Student ID '${studentId}' already exists`);
+      if (nullRows.length > 0) {
+        errors.push(`Row ${rowNum}: Sorry there is a missing row in ${nullRows.join(', ')}`);
+        continue;
+      }
+
+      // ── Validate academic year (optional — use current if blank) ────────────
+      const resolvedAcademicYear = academicYear || defaultAcademicYear;
+      if (academicYear && !isValidAcademicYear(academicYear)) {
+        errors.push(`Row ${rowNum}: the academic year consist of 1 year so use a valid academic year`);
+        continue;
+      }
+
+      // ── Validate parentNumber ───────────────────────────────────────────────
+      const parentNumInt = parseInt(rawParentNum, 10);
+      if (isNaN(parentNumInt) || parentNumInt < 100000000) {
+        errors.push(`Row ${rowNum}: Parent number '${rawParentNum}' must be a number with at least 9 digits.`);
+        continue;
+      }
+
+      // ── Resolve faculty ─────────────────────────────────────────────────────
+      const foundFac = allFaculties.find(f => f.name.trim().toLowerCase() === facultyName.toLowerCase());
+      if (!foundFac) {
+        errors.push(`Row ${rowNum}: Faculty '${facultyName}' not found in the database.`);
+        continue;
+      }
+      const facultyId = String(foundFac._id);
+
+      // ── Resolve department ──────────────────────────────────────────────────
+      const foundDept = allDepartments.find(
+        d => d.name.trim().toLowerCase() === deptName.toLowerCase() &&
+             String(d.facultyId) === facultyId
+      );
+      if (!foundDept) {
+        errors.push(`Row ${rowNum}: Department '${deptName}' not found under faculty '${facultyName}'.`);
+        continue;
+      }
+      const departmentId = String(foundDept._id);
+
+      // ── Resolve class — auto-create if missing ──────────────────────────────
+      let classId = null;
+      const foundClass = allClasses.find(
+        c => c.name.trim().toLowerCase() === className.toLowerCase() &&
+             String(c.departmentId) === departmentId
+      );
+      if (foundClass) {
+        classId = String(foundClass._id);
+      } else {
+        try {
+          const newClass = await Class.create({
+            name: className,
+            departmentId,
+            academicYear: resolvedAcademicYear,
+          });
+          classId = String(newClass._id);
+          allClasses.push(newClass.toObject ? newClass.toObject() : { ...newClass._doc });
+        } catch (classErr) {
+          errors.push(`Row ${rowNum}: Failed to auto-create class '${className}': ${classErr.message}`);
           continue;
         }
       }
 
+      // ── Duplicate studentId check ───────────────────────────────────────────
+      const exists = await User.findOne({ studentId });
+      if (exists) {
+        errors.push(`Row ${rowNum}: Student ID '${studentId}' already exists.`);
+        continue;
+      }
+
+      // ── Build photoUrl: embedded image first, then URL string from cell ─────
+      let photoUrl = imageVal || '';
+      const embeddedImg = rowImageMap[i]; // i = 0-based data row index
+      if (embeddedImg) {
+        try {
+          const profilesDir = path.join(__dirname, '../uploads/profiles');
+          if (!fs.existsSync(profilesDir)) fs.mkdirSync(profilesDir, { recursive: true });
+          const imgFilename = `student_${studentId}_${Date.now()}.${embeddedImg.ext}`;
+          const imgPath = path.join(profilesDir, imgFilename);
+          fs.writeFileSync(imgPath, embeddedImg.buffer);
+          photoUrl = `/uploads/profiles/${imgFilename}`;
+        } catch (imgErr) {
+          console.warn(`Row ${rowNum}: Failed to save embedded image — ${imgErr.message}`);
+        }
+      }
+
+      // ── Create student ──────────────────────────────────────────────────────
       try {
-        const qrCode = crypto.randomBytes(16).toString('hex');
+        const password = String(Math.floor(100000 + Math.random() * 900000));
+        const qrCode   = crypto.randomBytes(16).toString('hex');
         const newStudent = await User.create({
           fullName,
-          studentId: studentId || undefined,
-          parentNumber: parentNumberInt,
+          studentId,
+          parentNumber: parentNumInt,
+          photoUrl,
           role: 'student',
           password,
           plainPassword: password,
           qrCode,
-          faculty: facultyId || undefined,
-          department: departmentId || undefined,
-          class: classId || undefined,
-          academicYear: academicYear || '25/26',
-          createdBy: req.user?.id || null,
+          faculty:      facultyId,
+          department:   departmentId,
+          class:        classId,
+          academicYear: resolvedAcademicYear,
+          createdBy:    req.user?.id || null,
         });
-        created.push({ _id: newStudent._id, fullName, studentId, password });
-        if (classId) {
-          affectedClassIds.add(String(classId));
-        }
+        created.push({ _id: newStudent._id, fullName, studentId, password, photoUrl });
+        if (classId) affectedClassIds.add(String(classId));
       } catch (err) {
         errors.push(`Row ${rowNum}: ${err.message}`);
       }
@@ -710,7 +809,7 @@ exports.uploadExcelStudents = async (req, res) => {
       created,
       errors,
       totalCreated: created.length,
-      totalErrors: errors.length,
+      totalErrors:  errors.length,
     });
   } catch (error) {
     console.error('uploadExcelStudents error:', error);
@@ -730,6 +829,38 @@ exports.getTrashedUsers = async (req, res) => {
     const enriched = await enrichUsers(users);
     return sendSuccess(res, 'Trashed users fetched successfully', enriched);
   } catch (error) {
+    return sendError(res, error.message || 'Server Error');
+  }
+};
+
+// ─── PATCH /api/admin/users/:id/photo ────────────────────────────────────────
+
+exports.updateUserPhoto = async (req, res) => {
+  try {
+    if (!req.file) return sendError(res, 'No photo file uploaded', 400);
+
+    const user = await User.findById(req.params.id);
+    if (!user) return sendError(res, 'User not found', 404);
+
+    if (req.user && req.user.role === 'staff' && String(user.createdBy) !== req.user.id) {
+      return sendError(res, 'Not authorized to update this user', 403);
+    }
+
+    user.photoUrl = `/uploads/profiles/${req.file.filename}`;
+    await user.save();
+
+    await logAction({
+      userId: req.user?.id,
+      action: 'UPDATE_USER',
+      targetId: user._id,
+      targetType: 'User',
+      details: `Updated photo for user: ${user.fullName}`,
+      req,
+    });
+
+    return sendSuccess(res, 'Photo updated successfully', { photoUrl: user.photoUrl });
+  } catch (error) {
+    console.error('updateUserPhoto error:', error);
     return sendError(res, error.message || 'Server Error');
   }
 };

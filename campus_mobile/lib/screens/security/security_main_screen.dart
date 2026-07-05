@@ -85,7 +85,6 @@ class _SecurityMainScreenState extends State<SecurityMainScreen>
     _socketService.on('notification:new', (data) {
       if (mounted) {
         final provider = Provider.of<NotificationProvider>(context, listen: false);
-        // Map the socket data to our Notification model
         final newNotif = app_models_notif.Notification(
           id: data['id'] ?? '',
           title: data['title'] ?? '',
@@ -97,6 +96,41 @@ class _SecurityMainScreenState extends State<SecurityMainScreen>
         provider.addNotification(newNotif);
       }
     });
+
+    // When admin updates this guard's shift, the backend pushes fresh user data.
+    // We merge it into AuthProvider and re-fetch the active shift so the UI
+    // reflects the new schedule immediately — no logout/re-login required.
+    _socketService.on('user:shiftUpdated', (data) {
+      if (!mounted) return;
+      final updatedFields = {
+        if (data['assignedShift'] != null) 'assignedShift': data['assignedShift'],
+        if (data['shiftStartTime'] != null) 'shiftStartTime': data['shiftStartTime'],
+        if (data['shiftEndTime'] != null) 'shiftEndTime': data['shiftEndTime'],
+      };
+      Provider.of<AuthProvider>(context, listen: false)
+          .updateUserLocally(updatedFields);
+      Provider.of<ShiftProvider>(context, listen: false).fetchActiveShift();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.update_rounded, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Your shift schedule has been updated by admin.',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Color(0xFF1B3A6B),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 5),
+        ),
+      );
+    });
   }
 
   @override
@@ -104,6 +138,7 @@ class _SecurityMainScreenState extends State<SecurityMainScreen>
     _drawerAnimController.dispose();
     _socketService.off('security:alert');
     _socketService.off('notification:new');
+    _socketService.off('user:shiftUpdated');
     super.dispose();
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants.dart';
 import '../../core/widgets/widgets.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 import '../../models/lost_item.dart';
 import 'package:intl/intl.dart';
 
@@ -14,6 +15,7 @@ class LostItemsScreen extends StatefulWidget {
 
 class _LostItemsScreenState extends State<LostItemsScreen> {
   final ApiService _apiService = ApiService();
+  final SocketService _socketService = SocketService();
   final _searchController = TextEditingController();
   bool _isLoading = true;
   List<LostItem> _items = [];
@@ -22,6 +24,12 @@ class _LostItemsScreenState extends State<LostItemsScreen> {
   void initState() {
     super.initState();
     _fetchItems();
+    _socketService.on('lostItem:created', (_) {
+      if (mounted) _fetchItems();
+    });
+    _socketService.on('lostItem:updated', (_) {
+      if (mounted) _fetchItems();
+    });
   }
 
   Future<void> _fetchItems({String? search}) async {
@@ -60,6 +68,8 @@ class _LostItemsScreenState extends State<LostItemsScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _socketService.off('lostItem:created');
+    _socketService.off('lostItem:updated');
     super.dispose();
   }
 

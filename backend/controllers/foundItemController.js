@@ -6,6 +6,7 @@ const { findMatchesForFoundItem } = require('../services/matchService');
 const { logAction } = require('../utils/auditLogger');
 const APIFeatures = require('../utils/apiFeatures');
 const { createNotification } = require('./notificationController');
+const { emitGlobalEvent } = require('../socket/events/notificationEvents');
 const asyncHandler = require('../middleware/asyncHandler');
 const { sendSuccess } = require('../utils/responseHandler');
 
@@ -107,6 +108,8 @@ exports.reportFoundItem = asyncHandler(async (req, res) => {
   findMatchesForFoundItem(savedItem._id).catch(err => {
     console.error('Matching Service Error:', err);
   });
+
+  emitGlobalEvent('foundItem:created', savedItem);
 
   return sendSuccess(res, 'Found item reported successfully', savedItem, 201);
 });

@@ -109,7 +109,10 @@ export const getAllUsers = async (params = {}) => {
 };
 
 export const updateUser = async (id, userData) => {
-  const response = await api.put(`/admin/users/${id}`, userData);
+  const isFormData = userData instanceof FormData;
+  const response = await api.put(`/admin/users/${id}`, userData, {
+    headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : { 'Content-Type': 'application/json' },
+  });
   return response.data;
 };
 
@@ -140,6 +143,13 @@ export const permanentDeleteUser = async (id) => {
 
 export const importStudentsExcel = async (formData) => {
   const response = await api.post('/admin/users/upload-excel', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  return response.data;
+};
+
+export const updateUserPhoto = async (id, formData) => {
+  const response = await api.patch(`/admin/users/${id}/photo`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
   return response.data;

@@ -5,7 +5,7 @@ const Item = require('../models/Item');
 const { logAction } = require('../utils/auditLogger');
 const { createNotification } = require('./notificationController');
 const mongoose = require('mongoose');
-const { emitDashboardRefresh } = require('../socket/events/notificationEvents');
+const { emitDashboardRefresh, emitGlobalEvent } = require('../socket/events/notificationEvents');
 const asyncHandler = require('../middleware/asyncHandler');
 const { sendSuccess } = require('../utils/responseHandler');
 
@@ -121,6 +121,8 @@ exports.submitClaim = asyncHandler(async (req, res) => {
   } catch (err) {
     console.error('Notification Error:', err);
   }
+
+  emitGlobalEvent('claim:updated', newClaim);
 
   return sendSuccess(res, 'Claim submitted successfully', newClaim, 201);
 });
@@ -249,6 +251,8 @@ exports.updateClaimStatus = asyncHandler(async (req, res) => {
   emitDashboardRefresh('admin');
   emitDashboardRefresh('staff');
 
+  emitGlobalEvent('claim:updated', claim);
+
   return sendSuccess(res, `Claim ${status} successfully`, claim);
 });
 
@@ -298,6 +302,8 @@ exports.approveClaim = asyncHandler(async (req, res) => {
   } catch (err) {
     console.error('Notification Error:', err);
   }
+
+  emitGlobalEvent('claim:updated', claim);
 
   return sendSuccess(res, 'Claim approved successfully', claim);
 });
@@ -349,6 +355,8 @@ exports.rejectClaim = asyncHandler(async (req, res) => {
   } catch (err) {
     console.error('Notification Error:', err);
   }
+
+  emitGlobalEvent('claim:updated', claim);
 
   return sendSuccess(res, 'Claim rejected successfully', claim);
 });

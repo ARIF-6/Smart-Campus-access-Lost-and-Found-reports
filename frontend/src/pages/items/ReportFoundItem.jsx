@@ -13,10 +13,85 @@ const ReportFoundItem = () => {
   });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [imageMode, setImageMode] = useState('upload'); // 'upload' or 'camera'
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  
+  const videoRef = React.useRef(null);
+  const streamRef = React.useRef(null);
+  const fileInputRef = React.useRef(null);
   const navigate = useNavigate();
+
+  // ── Camera helpers (defined before any useEffect that calls them) ──
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setCameraActive(false);
+  };
+
+  const startCamera = async () => {
+    setCameraError('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      setCameraActive(true);
+    } catch (err) {
+      console.error(err);
+      setCameraError('Unable to access camera. Please allow camera permission and try again.');
+      // Revert mode back to upload on permission failure
+      setImageMode('upload');
+    }
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width  = videoRef.current.videoWidth  || 640;
+      canvas.height = videoRef.current.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg');
+      setImagePreview(dataUrl);
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const file = new File([blob], 'captured_item.jpg', { type: 'image/jpeg' });
+          setImageFile(file);
+        }
+      }, 'image/jpeg', 0.95);
+      stopCamera();
+      setImageMode('upload'); // switch back to show preview in upload panel
+    }
+  };
+
+  // Stop camera stream when component unmounts
+  React.useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  // Auto-start / stop camera whenever imageMode changes
+  React.useEffect(() => {
+    if (imageMode === 'camera') {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageMode]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -179,29 +254,104 @@ const ReportFoundItem = () => {
                   {fieldErrors.locationFound && <p className="mt-1 text-xs text-red-600 font-medium">{fieldErrors.locationFound}</p>}
                 </div>
 
-                <div className="md:col-span-2 space-y-2">
-                  <label className="text-sm font-bold text-gray-700 uppercase tracking-wide">Photographic Evidence</label>
-                  <div className="flex items-center justify-center w-full">
-                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-emerald-50/50 hover:border-emerald-300 transition-all group">
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            <svg className="w-8 h-8 mb-3 text-emerald-500 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  <div className="md:col-span-2 space-y-4">
+                    <label className="text-sm font-bold text-gray-700 uppercase tracking-wide">Photographic Evidence</label>
+
+                    {/* Hidden file input */}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      name="image"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageChange}
+                    />
+
+                    {/* ── Two option cards ── */}
+                    {!imagePreview && imageMode !== 'camera' && (
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Upload Photo card */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setImageMode('upload');
+                            fileInputRef.current?.click();
+                          }}
+                          className="flex flex-col items-center justify-center gap-3 bg-[#e8e8e8] hover:bg-[#dcdcdc] rounded-2xl p-8 transition-all group cursor-pointer"
+                        >
+                          <div className="w-16 h-16 bg-[#ffd2d2] rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+                            <svg className="w-9 h-9 text-[#e53935]" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 9a3 3 0 100 6 3 3 0 000-6z"/>
+                              <path fillRule="evenodd" d="M9.172 3A2 2 0 007.586 3.586L6.172 5H4a2 2 0 00-2 2v11a2 2 0 002 2h16a2 2 0 002-2V7a2 2 0 00-2-2h-2.172l-1.414-1.414A2 2 0 0014.828 3H9.172zM7 12a5 5 0 1110 0A5 5 0 017 12z" clipRule="evenodd"/>
+                              <path d="M11 6.5V9H8.5a.5.5 0 000 1H11v2.5a.5.5 0 001 0V10h2.5a.5.5 0 000-1H12V6.5a.5.5 0 00-1 0z"/>
                             </svg>
-                            <p className="mb-2 text-sm text-gray-500"><span className="font-semibold text-emerald-600">Click to upload</span> or drag and drop</p>
-                            <p className="text-xs text-gray-400 font-medium">PNG, JPG or WEBP (Max. 5MB)</p>
-                        </div>
-                        <input type="file" name="image" accept="*/*" className="hidden" onChange={handleImageChange} />
-                    </label>
+                          </div>
+                          <span className="text-sm font-semibold text-gray-600">upload photo</span>
+                        </button>
+
+                        {/* Take Photo card */}
+                        <button
+                          type="button"
+                          onClick={() => setImageMode('camera')}
+                          className="flex flex-col items-center justify-center gap-3 bg-[#e8e8e8] hover:bg-[#dcdcdc] rounded-2xl p-8 transition-all group cursor-pointer"
+                        >
+                          <div className="w-16 h-16 bg-[#ffd2d2] rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+                            <svg className="w-9 h-9 text-[#e53935]" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 9a3 3 0 100 6 3 3 0 000-6z"/>
+                              <path fillRule="evenodd" d="M9.172 3A2 2 0 007.586 3.586L6.172 5H4a2 2 0 00-2 2v11a2 2 0 002 2h16a2 2 0 002-2V7a2 2 0 00-2-2h-2.172l-1.414-1.414A2 2 0 0014.828 3H9.172zM7 12a5 5 0 1110 0A5 5 0 017 12z" clipRule="evenodd"/>
+                              <path d="M11 6.5V9H8.5a.5.5 0 000 1H11v2.5a.5.5 0 001 0V10h2.5a.5.5 0 000-1H12V6.5a.5.5 0 00-1 0z"/>
+                            </svg>
+                          </div>
+                          <span className="text-sm font-semibold text-gray-600">take photo</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* ── Live camera view ── */}
+                    {imageMode === 'camera' && !imagePreview && (
+                      <div className="flex flex-col items-center border border-gray-200 rounded-2xl bg-gray-900 p-4 gap-3">
+                        {cameraError ? (
+                          <div className="text-red-400 font-semibold text-sm p-4 text-center">{cameraError}</div>
+                        ) : (
+                          <>
+                            <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden shadow-inner">
+                              <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={capturePhoto}
+                                className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm rounded-xl shadow transition-colors"
+                              >
+                                📸 Capture
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setImageMode('upload'); stopCamera(); }}
+                                className="px-4 py-2.5 bg-gray-600 hover:bg-gray-500 text-white font-bold text-sm rounded-xl transition-colors"
+                              >
+                                ← Back
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ── Image preview after capture/upload ── */}
+                    {imagePreview && (
+                      <div className="relative rounded-2xl overflow-hidden border border-gray-200 shadow-md">
+                        <img src={imagePreview} alt="Preview" className="w-full max-h-64 object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => { setImageFile(null); setImagePreview(null); setImageMode('upload'); stopCamera(); }}
+                          className="absolute top-3 right-3 bg-white/90 hover:bg-red-50 text-red-600 rounded-full p-2 shadow-sm transition-all hover:scale-105"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  {imagePreview && (
-                    <div className="mt-4 relative rounded-xl overflow-hidden border border-gray-200 shadow-md">
-                      <img src={imagePreview} alt="Preview" className="w-full max-h-64 object-cover" />
-                      <button type="button" onClick={() => {setImageFile(null); setImagePreview(null);}} className="absolute top-3 right-3 bg-white/90 hover:bg-red-50 text-red-600 rounded-full p-2 shadow-sm transition-all hover:scale-105">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                      </button>
-                    </div>
-                  )}
-                </div>
               </div>
 
               <div className="pt-4 flex items-center justify-end space-x-4">

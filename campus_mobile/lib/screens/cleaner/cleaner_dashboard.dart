@@ -4,6 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 import 'report_item_screen.dart';
 import 'found_items_screen.dart';
 import 'cleaner_profile_screen.dart';
@@ -140,6 +141,7 @@ class _HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<_HomeTab> {
   final ApiService _api = ApiService();
+  final SocketService _socketService = SocketService();
   bool _loading = true;
   int _totalItems = 0;
   int _storedItems = 0;
@@ -155,6 +157,23 @@ class _HomeTabState extends State<_HomeTab> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _fetchStats();
     });
+    _socketService.on('foundItem:created', (_) {
+      if (mounted) _fetchStats();
+    });
+    _socketService.on('foundItem:updated', (_) {
+      if (mounted) _fetchStats();
+    });
+    _socketService.on('claim:updated', (_) {
+      if (mounted) _fetchStats();
+    });
+  }
+
+  @override
+  void dispose() {
+    _socketService.off('foundItem:created');
+    _socketService.off('foundItem:updated');
+    _socketService.off('claim:updated');
+    super.dispose();
   }
 
   Future<void> _fetchStats() async {

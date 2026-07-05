@@ -1,13 +1,32 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
 class AppConstants {
   // API URL
-  static const String baseUrl =
-      kIsWeb ? 'http://localhost:5000/api' : 'http://10.0.2.2:5000/api';
+  static String get baseUrl {
+    if (kIsWeb) {
+      return 'http://localhost:5000/api';
+    }
+    try {
+      if (Platform.isAndroid) {
+        return 'http://10.0.2.2:5000/api';
+      }
+    } catch (_) {}
+    return 'http://localhost:5000/api';
+  }
 
-  static const String serverUrl =
-      kIsWeb ? 'http://localhost:5000' : 'http://10.0.2.2:5000';
+  static String get serverUrl {
+    if (kIsWeb) {
+      return 'http://localhost:5000';
+    }
+    try {
+      if (Platform.isAndroid) {
+        return 'http://10.0.2.2:5000';
+      }
+    } catch (_) {}
+    return 'http://localhost:5000';
+  }
 
   // Helper for Image URLs (Handles local + Cloudinary)
   static String getImageUrl(String? path) {
