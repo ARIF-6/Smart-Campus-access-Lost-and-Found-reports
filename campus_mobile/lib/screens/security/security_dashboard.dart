@@ -30,6 +30,20 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
   bool _liveLoading = true;
   final SocketService _socketService = SocketService();
   Timer? _ticker;
+  bool _use12h = false; // false = 24h, true = 12h AM/PM
+
+  String _fmtTimeStr(String timeStr) {
+    if (timeStr.isEmpty) return timeStr;
+    try {
+      final parts = timeStr.split(':').map(int.parse).toList();
+      final isPm = parts[0] >= 12;
+      final hr = parts[0] % 12 == 0 ? 12 : parts[0] % 12;
+      final min = parts[1].toString().padLeft(2, '0');
+      return "$hr:$min ${isPm ? 'PM' : 'AM'}";
+    } catch (_) {
+      return timeStr;
+    }
+  }
 
   @override
   void initState() {
@@ -334,9 +348,33 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          const Text(
-                                            'Assigned Shift',
-                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0D47A1)),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              const Text(
+                                                'Assigned Shift',
+                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0D47A1)),
+                                              ),
+                                              GestureDetector(
+                                                onTap: () => setState(() => _use12h = !_use12h),
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: _use12h ? const Color(0xFF0D47A1) : Colors.white,
+                                                    borderRadius: BorderRadius.circular(12),
+                                                    border: Border.all(color: const Color(0xFF0D47A1), width: 1),
+                                                  ),
+                                                  child: Text(
+                                                    _use12h ? 'AM/PM' : '24H',
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: _use12h ? Colors.white : const Color(0xFF0D47A1),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
@@ -355,7 +393,9 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                                                 const Icon(Icons.access_time_rounded, size: 13, color: Color(0xFF1565C0)),
                                                 const SizedBox(width: 4),
                                                 Text(
-                                                  '${user!['shiftStartTime']}  –  ${user['shiftEndTime']}',
+                                                  _use12h
+                                                      ? '${_fmtTimeStr(user!['shiftStartTime'])}  –  ${_fmtTimeStr(user['shiftEndTime'])}'
+                                                      : '${user!['shiftStartTime']}  –  ${user['shiftEndTime']}',
                                                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1565C0)),
                                                 ),
                                               ],
