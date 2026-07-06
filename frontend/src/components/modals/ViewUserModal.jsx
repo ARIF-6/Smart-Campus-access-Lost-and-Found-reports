@@ -1,8 +1,20 @@
 import React, { useState } from 'react';
 import { getImageUrl } from '../../utils/imageUtils';
 
+// Helper: convert "HH:mm" to 12-hour AM/PM format
+const to12h = (timeStr) => {
+  if (!timeStr) return '-';
+  const [hStr, mStr] = timeStr.split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr || '00';
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${m} ${suffix}`;
+};
+
 const ViewUserModal = ({ isOpen, onClose, user, allRoles = [], availableRoles = [], viewerRole }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const [use12h, setUse12h] = useState(false);
 
   if (!isOpen || !user) return null;
 
@@ -140,7 +152,21 @@ const ViewUserModal = ({ isOpen, onClose, user, allRoles = [], availableRoles = 
             {/* Security Shift Details */}
             {user.role === 'security' && (user.assignedShift && user.assignedShift !== 'none') && (
               <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3 animate-fadeIn">
-                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block border-b border-gray-50 pb-1.5">Shift Details</span>
+                <div className="flex items-center justify-between border-b border-gray-50 pb-1.5">
+                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Shift Details</span>
+                  {/* 24H / AM·PM toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setUse12h(v => !v)}
+                    className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border transition-all ${
+                      use12h
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
+                    }`}
+                  >
+                    {use12h ? 'AM/PM' : '24H'}
+                  </button>
+                </div>
                 <div className="grid grid-cols-3 gap-4 text-xs">
                   <div>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-0.5">Assigned Shift</span>
@@ -148,11 +174,15 @@ const ViewUserModal = ({ isOpen, onClose, user, allRoles = [], availableRoles = 
                   </div>
                   <div>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-0.5">Start Time</span>
-                    <span className="font-bold text-gray-800">{user.shiftStartTime || '-'}</span>
+                    <span className="font-bold text-gray-800">
+                      {use12h ? to12h(user.shiftStartTime) : (user.shiftStartTime || '-')}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-0.5">End Time</span>
-                    <span className="font-bold text-gray-800">{user.shiftEndTime || '-'}</span>
+                    <span className="font-bold text-gray-800">
+                      {use12h ? to12h(user.shiftEndTime) : (user.shiftEndTime || '-')}
+                    </span>
                   </div>
                 </div>
               </div>

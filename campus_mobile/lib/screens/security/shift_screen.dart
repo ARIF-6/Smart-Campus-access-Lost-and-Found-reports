@@ -17,6 +17,7 @@ class _ShiftScreenState extends State<ShiftScreen> {
   final ApiService _api = ApiService();
   List<dynamic> _history = [];
   bool _loadingHistory = true;
+  bool _use12h = false; // toggle: false = 24h, true = 12h AM/PM
 
   final SocketService _socketService = SocketService();
 
@@ -153,18 +154,37 @@ class _ShiftScreenState extends State<ShiftScreen> {
     final endStr = user['shiftEndTime'] as String? ?? '';
 
     if (startStr.isNotEmpty && endStr.isNotEmpty) {
-      return 'Your shift will start at $startStr and end at $endStr.';
+      return 'Your shift will start at ${_fmtTimeStr(startStr)} and end at ${_fmtTimeStr(endStr)}.';
     }
 
     final assignedShift =
         (user['assignedShift'] as String? ?? 'none').toLowerCase();
     if (assignedShift == 'morning') {
-      return 'Your shift runs from 05:00 to 13:29 (Morning).';
+      return 'Your shift runs from ${_fmtTimeStr('05:00')} to ${_fmtTimeStr('13:29')} (Morning).';
     } else if (assignedShift == 'afternoon') {
-      return 'Your shift runs from 13:30 to 18:00 (Afternoon).';
+      return 'Your shift runs from ${_fmtTimeStr('13:30')} to ${_fmtTimeStr('18:00')} (Afternoon).';
     }
 
     return 'No active shift is assigned to you today.';
+  }
+
+  /// Format a DateTime to HH:mm or hh:mm a based on toggle
+  String _fmt(DateTime dt) {
+    return _use12h
+        ? DateFormat('hh:mm a').format(dt)
+        : DateFormat('HH:mm').format(dt);
+  }
+
+  /// Format a "HH:mm" string to 12h or 24h based on toggle
+  String _fmtTimeStr(String timeStr) {
+    if (timeStr.isEmpty) return timeStr;
+    try {
+      final parts = timeStr.split(':').map(int.parse).toList();
+      final dt = DateTime(2000, 1, 1, parts[0], parts[1]);
+      return _use12h ? DateFormat('hh:mm a').format(dt) : timeStr;
+    } catch (_) {
+      return timeStr;
+    }
   }
 
   @override
@@ -183,6 +203,29 @@ class _ShiftScreenState extends State<ShiftScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         actions: [
+          // ── 12h / 24h toggle ─────────────────────────────────────
+          GestureDetector(
+            onTap: () => setState(() => _use12h = !_use12h),
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _use12h ? const Color(0xFF1B3A6B) : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _use12h ? const Color(0xFF1B3A6B) : Colors.grey.shade300,
+                ),
+              ),
+              child: Text(
+                _use12h ? 'AM/PM' : '24H',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  color: _use12h ? Colors.white : Colors.grey.shade700,
+                ),
+              ),
+            ),
+          ),
           IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
         ],
       ),
@@ -245,7 +288,7 @@ class _ShiftScreenState extends State<ShiftScreen> {
                             const SizedBox(height: 16),
                             if (activeShift != null) ...[
                               Text(
-                                'Started: ${DateFormat('HH:mm').format(DateTime.parse(activeShift['shiftStart']).toLocal())}',
+                                'Started: ${_fmt(DateTime.parse(activeShift['shiftStart']).toLocal())}',
                                 style: const TextStyle(
                                     color: Colors.white70, fontSize: 13),
                               ),
@@ -446,8 +489,8 @@ class _ShiftScreenState extends State<ShiftScreen> {
                                           fontWeight: FontWeight.bold),
                                     ),
                                     Text(
-                                      '${DateFormat('HH:mm').format(DateTime.parse(sh['shiftStart']).toLocal())} - '
-                                      '${sh['shiftEnd'] != null ? DateFormat('HH:mm').format(DateTime.parse(sh['shiftEnd']).toLocal()) : 'Ongoing'}',
+                                      '${_fmt(DateTime.parse(sh['shiftStart']).toLocal())} - '
+                                      '${sh['shiftEnd'] != null ? _fmt(DateTime.parse(sh['shiftEnd']).toLocal()) : 'Ongoing'}',
                                       style: const TextStyle(
                                           fontSize: 12, color: Colors.grey),
                                     ),
