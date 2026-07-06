@@ -59,9 +59,12 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
   Future<void> _fetchCategories() async {
     try {
       final response = await _apiService.get('/categories/lost-found');
-      if (response.statusCode == 200 && response.data is List) {
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data is List
+            ? response.data
+            : (response.data['data'] ?? []);
         setState(() {
-          _categories = (response.data as List).map((e) => {
+          _categories = data.map((e) => {
                 'value': e['name'] ?? '',
                 'label': e['name'] ?? '',
                 'icon': Icons.category_rounded,
@@ -72,7 +75,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
         });
       }
     } catch (e) {
-      // ignore errors for now
+      debugPrint('Error fetching categories: $e');
     }
   }
 

@@ -24,17 +24,13 @@ const checkShiftWindow = async (req, res, next) => {
     // Require an active shift record
     let activeShift = await Shift.findOne({ guardId, status: 'active' });
     if (!activeShift) {
-      // Auto-start a shift in dev/testing mode if none exists
-      activeShift = await Shift.create({
-        guardId,
-        shiftStart: new Date(),
-        status: 'active'
+      return res.status(403).json({
+        success: false,
+        message: "You are not currently on duty. Student entry and exit are only allowed during your assigned shift time."
       });
-      console.log(`Auto-started active shift for guard ${guardId} to allow security action.`);
     }
 
-    // Active shift exists - allow the action
-    return next();
+    // Now check if current server time matches the guard's shift start/end times if assigned.
 
     const now = new Date();
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
@@ -62,7 +58,7 @@ const checkShiftWindow = async (req, res, next) => {
 
       return res.status(403).json({
         success: false,
-        message: `Outside your shift window. Your shift is from ${customStart} to ${customEnd}. Please wait until your shift starts.`
+        message: "You are not currently on duty. Student entry and exit are only allowed during your assigned shift time."
       });
     }
 
@@ -74,7 +70,7 @@ const checkShiftWindow = async (req, res, next) => {
       // No custom times and no named shift → deny
       return res.status(403).json({
         success: false,
-        message: 'No shift assigned – contact an admin to assign your shift schedule.'
+        message: "You are not currently on duty. Student entry and exit are only allowed during your assigned shift time."
       });
     }
 
@@ -94,7 +90,7 @@ const checkShiftWindow = async (req, res, next) => {
 
     return res.status(403).json({
       success: false,
-      message: `Outside your shift window. Your shift runs ${isMorningShift ? '05:00 – 13:29' : '13:30 – 18:00'}. Please wait until your shift starts.`
+      message: "You are not currently on duty. Student entry and exit are only allowed during your assigned shift time."
     });
   } catch (err) {
     console.error(err);
