@@ -24,6 +24,9 @@ android {
         applicationId = "com.example.campus_mobile"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
+        //
+        // minSdk 21 = Android 5.0 — required by mobile_scanner, permission_handler,
+        //             socket_io_client, and other plugins. Do NOT lower this.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

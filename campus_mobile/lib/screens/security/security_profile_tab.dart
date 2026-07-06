@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:dio/dio.dart';
 import '../settings_screen.dart';
 import '../../providers/auth_provider.dart';
@@ -62,6 +64,33 @@ class _SecurityProfileTabState extends State<SecurityProfileTab> with TickerProv
   Future<void> _pickAndUploadImage() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final messenger = ScaffoldMessenger.of(context);
+
+    // ── Android: request photo / storage permission before opening gallery ──
+    if (!kIsWeb) {
+      final permission = Permission.photos;
+      final status = await permission.request();
+      if (!mounted) return;
+      if (status.isPermanentlyDenied) {
+        messenger.showSnackBar(SnackBar(
+          content: const Text('Photos permission permanently denied. Enable it in Settings.'),
+          backgroundColor: AppConstants.errorColor,
+          action: SnackBarAction(
+            label: 'Settings',
+            textColor: Colors.white,
+            onPressed: openAppSettings,
+          ),
+        ));
+        return;
+      }
+      if (!status.isGranted) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('Photos permission denied. Cannot open gallery.'),
+          backgroundColor: AppConstants.errorColor,
+        ));
+        return;
+      }
+    }
+
     final picker = ImagePicker();
     final XFile? image = await picker.pickImage(
       source: ImageSource.gallery,

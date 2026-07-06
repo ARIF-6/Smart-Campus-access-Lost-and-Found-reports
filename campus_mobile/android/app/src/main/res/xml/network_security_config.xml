@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network Security Configuration for Campus Mobile (Android)
+
+  This file controls which network traffic the app is allowed to send.
+
+  PRODUCTION:
+    • HTTPS connections to all domains are always allowed.
+    • Cleartext (plain HTTP) is ONLY allowed for:
+        – localhost / 127.0.0.1   (local dev / emulator)
+        – 10.0.2.2                 (Android emulator → host machine)
+        – 192.168.x.x              (LAN — dev only; remove after backend is deployed publicly)
+
+  When the backend is moved to HTTPS on a public domain, you can delete the
+  <domain-config> blocks below and set cleartextTrafficPermitted="false" on
+  <base-config> to enforce HTTPS-only in production.
+-->
+<network-security-config>
+
+    <!-- Base config: HTTPS only in release (safest default) -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Allow HTTP to localhost (Flutter web dev server, emulator) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <!-- Android emulator host machine -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <!--
+          LAN IP for development (REMOVE this block once backend is
+          deployed to a public HTTPS server):
+        -->
+        <domain includeSubdomains="false">192.168.20.104</domain>
+    </domain-config>
+
+</network-security-config>

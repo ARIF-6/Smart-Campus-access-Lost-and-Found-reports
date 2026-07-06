@@ -1,15 +1,25 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Network -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Camera for QR scanning and photo capture -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Storage / Photos — Android 13+ (API 33+) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <!-- Storage / Photos — Android 9 and below (API ≤ 28) -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"  android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <!-- Vibration for notification feedback -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <uses-feature android:name="android.hardware.camera" android:required="false" />
-    
+
     <application
         android:label="campus_mobile"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name=".MainActivity"
             android:exported="true"

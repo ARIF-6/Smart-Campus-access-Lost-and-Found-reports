@@ -3,16 +3,31 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
 class AppConstants {
+  // ─────────────────────────────────────────────────────────────────────────
+  // PRODUCTION BACKEND URL
+  // Replace this with the actual public URL where your backend is deployed.
+  // Examples:
+  //   'https://campus-api.onrender.com'
+  //   'https://api.yourcampus.com'
+  //   'http://YOUR_VPS_PUBLIC_IP:5000'  (only if no HTTPS available)
+  //
+  // ⚠️  DO NOT use 192.168.x.x, 127.0.0.1, or 10.0.2.2 here — these are
+  //     private/local addresses that only work on your development machine.
+  // ─────────────────────────────────────────────────────────────────────────
+  static const String _kProdBackendUrl = 'http://192.168.20.104:5000';
+  //                                      ↑ REPLACE THIS with your public backend URL
+
   // API URL
   static String get baseUrl {
     if (kReleaseMode) {
-      return 'http://192.168.20.104:5000/api';
+      return '$_kProdBackendUrl/api';
     }
     if (kIsWeb) {
       return 'http://localhost:5000/api';
     }
     try {
       if (Platform.isAndroid) {
+        // 10.0.2.2 maps to the host machine's localhost from an Android emulator.
         return 'http://10.0.2.2:5000/api';
       }
     } catch (_) {}
@@ -21,7 +36,7 @@ class AppConstants {
 
   static String get serverUrl {
     if (kReleaseMode) {
-      return 'http://192.168.20.104:5000';
+      return _kProdBackendUrl;
     }
     if (kIsWeb) {
       return 'http://localhost:5000';
