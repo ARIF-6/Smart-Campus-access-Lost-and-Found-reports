@@ -92,17 +92,37 @@ exports.loginUser = asyncHandler(async (req, res) => {
   const identifier = typeof username === 'string' ? username.trim() : (typeof email === 'string' ? email.trim() : '');
   const cleanPassword = typeof password === 'string' ? password.trim() : '';
 
-  let query = { isDeleted: false };
-  query.$or = [
-    { username: identifier },
-    { studentId: identifier }
-  ];
+  // 1. Try finding a Student using a case-insensitive check on studentId
+  let studentUser = null;
+  if (identifier) {
+    studentUser = await User.findOne({
+      role: 'student',
+      isDeleted: false,
+      studentId: { $regex: new RegExp('^' + identifier.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') }
+    }).select('+password').populate('class').populate('faculty').populate('department');
+  }
 
-  // Check for user by identifier
-  const user = await User.findOne(query).select('+password').populate('class').populate('faculty').populate('department');
+  // 2. Try finding Admin, Staff, Security Guard, or Cleaner using exact case-sensitive username match
+  let staffUser = null;
+  if (identifier && !studentUser) {
+    // Standard Mongoose query for username exact match is case-sensitive (unless explicitly collated/regexed)
+    // However, to guarantee case sensitivity at database level or in-memory, we can query it directly
+    // and then double-check the exact string match, or query specifically.
+    const tempUser = await User.findOne({
+      role: { $in: ['admin', 'staff', 'security', 'cleaner', 'superadmin'] },
+      isDeleted: false,
+      username: identifier
+    }).select('+password').populate('class').populate('faculty').populate('department');
+
+    if (tempUser && tempUser.username === identifier) {
+      staffUser = tempUser;
+    }
+  }
+
+  const user = studentUser || staffUser;
 
   if (!user) {
-    return res.status(401).json({ success: false, message: 'Incorrect credentials' });
+    return res.status(401).json({ success: false, message: 'Invalid username or password' });
   }
 
   if (user.isActive === false) {
@@ -113,7 +133,7 @@ exports.loginUser = asyncHandler(async (req, res) => {
   const isMatch = await user.matchPassword(cleanPassword);
 
   if (!isMatch) {
-    return res.status(401).json({ success: false, message: 'Incorrect password' });
+    return res.status(401).json({ success: false, message: 'Invalid username or password' });
   }
 
   // Log audit action

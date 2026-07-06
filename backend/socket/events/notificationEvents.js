@@ -69,9 +69,25 @@ const emitToUser = (userId, event, data) => {
   }
 };
 
+/**
+ * Emit an event to a specific role's socket room
+ * @param {String} role  - Role name (admin, security, student, cleaner, staff)
+ * @param {String} event - Socket event name
+ * @param {*} data       - Payload to send
+ */
+const emitToRole = (role, event, data) => {
+  try {
+    const io = getIO();
+    io.to(`role:${role}`).emit(event, data);
+  } catch (err) {
+    console.error('Socket emitToRole Error:', err.message);
+  }
+};
+
 module.exports = {
   emitNotification,
   emitDashboardRefresh,
   emitGlobalEvent,
-  emitToUser
+  emitToUser,
+  emitToRole
 };

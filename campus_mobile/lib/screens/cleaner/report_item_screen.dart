@@ -8,6 +8,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
 import '../../widgets/web_camera_capture.dart';
+import '../../core/permission_helper.dart';
+import '../../services/socket_service.dart';
 
 class ReportItemScreen extends StatefulWidget {
   const ReportItemScreen({super.key});
@@ -33,11 +35,25 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
 
   List<Map<String, dynamic>> _categories = [];
 
+  final SocketService _socketService = SocketService();
+
   @override
   void initState() {
     super.initState();
     _selectedCategory = null;
     _fetchCategories();
+    _socketService.on('category:updated', (_) {
+      if (mounted) _fetchCategories();
+    });
+  }
+
+  @override
+  void dispose() {
+    _socketService.off('category:updated');
+    _titleController.dispose();
+    _descController.dispose();
+    _locController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchCategories() async {
@@ -83,13 +99,8 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
     }
 
     // ── Native (Android / iOS) ──────────────────────────────────────
-    Permission permission;
-    if (source == ImageSource.camera) {
-      permission = Permission.camera;
-    } else {
-      // Android 13+ uses READ_MEDIA_IMAGES; older versions use storage.
-      permission = Permission.photos;
-    }
+    final Permission permission =
+        source == ImageSource.camera ? Permission.camera : PermissionHelper.photosPermission;
 
     PermissionStatus status = await permission.request();
 
@@ -404,13 +415,5 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
         onChanged: (v) => setState(() => _selectedCategory = v),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descController.dispose();
-    _locController.dispose();
-    super.dispose();
   }
 }

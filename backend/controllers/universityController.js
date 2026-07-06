@@ -34,6 +34,12 @@ exports.createFaculty = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Faculty Name is required' });
     }
     const newFaculty = await Faculty.create({ name, description });
+    
+    try {
+      const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+      emitGlobalEvent('university:updated', {});
+    } catch (_) {}
+
     return res.status(201).json({ success: true, data: newFaculty });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
@@ -65,6 +71,12 @@ exports.createDepartment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Name and Faculty ID are required' });
     }
     const newDept = await Department.create({ name, description, facultyId });
+    
+    try {
+      const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+      emitGlobalEvent('university:updated', {});
+    } catch (_) {}
+
     return res.status(201).json({ success: true, data: newDept });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
@@ -123,6 +135,11 @@ exports.createClass = async (req, res) => {
     hall.classes.push(newClass._id);
     await hall.save();
     
+    try {
+      const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+      emitGlobalEvent('university:updated', {});
+    } catch (_) {}
+
     return res.status(201).json({ success: true, data: newClass });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
@@ -165,6 +182,12 @@ exports.createHall = async (req, res) => {
     }
 
     const newHall = await Hall.create({ name: name.trim(), campus: campusId, capacity, classes: [] });
+    
+    try {
+      const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+      emitGlobalEvent('university:updated', {});
+    } catch (_) {}
+
     return res.status(201).json({ success: true, data: newHall });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
@@ -214,6 +237,12 @@ exports.editHall = async (req, res) => {
     if (capacity !== undefined) hall.capacity = capacity;
     await hall.save();
     await enforceHallCapacityForHall(hallId);
+    
+    try {
+      const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+      emitGlobalEvent('university:updated', {});
+    } catch (_) {}
+
     return res.status(200).json({ success: true, data: hall });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
@@ -325,6 +354,11 @@ exports.assignClassLeader = async (req, res) => {
     classDetail.classLeader = studentId;
     await classDetail.save();
 
+    try {
+      const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+      emitGlobalEvent('university:updated', {});
+    } catch (_) {}
+
     return res.status(200).json({
       success: true,
       message: 'Class Leader assigned successfully',
@@ -359,6 +393,12 @@ exports.createCampus = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Campus name already exists' });
     }
     const newCampus = await Campus.create({ name });
+    
+    try {
+      const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+      emitGlobalEvent('university:updated', {});
+    } catch (_) {}
+
     return res.status(201).json({ success: true, data: newCampus });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
@@ -372,6 +412,12 @@ exports.updateCampus = async (req, res) => {
     if (!name) return res.status(400).json({ success: false, message: 'Campus Name is required' });
     const campus = await Campus.findByIdAndUpdate(id, { name }, { new: true, runValidators: true });
     if (!campus) return res.status(404).json({ success: false, message: 'Campus not found' });
+    
+    try {
+      const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+      emitGlobalEvent('university:updated', {});
+    } catch (_) {}
+
     return res.status(200).json({ success: true, data: campus });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
@@ -383,6 +429,12 @@ exports.deleteCampus = async (req, res) => {
     const { id } = req.params;
     const campus = await Campus.findByIdAndDelete(id);
     if (!campus) return res.status(404).json({ success: false, message: 'Campus not found' });
+    
+    try {
+      const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+      emitGlobalEvent('university:updated', {});
+    } catch (_) {}
+
     return res.status(200).json({ success: true, message: 'Campus deleted successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
@@ -396,6 +448,12 @@ exports.updateFaculty = async (req, res) => {
     if (!name) return res.status(400).json({ success: false, message: 'Faculty Name is required' });
     const faculty = await Faculty.findByIdAndUpdate(id, { name, description }, { new: true, runValidators: true });
     if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
+    
+    try {
+      const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+      emitGlobalEvent('university:updated', {});
+    } catch (_) {}
+
     return res.status(200).json({ success: true, data: faculty });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
@@ -407,6 +465,12 @@ exports.deleteFaculty = async (req, res) => {
     const { id } = req.params;
     const faculty = await Faculty.findByIdAndDelete(id);
     if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
+    
+    try {
+      const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+      emitGlobalEvent('university:updated', {});
+    } catch (_) {}
+
     return res.status(200).json({ success: true, message: 'Faculty deleted successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
@@ -420,6 +484,12 @@ exports.updateDepartment = async (req, res) => {
     if (!name) return res.status(400).json({ success: false, message: 'Department Name is required' });
     const dept = await Department.findByIdAndUpdate(id, { name, description, facultyId }, { new: true, runValidators: true }).populate('facultyId', 'name');
     if (!dept) return res.status(404).json({ success: false, message: 'Department not found' });
+    
+    try {
+      const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+      emitGlobalEvent('university:updated', {});
+    } catch (_) {}
+
     return res.status(200).json({ success: true, data: dept });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
@@ -431,6 +501,12 @@ exports.deleteDepartment = async (req, res) => {
     const { id } = req.params;
     const dept = await Department.findByIdAndDelete(id);
     if (!dept) return res.status(404).json({ success: false, message: 'Department not found' });
+    
+    try {
+      const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+      emitGlobalEvent('university:updated', {});
+    } catch (_) {}
+
     return res.status(200).json({ success: true, message: 'Department deleted successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
@@ -467,6 +543,11 @@ exports.updateClass = async (req, res) => {
     }
     await enforceHallCapacityForClass(id);
 
+    try {
+      const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+      emitGlobalEvent('university:updated', {});
+    } catch (_) {}
+
     return res.status(200).json({ success: true, data: cls });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
@@ -478,6 +559,12 @@ exports.deleteClass = async (req, res) => {
     const { id } = req.params;
     const cls = await require('../models/Class').findByIdAndDelete(id);
     if (!cls) return res.status(404).json({ success: false, message: 'Class not found' });
+    
+    try {
+      const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+      emitGlobalEvent('university:updated', {});
+    } catch (_) {}
+
     return res.status(200).json({ success: true, message: 'Class deleted successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
@@ -490,6 +577,12 @@ exports.deleteHall = async (req, res) => {
     const Hall = require('../models/Hall');
     const hall = await Hall.findByIdAndDelete(hallId);
     if (!hall) return res.status(404).json({ success: false, message: 'Hall not found' });
+    
+    try {
+      const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+      emitGlobalEvent('university:updated', {});
+    } catch (_) {}
+
     return res.status(200).json({ success: true, message: 'Hall deleted successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });

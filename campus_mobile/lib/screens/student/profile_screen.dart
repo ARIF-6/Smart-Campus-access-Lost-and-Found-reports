@@ -7,6 +7,7 @@ import 'package:dio/dio.dart';
 import '../../core/constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../core/permission_helper.dart';
 
 
 class ProfileScreen extends StatefulWidget {
@@ -52,7 +53,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     // ── Android: request photo / storage permission before opening gallery ──
     if (!kIsWeb) {
-      final status = await Permission.photos.request();
+      final status = await PermissionHelper.photosPermission.request();
       if (!mounted) return;
       if (status.isPermanentlyDenied) {
         messenger.showSnackBar(SnackBar(

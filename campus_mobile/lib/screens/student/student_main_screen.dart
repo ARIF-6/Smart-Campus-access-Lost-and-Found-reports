@@ -9,6 +9,8 @@ import 'student_report_item_screen.dart';
 import 'campus_complaint_screen.dart';
 import 'class_issue_form_screen.dart';
 import '../../services/socket_service.dart';
+import '../../providers/notification_provider.dart';
+import '../../core/app_lifecycle_observer.dart';
 
 const _navyPrimary = Color(0xFF1B3A6B);
 
@@ -37,6 +39,9 @@ class StudentMainScreenState extends State<StudentMainScreen> {
     super.initState();
     _socketService.on('notification:new', (data) {
       if (mounted) {
+        // Also refresh list via provider
+        Provider.of<NotificationProvider>(context, listen: false).fetchNotifications();
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Column(
@@ -182,48 +187,54 @@ class StudentMainScreenState extends State<StudentMainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        switchInCurve: Curves.easeIn,
-        switchOutCurve: Curves.easeOut,
-        transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
-        child: KeyedSubtree(key: ValueKey(_currentIndex), child: _screens[_currentIndex]),
-      ),
-
-      // ── Bottom Navigation Bar (custom premium design) ───────────────
-      bottomNavigationBar: Container(
-        height: 76,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 22),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 24, offset: const Offset(0, 8)),
-          ],
+    return AppLifecycleObserver(
+      onResume: () {
+        if (!mounted) return;
+        Provider.of<NotificationProvider>(context, listen: false).fetchNotifications();
+      },
+      child: Scaffold(
+        extendBody: true,
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          switchInCurve: Curves.easeIn,
+          switchOutCurve: Curves.easeOut,
+          transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+          child: KeyedSubtree(key: ValueKey(_currentIndex), child: _screens[_currentIndex]),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _navItem(0, Icons.home_rounded, Icons.home_outlined, 'Home'),
-            _navItem(1, Icons.receipt_long_rounded, Icons.receipt_long_outlined, 'Claims'),
-            // Center FAB / Action Button inside the nav bar itself
-            GestureDetector(
-              onTap: () => _showActionMenu(context),
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF1F2937), // dark background
-                  shape: BoxShape.circle,
+
+        // ── Bottom Navigation Bar (custom premium design) ───────────────
+        bottomNavigationBar: Container(
+          height: 76,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 22),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 24, offset: const Offset(0, 8)),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _navItem(0, Icons.home_rounded, Icons.home_outlined, 'Home'),
+              _navItem(1, Icons.receipt_long_rounded, Icons.receipt_long_outlined, 'Claims'),
+              // Center FAB / Action Button inside the nav bar itself
+              GestureDetector(
+                onTap: () => _showActionMenu(context),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF1F2937), // dark background
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.add_rounded, color: Colors.white, size: 24),
                 ),
-                child: const Icon(Icons.add_rounded, color: Colors.white, size: 24),
               ),
-            ),
-            _navItem(2, Icons.explore_rounded, Icons.explore_outlined, 'Items'),
-            _navItem(3, Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
-          ],
+              _navItem(2, Icons.explore_rounded, Icons.explore_outlined, 'Items'),
+              _navItem(3, Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
+            ],
+          ),
         ),
       ),
     );

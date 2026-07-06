@@ -64,8 +64,27 @@ const NotificationBell = () => {
         ), { duration: 5000, position: 'top-right' });
       };
 
-      socket.on("notification:new", handleNewNotification);
-      return () => socket.off("notification:new", handleNewNotification);
+      // When a notification is read on another device/tab — update badge instantly
+      const handleRead = ({ id }) => {
+        setNotifications(prev =>
+          prev.map(n => (n._id === id || n.id === id) ? { ...n, isRead: true } : n)
+        );
+      };
+
+      // When all notifications are marked read from another device/tab
+      const handleReadAll = () => {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      };
+
+      socket.on('notification:new', handleNewNotification);
+      socket.on('notification:read', handleRead);
+      socket.on('notification:readAll', handleReadAll);
+
+      return () => {
+        socket.off('notification:new', handleNewNotification);
+        socket.off('notification:read', handleRead);
+        socket.off('notification:readAll', handleReadAll);
+      };
     }
   }, [socket]);
 

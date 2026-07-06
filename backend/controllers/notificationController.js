@@ -57,6 +57,10 @@ exports.markAsRead = asyncHandler(async (req, res) => {
   notification.isRead = true;
   await notification.save();
 
+  // Notify other connections of the same user
+  const { emitToUser } = require('../socket/events/notificationEvents');
+  emitToUser(req.user.id, 'notification:read', { id: notification._id });
+
   return sendSuccess(res, 'Notification marked as read');
 });
 
@@ -76,6 +80,10 @@ exports.markAllRead = asyncHandler(async (req, res) => {
     },
     { isRead: true }
   );
+
+  // Notify other connections of the same user
+  const { emitToUser } = require('../socket/events/notificationEvents');
+  emitToUser(id, 'notification:readAll', {});
 
   return sendSuccess(res, 'All notifications marked as read');
 });

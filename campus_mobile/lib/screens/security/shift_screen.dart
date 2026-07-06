@@ -5,6 +5,7 @@ import '../../core/constants.dart';
 import '../../services/api_service.dart';
 import '../../providers/shift_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/socket_service.dart';
 
 class ShiftScreen extends StatefulWidget {
   const ShiftScreen({super.key});
@@ -17,10 +18,21 @@ class _ShiftScreenState extends State<ShiftScreen> {
   List<dynamic> _history = [];
   bool _loadingHistory = true;
 
+  final SocketService _socketService = SocketService();
+
   @override
   void initState() {
     super.initState();
     _refresh();
+    _socketService.on('user:shiftUpdated', (_) {
+      if (mounted) _refresh();
+    });
+  }
+
+  @override
+  void dispose() {
+    _socketService.off('user:shiftUpdated');
+    super.dispose();
   }
 
   Future<void> _refresh() async {

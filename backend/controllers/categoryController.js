@@ -67,6 +67,9 @@ exports.createCategory = asyncHandler(async (req, res, next) => {
     createdBy: req.user._id,
   });
 
+  const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+  emitGlobalEvent('category:updated', {});
+
   res.status(201).json({ success: true, data: category, message: 'Category created successfully.' });
 });
 
@@ -100,6 +103,9 @@ exports.updateCategory = asyncHandler(async (req, res, next) => {
 
   await category.save();
 
+  const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+  emitGlobalEvent('category:updated', {});
+
   res.status(200).json({ success: true, data: category, message: 'Category updated successfully.' });
 });
 
@@ -112,6 +118,10 @@ exports.deleteCategory = asyncHandler(async (req, res, next) => {
   if (!category) {
     return next(new ErrorResponse('Category not found.', 404));
   }
+
+  const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+  emitGlobalEvent('category:updated', {});
+
   res.status(200).json({ success: true, message: 'Category deleted permanently.' });
 });
 
@@ -149,6 +159,9 @@ exports.convertTemporary = asyncHandler(async (req, res, next) => {
   temp.isTemporary = false;
   temp.status = 'active';
   await temp.save();
+
+  const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+  emitGlobalEvent('category:updated', {});
   res.status(200).json({ success: true, data: temp, message: 'Temporary request converted to official category.' });
 });
 

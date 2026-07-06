@@ -8,6 +8,7 @@ import '../settings_screen.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
+import '../../core/permission_helper.dart';
 
 class SecurityProfileTab extends StatefulWidget {
   const SecurityProfileTab({super.key});
@@ -67,7 +68,7 @@ class _SecurityProfileTabState extends State<SecurityProfileTab> with TickerProv
 
     // ── Android: request photo / storage permission before opening gallery ──
     if (!kIsWeb) {
-      final permission = Permission.photos;
+      final permission = PermissionHelper.photosPermission;
       final status = await permission.request();
       if (!mounted) return;
       if (status.isPermanentlyDenied) {

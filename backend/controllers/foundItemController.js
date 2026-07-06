@@ -212,6 +212,11 @@ exports.updateFoundItem = asyncHandler(async (req, res) => {
 
   const updatedItem = await item.save();
 
+  try {
+    const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+    emitGlobalEvent('foundItem:updated', updatedItem);
+  } catch (_) {}
+
   if (item.status === 'returned' && oldStatus !== 'returned') {
     try {
       const claim = await Claim.findOne({ item: item._id, status: 'approved' });
@@ -260,6 +265,11 @@ exports.deleteFoundItem = asyncHandler(async (req, res) => {
 
   // Remove the document permanently
   await FoundItem.findByIdAndDelete(req.params.id);
+
+  try {
+    const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+    emitGlobalEvent('foundItem:deleted', { _id: req.params.id });
+  } catch (_) {}
 
   // Log audit of permanent delete
   await logAction({

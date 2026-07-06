@@ -15,7 +15,7 @@ import 'security_reports_screen.dart';
 
 import '../../services/socket_service.dart';
 import '../../providers/notification_provider.dart';
-import '../../models/notification.dart' as app_models_notif;
+import '../../core/app_lifecycle_observer.dart';
 
 class SecurityMainScreen extends StatefulWidget {
   const SecurityMainScreen({super.key});
@@ -84,16 +84,7 @@ class _SecurityMainScreenState extends State<SecurityMainScreen>
 
     _socketService.on('notification:new', (data) {
       if (mounted) {
-        final provider = Provider.of<NotificationProvider>(context, listen: false);
-        final newNotif = app_models_notif.Notification(
-          id: data['id'] ?? '',
-          title: data['title'] ?? '',
-          message: data['message'] ?? '',
-          type: data['type'] ?? 'GENERAL',
-          isRead: false,
-          createdAt: DateTime.tryParse(data['createdAt'] ?? '') ?? DateTime.now(),
-        );
-        provider.addNotification(newNotif);
+        Provider.of<NotificationProvider>(context, listen: false).fetchNotifications();
       }
     });
 
@@ -149,15 +140,22 @@ class _SecurityMainScreenState extends State<SecurityMainScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: AppConstants.backgroundColor,
-      drawer: _SecurityDrawer(
-        animController: _drawerAnimController,
-        onNav: _nav,
-      ),
-      body: SecurityDashboard(
-        openDrawer: _openDrawer,
+    return AppLifecycleObserver(
+      onResume: () {
+        if (!mounted) return;
+        Provider.of<ShiftProvider>(context, listen: false).fetchActiveShift();
+        Provider.of<NotificationProvider>(context, listen: false).fetchNotifications();
+      },
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: AppConstants.backgroundColor,
+        drawer: _SecurityDrawer(
+          animController: _drawerAnimController,
+          onNav: _nav,
+        ),
+        body: SecurityDashboard(
+          openDrawer: _openDrawer,
+        ),
       ),
     );
   }

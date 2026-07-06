@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 
 class FoundItemsScreen extends StatefulWidget {
   const FoundItemsScreen({super.key});
@@ -26,12 +27,31 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
     {'value': 'claimed', 'label': 'Claimed'},
   ];
 
+  final SocketService _socketService = SocketService();
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _fetchItems();
     });
+    _socketService.on('foundItem:created', (_) {
+      if (mounted) _fetchItems();
+    });
+    _socketService.on('foundItem:updated', (_) {
+      if (mounted) _fetchItems();
+    });
+    _socketService.on('foundItem:deleted', (_) {
+      if (mounted) _fetchItems();
+    });
+  }
+
+  @override
+  void dispose() {
+    _socketService.off('foundItem:created');
+    _socketService.off('foundItem:updated');
+    _socketService.off('foundItem:deleted');
+    super.dispose();
   }
 
   Future<void> _fetchItems() async {

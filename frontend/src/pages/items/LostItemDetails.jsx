@@ -50,7 +50,7 @@ const LostItemDetails = () => {
   if (loading) return (
     <AdminLayout title="Loading Details..."><div className="flex justify-center p-12"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div></div></AdminLayout>
   );
-  
+
   if (error || !item) return (
     <AdminLayout title="Error"><div className="bg-red-50 text-red-600 p-6 rounded-xl border border-red-200">{error || 'Item not found.'}</div></AdminLayout>
   );
@@ -58,8 +58,8 @@ const LostItemDetails = () => {
   return (
     <AdminLayout title="Lost Item Details">
       <div className="mb-8">
-        <Link 
-          to="/admin/lost-items" 
+        <Link
+          to="/admin/lost-items"
           className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-50/50 hover:bg-indigo-50 px-4 py-2 rounded-xl"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -71,15 +71,15 @@ const LostItemDetails = () => {
 
       <div className="bg-white rounded-3xl shadow-xl shadow-gray-100/50 border border-gray-100 overflow-hidden mb-10">
         <div className="grid grid-cols-1 lg:grid-cols-12">
-          
+
           {/* Image Display Panel */}
           <div className="lg:col-span-5 bg-gray-50/50 flex flex-col items-center justify-center p-8 border-b lg:border-b-0 lg:border-r border-gray-100 min-h-[350px]">
             {item.image || item.imageUrl ? (
               <div className="relative group overflow-hidden rounded-2xl shadow-lg border border-gray-200/50 max-w-full">
-                <img 
-                  src={getImageUrl(item)} 
-                  alt={item.category} 
-                  className="w-full h-auto object-cover max-h-[400px] transition-transform duration-500 group-hover:scale-105" 
+                <img
+                  src={getImageUrl(item)}
+                  alt={item.category}
+                  className="w-full h-auto object-cover max-h-[400px] transition-transform duration-500 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none" />
               </div>
@@ -102,9 +102,9 @@ const LostItemDetails = () => {
               <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
                 <div className="flex gap-2">
                   <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider shadow-sm border
-                    ${item.status === 'lost' || item.status === 'pending' ? 'bg-red-50 text-red-700 border-red-100' : 
-                      item.status === 'matched' || item.status === 'approved' ? 'bg-amber-50 text-amber-700 border-amber-100' : 
-                      'bg-green-50 text-green-700 border-green-100'}`
+                    ${item.status === 'lost' || item.status === 'pending' ? 'bg-red-50 text-red-700 border-red-100' :
+                      item.status === 'matched' || item.status === 'approved' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                        'bg-green-50 text-green-700 border-green-100'}`
                   }>
                     {item.status}
                   </span>
@@ -112,7 +112,7 @@ const LostItemDetails = () => {
                     {item.category}
                   </span>
                 </div>
-                
+
                 <div className="text-left sm:text-right">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-0.5">Date Reported</span>
                   <span className="text-sm text-gray-700 font-bold bg-gray-50 px-3 py-1 rounded-lg border border-gray-100">
@@ -163,7 +163,7 @@ const LostItemDetails = () => {
 
             {/* Actions Panel */}
             <div className="pt-6 border-t border-gray-100 flex flex-wrap gap-3">
-              <button 
+              <button
                 onClick={() => setIsEditModalOpen(true)}
                 className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 active:scale-95 transition-all flex items-center gap-2 shadow-lg shadow-indigo-100 text-sm"
               >
@@ -172,7 +172,7 @@ const LostItemDetails = () => {
                 </svg>
                 Edit Report
               </button>
-              <button 
+              <button
                 onClick={handleDelete}
                 className="px-6 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 hover:text-red-700 active:scale-95 transition-all flex items-center gap-2 border border-red-100/50 text-sm"
               >
@@ -203,8 +203,8 @@ const LostItemDetails = () => {
                   <p className="text-xs text-emerald-700/80 mt-1">This report is successfully linked with a found item.</p>
                 </div>
               </div>
-              <Link 
-                to={`/admin/found-items/${item.linkedFoundItem._id || item.linkedFoundItem}`} 
+              <Link
+                to={`/admin/found-items/${item.linkedFoundItem._id || item.linkedFoundItem}`}
                 className="bg-white text-emerald-700 font-bold px-5 py-2.5 rounded-xl shadow-sm border border-emerald-200/50 hover:bg-emerald-50 transition-colors text-sm"
               >
                 View Found Record
@@ -213,18 +213,10 @@ const LostItemDetails = () => {
           </div>
         ) : null}
 
-        <div className="flex items-center gap-2 mb-6">
-          <div className="p-2 bg-amber-50 text-amber-500 rounded-lg">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </div>
-          <h3 className="text-xl font-extrabold text-gray-900">Smart Suggested Matches</h3>
-        </div>
-        
+
+
         {matches.length === 0 ? (
           <div className="bg-gray-50/50 border-2 border-dashed border-gray-200/60 rounded-3xl p-10 text-center">
-            <p className="text-gray-400 font-medium text-sm italic">No matches detected at this time. Our matching engine updates continuously.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -253,7 +245,7 @@ const LostItemDetails = () => {
                       <p className="text-xs text-gray-500 font-semibold truncate">Found at: {match.foundItemId.locationFound}</p>
                     </div>
                     <div className="flex gap-2">
-                      <Link 
+                      <Link
                         to={`/admin/found-items/${match.foundItemId._id}`}
                         className="w-full bg-gray-50 text-indigo-600 hover:bg-indigo-50 border border-indigo-100/30 text-center py-2 rounded-xl text-xs font-bold transition-colors"
                       >
@@ -268,7 +260,7 @@ const LostItemDetails = () => {
         )}
       </div>
 
-      <EditLostItemModal 
+      <EditLostItemModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         onSuccess={() => {

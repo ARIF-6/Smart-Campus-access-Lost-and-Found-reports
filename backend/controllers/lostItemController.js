@@ -143,6 +143,12 @@ exports.updateLostItem = asyncHandler(async (req, res) => {
   if (status) item.status = status;
 
   const updatedItem = await item.save();
+
+  try {
+    const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+    emitGlobalEvent('lostItem:updated', updatedItem);
+  } catch (_) {}
+
   return sendSuccess(res, 'Lost item updated successfully', updatedItem);
 });
 
@@ -163,6 +169,11 @@ exports.deleteLostItem = asyncHandler(async (req, res) => {
 
   // Permanently delete the lost item from the database
   await LostItem.findByIdAndDelete(req.params.id);
+
+  try {
+    const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+    emitGlobalEvent('lostItem:deleted', { _id: req.params.id });
+  } catch (_) {}
 
   // Log audit for permanent deletion
   await logAction({

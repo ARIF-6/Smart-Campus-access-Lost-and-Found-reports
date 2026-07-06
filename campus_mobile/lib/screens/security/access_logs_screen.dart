@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 
 class AccessLogsScreen extends StatefulWidget {
   const AccessLogsScreen({super.key});
@@ -20,10 +21,21 @@ class _AccessLogsScreenState extends State<AccessLogsScreen> {
   int _todayEntries = 0;
   int _todayExits = 0;
 
+  final SocketService _socketService = SocketService();
+
   @override
   void initState() {
     super.initState();
     _fetchLogs();
+    _socketService.on('dashboard:refresh', (_) {
+      if (mounted) _fetchLogs();
+    });
+  }
+
+  @override
+  void dispose() {
+    _socketService.off('dashboard:refresh');
+    super.dispose();
   }
 
   Future<void> _fetchLogs() async {

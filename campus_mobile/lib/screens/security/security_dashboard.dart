@@ -14,6 +14,7 @@ import 'blacklist_screen.dart';
 import 'shift_screen.dart';
 import 'security_reports_screen.dart';
 import '../student/notifications_screen.dart';
+import '../../services/socket_service.dart';
 
 class SecurityDashboard extends StatefulWidget {
   final VoidCallback? openDrawer;
@@ -27,6 +28,7 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
   final ApiService _api = ApiService();
   Map<String, dynamic> _live = {};
   bool _liveLoading = true;
+  final SocketService _socketService = SocketService();
   Timer? _ticker;
 
   @override
@@ -36,10 +38,14 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
     _ticker = Timer.periodic(const Duration(seconds: 30), (_) {
       _fetchLive();
     });
+    _socketService.on('dashboard:refresh', (data) {
+      if (mounted) _fetchLive();
+    });
   }
 
   @override
   void dispose() {
+    _socketService.off('dashboard:refresh');
     _ticker?.cancel();
     super.dispose();
   }

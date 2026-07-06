@@ -9,6 +9,7 @@ import 'report_item_screen.dart';
 import 'found_items_screen.dart';
 import 'cleaner_profile_screen.dart';
 import '../student/notifications_screen.dart';
+import '../../core/app_lifecycle_observer.dart';
 
 class CleanerDashboard extends StatefulWidget {
   const CleanerDashboard({super.key});
@@ -42,48 +43,54 @@ class CleanerDashboardState extends State<CleanerDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      backgroundColor: AppConstants.backgroundColor,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
-
-      bottomNavigationBar: Container(
-        height: 76,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 22),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-            ),
-          ],
+    return AppLifecycleObserver(
+      onResume: () {
+        if (!mounted) return;
+        Provider.of<NotificationProvider>(context, listen: false).fetchNotifications();
+      },
+      child: Scaffold(
+        extendBody: true,
+        backgroundColor: AppConstants.backgroundColor,
+        body: IndexedStack(
+          index: _currentIndex,
+          children: _pages,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildNavItem(0, Icons.home_filled, Icons.home_outlined, 'Home'),
-            _buildNavItem(1, Icons.inventory_2_rounded, Icons.inventory_2_outlined, 'Items'),
-            GestureDetector(
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const ReportItemScreen())),
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF1F2937),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.add_rounded, color: Colors.white, size: 24),
+
+        bottomNavigationBar: Container(
+          height: 76,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 22),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
               ),
-            ),
-            _buildNavItem(2, Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
-          ],
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildNavItem(0, Icons.home_filled, Icons.home_outlined, 'Home'),
+              _buildNavItem(1, Icons.inventory_2_rounded, Icons.inventory_2_outlined, 'Items'),
+              GestureDetector(
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const ReportItemScreen())),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF1F2937),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.add_rounded, color: Colors.white, size: 24),
+                ),
+              ),
+              _buildNavItem(2, Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
+            ],
+          ),
         ),
       ),
     );

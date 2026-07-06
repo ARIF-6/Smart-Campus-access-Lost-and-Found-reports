@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 
 class VisitorsScreen extends StatefulWidget {
   const VisitorsScreen({super.key});
@@ -16,10 +17,21 @@ class _VisitorsScreenState extends State<VisitorsScreen> {
   List<dynamic> _visitors = [];
   bool _loading = true;
 
+  final SocketService _socketService = SocketService();
+
   @override
   void initState() {
     super.initState();
     _fetchVisitors();
+    _socketService.on('dashboard:refresh', (_) {
+      if (mounted) _fetchVisitors();
+    });
+  }
+
+  @override
+  void dispose() {
+    _socketService.off('dashboard:refresh');
+    super.dispose();
   }
 
   Future<void> _fetchVisitors() async {

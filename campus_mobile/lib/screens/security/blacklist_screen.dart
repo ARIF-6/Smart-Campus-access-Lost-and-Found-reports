@@ -7,6 +7,7 @@ import '../../services/api_service.dart';
 import '../../providers/auth_provider.dart';
 
 import '../../providers/shift_provider.dart';
+import '../../services/socket_service.dart';
 
 class BlacklistScreen extends StatefulWidget {
   const BlacklistScreen({super.key});
@@ -19,10 +20,21 @@ class _BlacklistScreenState extends State<BlacklistScreen> {
   List<dynamic> _list = [];
   bool _loading = true;
 
+  final SocketService _socketService = SocketService();
+
   @override
   void initState() {
     super.initState();
     _fetch();
+    _socketService.on('dashboard:refresh', (_) {
+      if (mounted) _fetch();
+    });
+  }
+
+  @override
+  void dispose() {
+    _socketService.off('dashboard:refresh');
+    super.dispose();
   }
 
   Future<void> _fetch() async {

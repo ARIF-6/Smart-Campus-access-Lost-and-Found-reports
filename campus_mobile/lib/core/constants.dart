@@ -14,7 +14,7 @@ class AppConstants {
   // ⚠️  DO NOT use 192.168.x.x, 127.0.0.1, or 10.0.2.2 here — these are
   //     private/local addresses that only work on your development machine.
   // ─────────────────────────────────────────────────────────────────────────
-  static const String _kProdBackendUrl = 'http://192.168.20.104:5000';
+  static const String _kProdBackendUrl = 'https://smart-campus-access-lost-and-found-dbgg.onrender.com';
   //                                      ↑ REPLACE THIS with your public backend URL
 
   // API URL

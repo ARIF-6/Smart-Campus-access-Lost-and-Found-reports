@@ -7,6 +7,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../../services/api_service.dart';
 import '../../widgets/web_camera_capture.dart';
+import '../../core/permission_helper.dart';
+import '../../services/socket_service.dart';
 
 class StudentReportItemScreen extends StatefulWidget {
   final String? initialType;
@@ -33,6 +35,8 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
   List<String> _categories = [];
   bool _showCustomTitleField = false;
 
+  final SocketService _socketService = SocketService();
+
   @override
   void initState() {
     super.initState();
@@ -40,6 +44,18 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
       _reportType = widget.initialType!;
     }
     _loadCategories();
+    _socketService.on('category:updated', (_) {
+      if (mounted) _loadCategories();
+    });
+  }
+
+  @override
+  void dispose() {
+    _socketService.off('category:updated');
+    _titleController.dispose();
+    _descController.dispose();
+    _locController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCategories() async {
@@ -402,7 +418,7 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
     // Always request the correct permission BEFORE opening the picker so that
     // the OS does not silently redirect to the gallery when camera is denied.
     final Permission permission =
-        source == ImageSource.camera ? Permission.camera : Permission.photos;
+        source == ImageSource.camera ? Permission.camera : PermissionHelper.photosPermission;
 
     final PermissionStatus status = await permission.request();
 
