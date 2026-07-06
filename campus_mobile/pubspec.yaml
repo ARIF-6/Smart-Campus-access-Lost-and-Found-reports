@@ -37,6 +37,8 @@ dependencies:
   socket_io_client: ^3.1.4
   carousel_slider: ^5.1.2
   smooth_page_indicator: ^2.0.1
+  # Permission handling (camera/gallery)
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:

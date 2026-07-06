@@ -14,3 +14,4 @@ export { default as Incidents } from './Incidents';
 export { default as Blacklist } from './Blacklist';
 export { default as SecurityShifts } from './SecurityShifts';
 export { default as UniversityManagement } from './UniversityManagement';
+export { default as AdminProfile } from './AdminProfile';

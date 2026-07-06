@@ -32,9 +32,9 @@ router.patch('/incidents/:id/status', allowRoles('admin', 'staff'), updateIncide
 
 // Visitors
 router.post('/visitors', checkShiftWindow, [
-  body('name', 'Name is required').notEmpty().trim().escape(),
-  body('purpose', 'Purpose is required').notEmpty().trim().escape(),
-  body('hostName', 'Host Name is required').notEmpty().trim().escape(),
+  body('name', 'Name is required').notEmpty().trim(),
+  body('purpose', 'Purpose is required').notEmpty().trim(),
+  body('hostName', 'Host Name is required').notEmpty().trim(),
   validate
 ], registerVisitor);
 router.get('/visitors', getVisitors);

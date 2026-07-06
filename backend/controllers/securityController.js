@@ -112,7 +112,37 @@ exports.updateIncidentStatus = asyncHandler(async (req, res) => {
 // @route   POST /api/security/visitors
 exports.registerVisitor = asyncHandler(async (req, res) => {
   const { name, idNumber, phone, purpose, hostName, hostStudentId } = req.body;
-  
+
+  // ── 1. Purpose & hostName must not contain digits ─────────────────────────
+  const hasDigit = /\d/;
+  if (purpose && hasDigit.test(purpose)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Purpose cannot contain numbers.'
+    });
+  }
+  if (hostName && hasDigit.test(hostName)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Host name cannot contain numbers.'
+    });
+  }
+
+  // ── 2. Duplicate active check-in guard (by phone) ─────────────────────────
+  if (phone && phone.trim()) {
+    const existing = await Visitor.findOne({
+      phone: phone.trim(),
+      status: 'inside'
+    });
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        message: 'This visitor is already checked in and is currently inside the campus.'
+      });
+    }
+  }
+
+  // ── 3. Create visitor record ──────────────────────────────────────────────
   const lastVisitor = await Visitor.findOne().sort({ createdAt: -1 });
   const nextSeq = lastVisitor && lastVisitor.visitorId ? lastVisitor.visitorId + 1 : 1;
   const finalIdNumber = idNumber && idNumber.trim() ? idNumber : String(nextSeq);

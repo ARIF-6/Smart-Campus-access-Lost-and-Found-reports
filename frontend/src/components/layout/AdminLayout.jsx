@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import AdminSidebar from './AdminSidebar';
 import NotificationBell from '../common/NotificationBell';
 import { useAuth } from '../../context/AuthContext';
@@ -10,8 +11,9 @@ import { AutoRefreshProvider } from '../../context/AutoRefreshContext';
  * Auto-refresh is provided to all child pages via AutoRefreshProvider (30s interval).
  */
 const AdminLayout = ({ children, title = 'Smart Campus' }) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const getInitial = () => {
     const name = user?.fullName || user?.username || user?.name || '';
@@ -53,14 +55,59 @@ const AdminLayout = ({ children, title = 'Smart Campus' }) => {
               {/* Right: Bell + Welcome + Avatar */}
               <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
                 <NotificationBell />
-                <span className="text-sm text-gray-500 hidden sm:block">
-                  Welcome, {getDisplayName()} ({user?.role || 'user'})
-                </span>
-                <div
-                  className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                  title={getDisplayName()}
-                >
-                  {getInitial()}
+                <div className="relative">
+                  <button
+                    onClick={() => setDropdownOpen(!dropdownOpen)}
+                    className="flex items-center gap-2 focus:outline-none hover:bg-gray-50 p-1.5 rounded-xl transition-all select-none"
+                  >
+                    {/* User profile image or avatar */}
+                    <div className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-500 font-bold text-sm flex-shrink-0">
+                      <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <span className="text-sm font-semibold text-gray-700 hidden sm:block">
+                      {getDisplayName()}
+                    </span>
+                    <svg className={`w-4 h-4 text-gray-500 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {dropdownOpen && (
+                    <>
+                      {/* Background click listener overlay to close dropdown */}
+                      <div className="fixed inset-0 z-20" onClick={() => setDropdownOpen(false)} />
+                      
+                      {/* Menu Card */}
+                      <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-100 rounded-2xl shadow-xl py-1 z-30 overflow-hidden transform origin-top-right transition-all">
+                        <Link
+                          to="/admin/profile"
+                          className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          onClick={() => setDropdownOpen(false)}
+                        >
+                          <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          <span>My Profile</span>
+                        </Link>
+                        
+                        <button
+                          onClick={() => {
+                            logout();
+                            setDropdownOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100 text-left"
+                        >
+                          <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                          </svg>
+                          <span>Logout</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

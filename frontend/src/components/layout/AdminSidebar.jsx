@@ -421,32 +421,6 @@ const AdminSidebar = ({ isOpen = false, onClose = () => {} }) => {
             );
           })}
         </nav>
-
-        {/* ── Sign Out ─────────────────────────────────────────── */}
-        <div className={`p-2 border-t border-gray-100 flex-shrink-0 ${isCollapsed ? 'flex justify-center' : ''}`}>
-          {isCollapsed ? (
-            <Tooltip label="Sign Out">
-              <button
-                onClick={handleLogout}
-                className="w-10 h-10 flex items-center justify-center rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all duration-150"
-              >
-                <Icon>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </Icon>
-              </button>
-            </Tooltip>
-          ) : (
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-[13.5px] font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 transition-all duration-150"
-            >
-              <Icon>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </Icon>
-              <span>Sign Out</span>
-            </button>
-          )}
-        </div>
       </aside>
     </>
   );

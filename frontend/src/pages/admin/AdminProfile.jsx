@@ -63,16 +63,20 @@ const AdminProfile = () => {
   };
 
   const tabs = [
-    { id: 'info', label: 'Personal Info', icon: (
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-      </svg>
-    )},
-    { id: 'security', label: 'Security', icon: (
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-      </svg>
-    )},
+    {
+      id: 'info', label: 'Personal Info', icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      )
+    },
+    // {
+    //   id: 'security', label: 'Security', icon: (
+    //     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    //       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+    //     </svg>
+    //   )
+    // },
   ];
 
   return (
@@ -114,7 +118,7 @@ const AdminProfile = () => {
                   <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
                   </svg>
-                  @{info.username}
+                  {info.username}
                 </span>
               )}
             </div>
@@ -129,11 +133,10 @@ const AdminProfile = () => {
               <button
                 key={tab.id}
                 onClick={() => { setActiveTab(tab.id); setMsg({ type: '', text: '' }); }}
-                className={`flex items-center gap-2 px-6 py-4 text-sm font-semibold transition-all ${
-                  activeTab === tab.id
-                    ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                }`}
+                className={`flex items-center gap-2 px-6 py-4 text-sm font-semibold transition-all ${activeTab === tab.id
+                  ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
               >
                 {tab.icon}
                 {tab.label}
@@ -145,11 +148,10 @@ const AdminProfile = () => {
           <div className="p-6">
             {/* Flash message */}
             {msg.text && (
-              <div className={`mb-5 flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium ${
-                msg.type === 'success'
-                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                  : 'bg-red-50 text-red-700 border border-red-200'
-              }`}>
+              <div className={`mb-5 flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium ${msg.type === 'success'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : 'bg-red-50 text-red-700 border border-red-200'
+                }`}>
                 {msg.type === 'success' ? (
                   <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -188,7 +190,7 @@ const AdminProfile = () => {
                     />
                   </div>
                 </div>
-                <div className="space-y-1.5">
+                {/* <div className="space-y-1.5">
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Email Address</label>
                   <input
                     type="email"
@@ -197,7 +199,7 @@ const AdminProfile = () => {
                     placeholder="you@example.com"
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all"
                   />
-                </div>
+                </div> */}
                 <div className="flex justify-end">
                   <button
                     type="submit"
@@ -211,7 +213,7 @@ const AdminProfile = () => {
               </form>
             )}
 
-            {/* Security / Password Tab */}
+            {/* Security / Password Tab
             {activeTab === 'security' && (
               <form onSubmit={handlePasswordSubmit} className="space-y-5">
                 <div className="space-y-1.5">
@@ -248,8 +250,8 @@ const AdminProfile = () => {
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all"
                     />
                   </div>
-                </div>
-                <div className="flex justify-end">
+                </div> */}
+            {/* <div className="flex justify-end">
                   <button
                     type="submit"
                     disabled={saving}
@@ -260,7 +262,7 @@ const AdminProfile = () => {
                   </button>
                 </div>
               </form>
-            )}
+            )} */}
           </div>
         </div>
       </div>

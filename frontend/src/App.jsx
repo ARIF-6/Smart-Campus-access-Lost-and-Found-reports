@@ -22,7 +22,8 @@ import {
   Incidents,
   Blacklist,
   SecurityShifts,
-  UniversityManagement
+  UniversityManagement,
+  AdminProfile
 } from './pages/admin';
 import CategoryManagement from './pages/CategoryManagement';
 // Campus Environment Pages
@@ -88,6 +89,10 @@ function App() {
         <Route
           path="/admin/dashboard"
           element={<ProtectedRoute allowedRoles={['admin', 'staff']}><AdminDashboard /></ProtectedRoute>}
+        />
+        <Route
+          path="/admin/profile"
+          element={<ProtectedRoute allowedRoles={['admin', 'staff']}><AdminProfile /></ProtectedRoute>}
         />
         <Route
           path="/admin/users/:section?"

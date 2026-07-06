@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:dio/dio.dart';
 import 'package:http_parser/http_parser.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../../services/api_service.dart';
+import '../../widgets/web_camera_capture.dart';
 
 class StudentReportItemScreen extends StatefulWidget {
   final String? initialType;
@@ -363,25 +365,85 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
     );
   }
 
+  /// Request the appropriate runtime permission, then open the camera or gallery.
+  /// ImageSource.camera → requests Permission.camera first.
+  /// ImageSource.gallery → requests Permission.photos first.
   Future<void> _pickImage(ImageSource source) async {
-    final XFile? picked = await _picker.pickImage(
-      source: source,
-      maxWidth: 1200,
-      maxHeight: 1200,
-      imageQuality: 85,
-    );
-    if (picked != null) {
-      if (kIsWeb) {
-        final bytes = await picked.readAsBytes();
+    if (kIsWeb) {
+      if (source == ImageSource.camera) {
+        final bytes = await showWebCameraCapture(context);
+        if (bytes == null || !mounted) return;
         setState(() {
-          _imageFile = picked;
+          _imageFile = XFile.fromData(bytes, name: 'camera_capture.jpg');
           _webImage = bytes;
         });
-      } else {
+        return;
+      }
+      // Web: gallery picker is handled by the browser — pick directly.
+      final XFile? picked = await _picker.pickImage(
+        source: source,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+      if (picked != null) {
+        final bytes = await picked.readAsBytes();
+        if (mounted) {
+          setState(() {
+            _imageFile = picked;
+            _webImage = bytes;
+          });
+        }
+      }
+      return;
+    }
+
+    // ── Native (Android / iOS) ─────────────────────────────────────────────
+    // Always request the correct permission BEFORE opening the picker so that
+    // the OS does not silently redirect to the gallery when camera is denied.
+    final Permission permission =
+        source == ImageSource.camera ? Permission.camera : Permission.photos;
+
+    final PermissionStatus status = await permission.request();
+
+    if (status.isGranted) {
+      final XFile? picked = await _picker.pickImage(
+        source: source,          // camera → device camera, gallery → gallery
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+      if (picked != null && mounted) {
         setState(() {
           _imageFile = picked;
+          _webImage = null; // not needed on native
         });
       }
+    } else if (status.isPermanentlyDenied) {
+      if (!mounted) return;
+      final label = source == ImageSource.camera ? 'Camera' : 'Photos';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$label permission permanently denied. Please enable it in Settings.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'Settings',
+            textColor: Colors.white,
+            onPressed: openAppSettings,
+          ),
+        ),
+      );
+    } else {
+      if (!mounted) return;
+      final label = source == ImageSource.camera ? 'Camera' : 'Photos';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$label permission denied.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 

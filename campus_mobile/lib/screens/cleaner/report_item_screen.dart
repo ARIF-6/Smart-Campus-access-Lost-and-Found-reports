@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:dio/dio.dart';
 import 'package:http_parser/http_parser.dart';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
+import '../../widgets/web_camera_capture.dart';
 
 class ReportItemScreen extends StatefulWidget {
   const ReportItemScreen({super.key});
@@ -58,12 +60,73 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
     }
   }
 
+  /// Request camera permission explicitly, then open the camera.
+  /// For gallery, request photos permission (Android 13+) then open gallery.
   Future<void> _pickImage(ImageSource source) async {
-    final XFile? picked = await _picker.pickImage(source: source, maxWidth: 1200, imageQuality: 85);
-    if (!mounted || picked == null) return;
-    final bytes = await picked.readAsBytes();
-    if (!mounted) return;
-    setState(() { _imageFile = picked; _webImage = bytes; });
+    if (kIsWeb) {
+      if (source == ImageSource.camera) {
+        final bytes = await showWebCameraCapture(context);
+        if (bytes == null || !mounted) return;
+        setState(() {
+          _imageFile = XFile.fromData(bytes, name: 'camera_capture.jpg');
+          _webImage = bytes;
+        });
+        return;
+      }
+      // Web: gallery picker is handled by the browser — pick directly.
+      final XFile? picked = await _picker.pickImage(source: source, maxWidth: 1200, imageQuality: 85);
+      if (!mounted || picked == null) return;
+      final bytes = await picked.readAsBytes();
+      if (!mounted) return;
+      setState(() { _imageFile = picked; _webImage = bytes; });
+      return;
+    }
+
+    // ── Native (Android / iOS) ──────────────────────────────────────
+    Permission permission;
+    if (source == ImageSource.camera) {
+      permission = Permission.camera;
+    } else {
+      // Android 13+ uses READ_MEDIA_IMAGES; older versions use storage.
+      permission = Permission.photos;
+    }
+
+    PermissionStatus status = await permission.request();
+
+    if (status.isGranted) {
+      final XFile? picked = await _picker.pickImage(
+        source: source,
+        maxWidth: 1200,
+        imageQuality: 85,
+      );
+      if (!mounted || picked == null) return;
+      final bytes = await picked.readAsBytes();
+      if (!mounted) return;
+      setState(() { _imageFile = picked; _webImage = bytes; });
+    } else if (status.isPermanentlyDenied) {
+      if (!mounted) return;
+      final label = source == ImageSource.camera ? 'Camera' : 'Photos';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$label permission permanently denied. Please enable it in Settings.'),
+          backgroundColor: AppConstants.errorColor,
+          action: SnackBarAction(
+            label: 'Settings',
+            textColor: Colors.white,
+            onPressed: openAppSettings,
+          ),
+        ),
+      );
+    } else {
+      if (!mounted) return;
+      final label = source == ImageSource.camera ? 'Camera' : 'Photos';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$label permission denied. Cannot open ${source == ImageSource.camera ? "camera" : "gallery"}.'),
+          backgroundColor: AppConstants.errorColor,
+        ),
+      );
+    }
   }
 
   Future<void> _submit() async {
