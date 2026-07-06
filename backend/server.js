@@ -174,8 +174,10 @@ initSocket(server);
 const PORT = process.env.PORT || 5000;
 
 const startServer = () => {
-  server.listen(PORT, async () => {
+  // Listen on 0.0.0.0 so mobile devices on the same network can connect
+  server.listen(PORT, '0.0.0.0', async () => {
     console.log(`Server running on port ${PORT}`);
+    console.log(`Mobile devices: http://192.168.20.104:${PORT}`);
     await createAdmin();
   });
 };

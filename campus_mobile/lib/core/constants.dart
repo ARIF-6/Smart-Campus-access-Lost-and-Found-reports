@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 class AppConstants {
   // API URL
   static String get baseUrl {
+    if (kReleaseMode) {
+      return 'http://192.168.20.104:5000/api';
+    }
     if (kIsWeb) {
       return 'http://localhost:5000/api';
     }
@@ -17,6 +20,9 @@ class AppConstants {
   }
 
   static String get serverUrl {
+    if (kReleaseMode) {
+      return 'http://192.168.20.104:5000';
+    }
     if (kIsWeb) {
       return 'http://localhost:5000';
     }
