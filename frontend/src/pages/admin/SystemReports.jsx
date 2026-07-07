@@ -460,7 +460,7 @@ const SystemReports = () => {
             headers={['#', 'Name', 'Purpose', 'Status', 'Entry Time', 'Exit Time']}
             rows={filtered.map((r, i) => [
               <span className="text-xs text-gray-300 font-mono" key="idx">{i + 1}</span>,
-              <span className="font-bold text-gray-800" key="name">{r.fullName}</span>,
+              <span className="font-bold text-gray-800" key="name">{r.name || r.fullName || '—'}</span>,
               <span className="text-gray-500 capitalize" key="purpose">{r.purpose}</span>,
               <StatusBadge value={r.status || (r.exitTime ? 'exited' : 'inside')} />,
               <span className="text-gray-400 text-xs" key="entry">{fmt(r.entryTime)}</span>,

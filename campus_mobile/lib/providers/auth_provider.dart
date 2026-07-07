@@ -45,9 +45,29 @@ class AuthProvider extends ChangeNotifier {
       _user = jsonDecode(userData);
       if (_token != null) {
         _socketService.connect(_token!);
+        _listenForShiftUpdates();
       }
     }
     notifyListeners();
+  }
+
+  /// Registers a socket listener for real-time shift updates pushed by the
+  /// backend whenever an admin edits a security guard's shift fields.
+  void _listenForShiftUpdates() {
+    _socketService.off('user:shiftUpdated'); // remove any stale listener first
+    _socketService.on('user:shiftUpdated', (data) {
+      if (data is Map) {
+        final incoming = Map<String, dynamic>.from(data);
+        // Only update shift-related fields to avoid overwriting other profile data
+        final shiftFields = <String, dynamic>{};
+        if (incoming.containsKey('assignedShift')) shiftFields['assignedShift'] = incoming['assignedShift'];
+        if (incoming.containsKey('shiftStartTime')) shiftFields['shiftStartTime'] = incoming['shiftStartTime'];
+        if (incoming.containsKey('shiftEndTime')) shiftFields['shiftEndTime'] = incoming['shiftEndTime'];
+        if (shiftFields.isNotEmpty) {
+          updateUserLocally(shiftFields);
+        }
+      }
+    });
   }
 
   Future<bool> login(String email, String password) async {
@@ -71,8 +91,9 @@ class AuthProvider extends ChangeNotifier {
         await prefs.setString(AppConstants.tokenKey, _token!);
         await prefs.setString(AppConstants.userKey, jsonEncode(_user));
         
-        // Connect Socket
+        // Connect Socket and start listening for server-pushed updates
         _socketService.connect(_token!);
+        _listenForShiftUpdates();
 
         _isLoading = false;
         notifyListeners();
@@ -104,7 +125,9 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(AppConstants.tokenKey);
     await prefs.remove(AppConstants.userKey);
-    
+
+    // Remove shift update listener before disconnecting socket
+    _socketService.off('user:shiftUpdated');
     // Disconnect Socket
     _socketService.disconnect();
 

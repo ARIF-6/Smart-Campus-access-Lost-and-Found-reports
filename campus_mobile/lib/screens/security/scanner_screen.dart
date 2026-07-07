@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:dio/dio.dart';
+import 'package:provider/provider.dart';
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
+import '../../providers/auth_provider.dart';
 
 enum _ScanState { idle, loading, scanned }
 
@@ -94,6 +96,22 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
     if (_scanState == _ScanState.loading) return;
     final cleanIdentifier = identifier.trim();
     if (cleanIdentifier.isEmpty) return;
+
+    // Real-time shift-window guard: re-check against the latest user data before
+    // submitting to the backend — even if the UI overlay is somehow bypassed.
+    final user = Provider.of<AuthProvider>(context, listen: false).user;
+    if (!_isWithinShiftWindow(user)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Access denied: you are outside your assigned shift window.'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
     _lastMethod = method;
     setState(() => _scanState = _ScanState.loading);
     try {
@@ -261,26 +279,160 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
     } catch (_) {}
   }
 
+  /// Returns true if the current time is within the guard's assigned shift window.
+  /// Mirrors the identical helper in ShiftScreen so both screens are consistent.
+  bool _isWithinShiftWindow(Map<String, dynamic>? user) {
+    if (user == null) return false;
+
+    final role = (user['role'] as String?)?.toLowerCase();
+    if (role == 'admin' || role == 'superadmin' || role == 'staff') return true;
+
+    final now = DateTime.now();
+    final nowMins = now.hour * 60 + now.minute;
+
+    final startStr = user['shiftStartTime'] as String? ?? '';
+    final endStr   = user['shiftEndTime']   as String? ?? '';
+
+    if (startStr.isNotEmpty && endStr.isNotEmpty) {
+      try {
+        final sParts = startStr.split(':').map(int.parse).toList();
+        final eParts = endStr.split(':').map(int.parse).toList();
+        final startMins = sParts[0] * 60 + sParts[1];
+        final endMins   = eParts[0] * 60 + eParts[1];
+        if (startMins <= endMins) {
+          return nowMins >= startMins && nowMins <= endMins;
+        } else {
+          // Overnight window (e.g. 22:00 – 06:00)
+          return nowMins >= startMins || nowMins <= endMins;
+        }
+      } catch (_) {}
+    }
+
+    final assignedShift = (user['assignedShift'] as String? ?? 'none').toLowerCase();
+    if (assignedShift == 'morning') {
+      return nowMins >= (5 * 60) && nowMins <= (13 * 60 + 29);
+    } else if (assignedShift == 'afternoon') {
+      return nowMins >= (13 * 60 + 30) && nowMins <= (18 * 60);
+    }
+
+    return false;
+  }
+
+  /// Returns a human-readable message describing the guard's assigned shift window.
+  String _getShiftWindowMessage(Map<String, dynamic>? user) {
+    if (user == null) return 'No shift information available.';
+    final startStr = user['shiftStartTime'] as String? ?? '';
+    final endStr   = user['shiftEndTime']   as String? ?? '';
+    if (startStr.isNotEmpty && endStr.isNotEmpty) {
+      return 'Your assigned shift window is $startStr – $endStr.';
+    }
+    final assignedShift = (user['assignedShift'] as String? ?? 'none').toLowerCase();
+    if (assignedShift == 'morning')   return 'Your shift runs 05:00 – 13:29 (Morning).';
+    if (assignedShift == 'afternoon') return 'Your shift runs 13:30 – 18:00 (Afternoon).';
+    return 'No active shift is assigned to you. Contact an administrator.';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppConstants.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Access Control'),
-        backgroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: Stack(
-        children: [
-          _cameraActive ? _buildCameraView() : _buildHomeView(),
-          if (_scanState != _ScanState.idle)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: _buildResultSheet(),
+    // Wrap in Consumer<AuthProvider> so the screen rebuilds instantly when
+    // the admin pushes a shift update via the real-time socket event.
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) {
+        final user = auth.user;
+        final withinWindow = _isWithinShiftWindow(user);
+
+        return Scaffold(
+          backgroundColor: AppConstants.backgroundColor,
+          appBar: AppBar(
+            title: const Text('Access Control'),
+            backgroundColor: Colors.white,
+            elevation: 0,
+          ),
+          body: withinWindow
+              ? Stack(
+                  children: [
+                    _cameraActive ? _buildCameraView() : _buildHomeView(),
+                    if (_scanState != _ScanState.idle)
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: _buildResultSheet(),
+                      ),
+                  ],
+                )
+              : _buildShiftBlockedView(user),
+        );
+      },
+    );
+  }
+
+  /// Shown when the current time is outside the guard's assigned shift window.
+  Widget _buildShiftBlockedView(Map<String, dynamic>? user) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.access_time_filled_rounded,
+                size: 72,
+                color: Colors.orange.shade700,
+              ),
             ),
-        ],
+            const SizedBox(height: 24),
+            const Text(
+              'Access Control Locked',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0D1B38),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _getShiftWindowMessage(user),
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600, height: 1.5),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Student Entry and Exit operations are only allowed during your assigned shift window.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade500, height: 1.4),
+            ),
+            const SizedBox(height: 28),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.shade300),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.info_outline, color: Colors.orange.shade800, size: 18),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'This screen will unlock automatically when your shift begins.',
+                      style: TextStyle(fontSize: 12, color: Colors.orange.shade800, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -89,14 +89,124 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
     return '${AppConstants.serverUrl}/$p';
   }
 
+  /// Returns true when the current time is inside the guard's assigned window.
+  /// Keeps the dashboard in sync with the same logic used by ShiftScreen and
+  /// ScannerScreen so behaviour is consistent across the app.
+  bool _isWithinShiftWindow(Map<String, dynamic>? user) {
+    if (user == null) return false;
+    final role = (user['role'] as String?)?.toLowerCase();
+    if (role == 'admin' || role == 'superadmin' || role == 'staff') return true;
+
+    final now = DateTime.now();
+    final nowMins = now.hour * 60 + now.minute;
+
+    final startStr = user['shiftStartTime'] as String? ?? '';
+    final endStr   = user['shiftEndTime']   as String? ?? '';
+
+    if (startStr.isNotEmpty && endStr.isNotEmpty) {
+      try {
+        final sParts = startStr.split(':').map(int.parse).toList();
+        final eParts = endStr.split(':').map(int.parse).toList();
+        final startMins = sParts[0] * 60 + sParts[1];
+        final endMins   = eParts[0] * 60 + eParts[1];
+        if (startMins <= endMins) {
+          return nowMins >= startMins && nowMins <= endMins;
+        } else {
+          return nowMins >= startMins || nowMins <= endMins;
+        }
+      } catch (_) {}
+    }
+
+    final assignedShift = (user['assignedShift'] as String? ?? 'none').toLowerCase();
+    if (assignedShift == 'morning')   return nowMins >= (5 * 60) && nowMins <= (13 * 60 + 29);
+    if (assignedShift == 'afternoon') return nowMins >= (13 * 60 + 30) && nowMins <= (18 * 60);
+    return false;
+  }
+
+  String _getShiftWindowMessage(Map<String, dynamic>? user) {
+    if (user == null) return 'No shift information available.';
+    final startStr = user['shiftStartTime'] as String? ?? '';
+    final endStr   = user['shiftEndTime']   as String? ?? '';
+    if (startStr.isNotEmpty && endStr.isNotEmpty) {
+      return 'Your assigned shift window is $startStr – $endStr.';
+    }
+    final assignedShift = (user['assignedShift'] as String? ?? 'none').toLowerCase();
+    if (assignedShift == 'morning')   return 'Your shift runs 05:00 – 13:29 (Morning).';
+    if (assignedShift == 'afternoon') return 'Your shift runs 13:30 – 18:00 (Afternoon).';
+    return 'No shift has been assigned to you yet. Contact an administrator.';
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
     final user = auth.user;
     final photoUrl = _getProfileImageUrl(user?['photoUrl']);
     final shiftProvider = Provider.of<ShiftProvider>(context);
+    // Real-time check: is the current wall-clock time within the shift window?
+    final withinWindow = _isWithinShiftWindow(user);
 
+    /// Tap handler for shift-gated action cards.
+    /// Only navigates when the guard has an active shift record AND the current
+    /// time is within their assigned window. Otherwise shows a descriptive sheet.
     void requireShift(VoidCallback action) {
+      if (!shiftProvider.hasActiveShift) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Start your shift first to access this feature.'),
+            backgroundColor: Color(0xFF1B3A6B),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      if (!withinWindow) {
+        // Show a modal bottom sheet explaining the shift window restriction.
+        showModalBottomSheet(
+          context: context,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          builder: (sheetCtx) => Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.access_time_filled_rounded, size: 56, color: Colors.orange.shade700),
+                const SizedBox(height: 16),
+                const Text(
+                  'Outside Shift Window',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  _getShiftWindowMessage(user),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, color: Colors.black54, height: 1.5),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Student Entry and Exit operations are only allowed during your assigned shift window.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: Colors.black38, height: 1.4),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1B3A6B),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => Navigator.pop(sheetCtx),
+                    child: const Text('OK', style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        return;
+      }
       action();
     }
 
