@@ -290,7 +290,7 @@ const SystemReports = () => {
       case 'userStaff':
         return filtered.map(r => ({ Name: r.fullName || r.name || '—', Username: r.username || '—', 'Campus Assigned': r.campus?.name || '—', Role: r.role, Joined: fmtDate(r.createdAt) }));
       case 'userStudents':
-        return filtered.map(r => ({ ID: r.studentId || '—', Name: r.fullName || r.name || '—', 'Parent Number': r.parentNumber || '—', Faculty: r.faculty?.name || '—', Department: r.department?.name || '—', Class: r.class?.name || '—', Hall: r.hallName || '—', 'Academic Year': r.academicYear || '—', Role: r.role, Joined: fmtDate(r.createdAt) }));
+        return filtered.map(r => ({ ID: r.studentId || '—', Name: r.fullName || r.name || '—', 'Parent Number': r.parentNumber || '—', Faculty: r.faculty?.name || '—', Department: r.department?.name || '—', Class: r.class?.name || '—', Hall: r.hallName || '—', 'Academic Year': r.academicYear || '—', Joined: fmtDate(r.createdAt) }));
       case 'userSecurity':
         return filtered.map(r => ({ Name: r.fullName || r.name || '—', Username: r.username || '—', 'Campus Assigned': r.campus?.name || '—', Shift: r.assignedShift || '—', 'Shift Time': r.shiftStartTime && r.shiftEndTime ? `${r.shiftStartTime} - ${r.shiftEndTime}` : '—', Role: r.role, Joined: fmtDate(r.createdAt) }));
       case 'userCleaners':
@@ -388,7 +388,7 @@ const SystemReports = () => {
       case 'userStudents':
         return (
           <DataTable
-            headers={['#', 'ID', 'Full Name', 'Parent Number', 'Faculty', 'Department', 'Class', 'Hall', 'Academic Year', 'Role', 'Joined']}
+            headers={['#', 'ID', 'Full Name', 'Parent Number', 'Faculty', 'Department', 'Class', 'Hall', 'Academic Year', 'Joined']}
             rows={filtered.map((r, i) => [
               <span className="text-xs text-gray-300 font-mono" key="idx">{i + 1}</span>,
               <span className="text-indigo-600 font-mono text-xs" key="id">{r.studentId || '—'}</span>,
@@ -399,7 +399,6 @@ const SystemReports = () => {
               <span className="text-gray-600 text-xs" key="class">{r.class?.name || '—'}</span>,
               <span className="text-gray-600 text-xs" key="hall">{r.hallName || '—'}</span>,
               <span className="text-gray-500 text-xs font-medium" key="year">{r.academicYear || '—'}</span>,
-              <StatusBadge value={r.role} />,
               <span className="text-gray-400 text-xs" key="joined">{fmtDate(r.createdAt)}</span>,
             ])}
           />
