@@ -1,8 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants.dart';
 import '../../core/widgets/widgets.dart';
+import '../../services/api_service.dart';
 
 class ReportLostItemScreen extends StatefulWidget {
   const ReportLostItemScreen({super.key});
@@ -20,6 +23,7 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
   bool _isSubmitting = false;
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
+  final ApiService _apiService = ApiService();
 
   @override
   void dispose() {
@@ -29,10 +33,10 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? image = await _picker.pickImage(
-        source: ImageSource.camera,
+        source: source,
         maxWidth: 1024,
         maxHeight: 1024,
         imageQuality: 85,
@@ -55,35 +59,112 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
     }
   }
 
+  void _showImageSourceSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take Photo'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from Gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+            if (_selectedImage != null)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('Remove Photo', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(context);
+                  setState(() => _selectedImage = null);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _submitReport() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSubmitting = true);
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final Map<String, dynamic> fields = {
+        'title': _titleController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'locationLost': _locationController.text.trim(),
+        'dateLost': DateTime.now().toIso8601String(),
+      };
 
-    if (mounted) {
-      setState(() => _isSubmitting = false);
+      // Image is OPTIONAL — only attach if selected
+      if (_selectedImage != null) {
+        final fileName = _selectedImage!.path.split('/').last;
+        fields['image'] = await MultipartFile.fromFile(
+          _selectedImage!.path,
+          filename: fileName,
+          contentType: MediaType('image', 'jpeg'),
+        );
+      }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.white),
-              SizedBox(width: 12),
-              Text('Item reported successfully!'),
-            ],
+      final formData = FormData.fromMap(fields);
+      final response = await _apiService.post('/lost-items', data: formData);
+
+      if (mounted) {
+        if (response.statusCode == 201 || response.statusCode == 200) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 12),
+                  Text('Item reported successfully!'),
+                ],
+              ),
+              backgroundColor: AppConstants.successColor,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          );
+          Navigator.pop(context);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        String errorMessage = 'Failed to submit report';
+        if (e is DioException && e.response?.data != null) {
+          final data = e.response?.data;
+          if (data is Map) {
+            errorMessage = data['message'] ?? errorMessage;
+          }
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: AppConstants.errorColor,
+            behavior: SnackBarBehavior.floating,
           ),
-          backgroundColor: AppConstants.successColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
-
-      Navigator.pop(context);
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -128,21 +209,34 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Image Upload
+                  // Image Upload — OPTIONAL
                   AppCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Item Photo',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        Row(
+                          children: [
+                            const Text(
+                              'Item Photo',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '(Optional)',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.normal,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
                         GestureDetector(
-                          onTap: _pickImage,
+                          onTap: _showImageSourceSheet,
                           child: Container(
                             height: 200,
                             width: double.infinity,
@@ -155,24 +249,45 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
                               ),
                             ),
                             child: _selectedImage != null
-                                ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: Image.file(
-                                      _selectedImage!,
-                                      fit: BoxFit.cover,
-                                    ),
+                                ? Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: Image.file(
+                                          _selectedImage!,
+                                          fit: BoxFit.cover,
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                        ),
+                                      ),
+                                      Positioned(
+                                        top: 8,
+                                        right: 8,
+                                        child: GestureDetector(
+                                          onTap: () => setState(() => _selectedImage = null),
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.black54,
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            padding: const EdgeInsets.all(4),
+                                            child: const Icon(Icons.close, color: Colors.white, size: 18),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   )
                                 : Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Icon(
-                                        Icons.camera_alt_outlined,
+                                        Icons.add_photo_alternate_outlined,
                                         size: 48,
                                         color: Colors.grey.shade400,
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
-                                        'Tap to take a photo',
+                                        'Tap to add a photo (optional)',
                                         style: TextStyle(
                                           color: Colors.grey.shade600,
                                           fontSize: 14,
@@ -305,7 +420,7 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Your report will be reviewed and matched with found items.',
+                            'Your report will be reviewed and matched with found items. A photo is helpful but not required.',
                             style: TextStyle(
                               fontSize: 13,
                               color: AppConstants.textSecondary,

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import AuthLayout from '../../components/layout/AuthLayout';
-import { login } from '../../services/api';
+import { login, getSystemStatus } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 const Login = () => {
@@ -13,6 +13,12 @@ const Login = () => {
 
   const navigate = useNavigate();
   const { login: setAuth } = useAuth();
+
+  // Warm up Render instance immediately on page hit to handle cold starts
+  useEffect(() => {
+    getSystemStatus().catch(() => {});
+  }, []);
+
 
   const handleLogin = async (e) => {
     e.preventDefault();

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants.dart';
+import '../../services/api_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -18,6 +19,11 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
+
+    // Trigger non-blocking backend warmup (cold start mitigation)
+    try {
+      ApiService().get('/dashboard/system-status').catchError((_) => null);
+    } catch (_) {}
 
     _controller = AnimationController(
       vsync: this,
@@ -40,6 +46,7 @@ class _SplashScreenState extends State<SplashScreen>
       if (mounted) Navigator.of(context).pushReplacementNamed('/login');
     });
   }
+
 
   @override
   void dispose() {

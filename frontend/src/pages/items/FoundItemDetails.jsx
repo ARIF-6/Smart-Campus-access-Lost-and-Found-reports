@@ -39,13 +39,18 @@ const FoundItemDetails = () => {
   }, [id]);
 
   const handleMarkReturned = async () => {
+    // Guard: cannot return while a claim is still pending
+    if (item.status === 'pending') {
+      toast.error('This item cannot be returned until the claim request has been accepted.');
+      return;
+    }
     try {
       const updatedItem = await markItemReturned(id);
       setItem(updatedItem); 
       fetchItemData();
       toast.success('Item marked as returned successfully!');
     } catch (err) {
-      toast.error('Error updating item status.');
+      toast.error(err.response?.data?.message || 'Error updating item status.');
     }
   };
 
@@ -159,24 +164,39 @@ const FoundItemDetails = () => {
             </div>
 
              <div className="pt-6 border-t border-gray-200 flex flex-wrap gap-4">
-               {item.status !== 'returned' && (
-                 <>
-                   <button 
-                     onClick={() => setIsEditModalOpen(true)}
-                     className="px-6 py-2.5 bg-blue-100 text-blue-700 rounded-lg shadow-sm font-semibold hover:bg-blue-200 transition-colors flex items-center gap-2"
-                   >
-                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                     Edit Details
-                   </button>
-                   <button 
-                     onClick={handleMarkReturned}
-                     className="px-6 py-2.5 bg-orange-500 text-white rounded-lg shadow-sm font-semibold hover:bg-orange-600 transition-colors flex items-center gap-2"
-                    >
-                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                     Flag as Returned
-                   </button>
-                 </>
-               )}
+                   {item.status !== 'returned' && (
+                     <>
+                       <button 
+                         onClick={() => setIsEditModalOpen(true)}
+                         className="px-6 py-2.5 bg-blue-100 text-blue-700 rounded-lg shadow-sm font-semibold hover:bg-blue-200 transition-colors flex items-center gap-2"
+                       >
+                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                         Edit Details
+                       </button>
+                       {item.status === 'pending' ? (
+                         <div className="group relative">
+                           <button 
+                             disabled
+                             className="px-6 py-2.5 bg-gray-200 text-gray-400 rounded-lg shadow-sm font-semibold cursor-not-allowed flex items-center gap-2"
+                           >
+                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                             Flag as Returned
+                           </button>
+                           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10 w-64 bg-gray-800 text-white text-xs rounded-lg px-3 py-2 text-center shadow-lg">
+                             Cannot return while claim is still Pending. Approve the claim first.
+                           </div>
+                         </div>
+                       ) : (
+                         <button 
+                           onClick={handleMarkReturned}
+                           className="px-6 py-2.5 bg-orange-500 text-white rounded-lg shadow-sm font-semibold hover:bg-orange-600 transition-colors flex items-center gap-2"
+                          >
+                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                           Flag as Returned
+                         </button>
+                       )}
+                     </>
+                   )}
                <button 
                  onClick={handleDelete}
                  className="px-6 py-2.5 bg-red-100 text-red-700 rounded-lg shadow-sm font-semibold hover:bg-red-200 transition-colors flex items-center gap-2"

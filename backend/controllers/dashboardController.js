@@ -15,10 +15,12 @@ const getPastDate = (days) => {
 // @route   GET /api/dashboard/stats
 exports.getStats = async (req, res) => {
   try {
-    const totalLost = await LostItem.countDocuments();
-    const totalFound = await FoundItem.countDocuments();
-    const totalClaims = await Claim.countDocuments();
-    const pendingClaims = await Claim.countDocuments({ status: 'pending' });
+    const [totalLost, totalFound, totalClaims, pendingClaims] = await Promise.all([
+      LostItem.countDocuments(),
+      FoundItem.countDocuments(),
+      Claim.countDocuments(),
+      Claim.countDocuments({ status: 'pending' })
+    ]);
 
     res.json({ totalLost, totalFound, totalClaims, pendingClaims });
   } catch (error) {
@@ -30,8 +32,8 @@ exports.getStats = async (req, res) => {
 // @route   GET /api/dashboard/lost-vs-found
 exports.getLostVsFound = async (req, res) => {
   try {
-    const data = [];
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const promises = [];
 
     for (let i = 5; i >= 0; i--) {
       const start = new Date();
@@ -42,16 +44,22 @@ exports.getLostVsFound = async (req, res) => {
       const end = new Date(start);
       end.setMonth(end.getMonth() + 1);
 
-      const lostCount = await LostItem.countDocuments({ createdAt: { $gte: start, $lt: end } });
-      const foundCount = await FoundItem.countDocuments({ createdAt: { $gte: start, $lt: end } });
+      const monthName = monthNames[start.getMonth()];
 
-      data.push({
-        month: monthNames[start.getMonth()],
-        lost: lostCount,
-        found: foundCount
-      });
+      // Push concurrent count requests
+      promises.push(
+        Promise.all([
+          LostItem.countDocuments({ createdAt: { $gte: start, $lt: end } }),
+          FoundItem.countDocuments({ createdAt: { $gte: start, $lt: end } })
+        ]).then(([lostCount, foundCount]) => ({
+          month: monthName,
+          lost: lostCount,
+          found: foundCount
+        }))
+      );
     }
 
+    const data = await Promise.all(promises);
     res.json(data);
   } catch (error) {
     res.status(500).json({ message: 'Server Error' });
@@ -64,14 +72,10 @@ exports.getCategories = async (req, res) => {
   try {
     const categoriesMap = {};
     
-    // Aggregate lost items
-    const lostAggr = await LostItem.aggregate([
-      { $group: { _id: "$category", count: { $sum: 1 } } }
-    ]);
-    
-    // Aggregate found items
-    const foundAggr = await FoundItem.aggregate([
-      { $group: { _id: "$category", count: { $sum: 1 } } }
+    // Aggregate lost items & found items concurrently
+    const [lostAggr, foundAggr] = await Promise.all([
+      LostItem.aggregate([{ $group: { _id: "$category", count: { $sum: 1 } } }]),
+      FoundItem.aggregate([{ $group: { _id: "$category", count: { $sum: 1 } } }])
     ]);
 
     lostAggr.forEach(item => {
@@ -106,7 +110,7 @@ exports.getCategories = async (req, res) => {
 exports.getActivityLine = async (req, res) => {
   try {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const data = [];
+    const promises = [];
 
     for (let i = 6; i >= 0; i--) {
       const start = new Date();
@@ -116,20 +120,26 @@ exports.getActivityLine = async (req, res) => {
       const end = new Date(start);
       end.setDate(end.getDate() + 1);
 
-      const lostCount = await LostItem.countDocuments({ createdAt: { $gte: start, $lt: end } });
-      const foundCount = await FoundItem.countDocuments({ createdAt: { $gte: start, $lt: end } });
+      const dayName = days[start.getDay()];
 
-      data.push({
-        day: days[start.getDay()],
-        count: lostCount + foundCount
-      });
+      promises.push(
+        Promise.all([
+          LostItem.countDocuments({ createdAt: { $gte: start, $lt: end } }),
+          FoundItem.countDocuments({ createdAt: { $gte: start, $lt: end } })
+        ]).then(([lostCount, foundCount]) => ({
+          day: dayName,
+          count: lostCount + foundCount
+        }))
+      );
     }
 
+    const data = await Promise.all(promises);
     res.json(data);
   } catch (error) {
     res.status(500).json({ message: 'Server Error' });
   }
 };
+
 
 // @desc    Get recent system activity
 // @route   GET /api/dashboard/recent-activity

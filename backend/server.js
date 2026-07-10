@@ -20,6 +20,7 @@ const connectDB = require("./config/db");
 const createAdmin = require("./utils/createAdmin");
 const { initSocket } = require('./socket');
 const errorHandler = require("./middleware/errorHandler");
+const compression = require("compression");
 
 const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
@@ -48,11 +49,15 @@ const trashRoutes = require("./routes/trashRoutes");
 const roleRoutes = require("./routes/roleRoutes");
 const campusEnvironmentRoutes = require("./modules/campusEnvironment/routes/campusEnvironmentRoutes");
 const classIssueRoutes = require("./modules/classIssues/routes/classIssueRoutes");
-
+const hostRoutes = require("./routes/hostRoutes");
 const app = express();
 
 // Connect to database
 connectDB();
+
+// Enable response compression (gzip/deflate)
+app.use(compression());
+
 
 // 1. CORS — allow Vercel frontend (production) and localhost (development)
 const ALLOWED_ORIGINS = [
@@ -160,6 +165,7 @@ app.use("/api/trash", trashRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/campus-environment", campusEnvironmentRoutes);
 app.use("/api/class-issues", classIssueRoutes);
+app.use("/api/hosts", hostRoutes);
 
 app.get("/", (req, res) => {
   res.send("API is running...");
@@ -169,6 +175,11 @@ app.get("/", (req, res) => {
 app.use(errorHandler);
 
 const server = http.createServer(app);
+
+// Optimize Keep-Alive timeouts for client reuses (Render & Mobile app connection resilience)
+server.keepAliveTimeout = 61000;
+server.headersTimeout = 65000;
+
 initSocket(server);
 
 const PORT = process.env.PORT || 5000;
@@ -206,3 +217,4 @@ process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
 
 startServer();
+

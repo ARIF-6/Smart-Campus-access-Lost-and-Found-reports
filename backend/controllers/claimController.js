@@ -136,7 +136,15 @@ exports.getAllClaims = asyncHandler(async (req, res) => {
   const skip = (page - 1) * limit;
 
   const claims = await Claim.find({ isDeleted: false })
-    .populate('user', 'fullName email studentId')
+    .populate({
+      path: 'user',
+      select: 'fullName email studentId faculty department class',
+      populate: [
+        { path: 'faculty', select: 'name' },
+        { path: 'department', select: 'name' },
+        { path: 'class', select: 'name' }
+      ]
+    })
     .populate('item')
     .sort({ createdAt: -1 })
     .skip(skip)

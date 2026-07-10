@@ -52,12 +52,16 @@ const FoundItemsList = () => {
     fetchLostFoundCategories().then(cats => setDynamicCategories(cats));
   }, []);
 
-  const handleMarkReturned = async (id) => {
+  const handleMarkReturned = async (id, itemStatus) => {
+    if (itemStatus === 'pending') {
+      alert('This item cannot be returned until the claim request has been accepted.');
+      return;
+    }
     try {
       await markItemReturned(id);
       fetchItems();
     } catch (err) {
-      alert('Error updating status.');
+      alert(err.response?.data?.message || 'Error updating status.');
     }
   };
 
@@ -222,8 +226,8 @@ const FoundItemsList = () => {
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                           </button>
 
-                          {(item.status === 'pending' || item.status === 'approved') && (
-                            <button onClick={() => handleMarkReturned(item._id)} className="p-2 text-emerald-400 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl transition-all" title="Mark as Returned">
+                          {item.status === 'approved' && (
+                            <button onClick={() => handleMarkReturned(item._id, item.status)} className="p-2 text-emerald-400 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl transition-all" title="Mark as Returned">
                               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                             </button>
                           )}

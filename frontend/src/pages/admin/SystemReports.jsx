@@ -94,18 +94,18 @@ const PARENT_TABS = [
 ];
 
 const TABS = [
-  { key: 'lostItems',   label: 'Lost Items',   color: 'from-red-500 to-rose-600' },
-  { key: 'foundItems',  label: 'Found Items',  color: 'from-green-500 to-emerald-600' },
-  { key: 'claims',      label: 'Claims',       color: 'from-amber-500 to-orange-600' },
-  { key: 'userAdmins',  label: 'Admin',        color: 'from-violet-500 to-purple-600' },
-  { key: 'userStaff',   label: 'Staff',        color: 'from-violet-500 to-purple-600' },
-  { key: 'userStudents',label: 'Students',     color: 'from-violet-500 to-purple-600' },
-  { key: 'userSecurity',label: 'Security',     color: 'from-violet-500 to-purple-600' },
-  { key: 'userCleaners',label: 'Cleaners',     color: 'from-violet-500 to-purple-600' },
-  { key: 'visitors',    label: 'Visitors',     color: 'from-sky-500 to-blue-600' },
-  { key: 'incidents',   label: 'Incidents',    color: 'from-orange-500 to-red-600' },
-  { key: 'accessLogs',  label: 'Access Logs',  color: 'from-teal-500 to-cyan-600' },
-  { key: 'auditLogs',   label: 'Audit Logs',   color: 'from-indigo-500 to-blue-700' },
+  { key: 'lostItems', label: 'Lost Items', color: 'from-red-500 to-rose-600' },
+  { key: 'foundItems', label: 'Found Items', color: 'from-green-500 to-emerald-600' },
+  { key: 'claims', label: 'Claims', color: 'from-amber-500 to-orange-600' },
+  { key: 'userAdmins', label: 'Admin', color: 'from-violet-500 to-purple-600' },
+  { key: 'userStaff', label: 'Staff', color: 'from-violet-500 to-purple-600' },
+  { key: 'userStudents', label: 'Students', color: 'from-violet-500 to-purple-600' },
+  { key: 'userSecurity', label: 'Security', color: 'from-violet-500 to-purple-600' },
+  { key: 'userCleaners', label: 'Cleaners', color: 'from-violet-500 to-purple-600' },
+  { key: 'visitors', label: 'Visitors', color: 'from-sky-500 to-blue-600' },
+  { key: 'incidents', label: 'Incidents', color: 'from-orange-500 to-red-600' },
+  { key: 'accessLogs', label: 'Access Logs', color: 'from-teal-500 to-cyan-600' },
+  { key: 'auditLogs', label: 'Audit Logs', color: 'from-indigo-500 to-blue-700' },
 ];
 
 const getChildCount = (childKey, data, summary) => {
@@ -134,7 +134,7 @@ const StatCard = ({ tab, count, active, onClick }) => (
     `}
   >
     <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${tab.color} flex items-center justify-center text-lg mb-3 shadow-sm`}
-      >{tab.icon}</div>
+    >{tab.icon}</div>
     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{tab.label}</p>
     <p className={`text-2xl font-black mt-1 ${active ? 'text-indigo-700' : 'text-gray-800'}`}>{count.toLocaleString()}</p>
   </button>
@@ -182,16 +182,16 @@ const SystemReports = () => {
   const { user: currentUser } = useAuth();
   const isStaff = currentUser?.role === 'staff';
 
-  const [data, setData]       = useState(null);
+  const [data, setData] = useState(null);
   const [summary, setSummary] = useState({});
   const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState(null);
+  const [error, setError] = useState(null);
 
   // Filters
-  const [activeTab,   setActiveTab]   = useState('lostItems');
-  const [startDate,   setStartDate]   = useState('');
-  const [endDate,     setEndDate]     = useState('');
-  const [search,      setSearch]      = useState('');
+  const [activeTab, setActiveTab] = useState('lostItems');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
 
   const fetchData = useCallback(async () => {
@@ -200,7 +200,7 @@ const SystemReports = () => {
       setError(null);
       const params = {};
       if (startDate) params.startDate = startDate;
-      if (endDate)   params.endDate   = endDate;
+      if (endDate) params.endDate = endDate;
 
       // The axios interceptor unwraps { success, data: { summary, ... } }
       const res = await getSystemReports(params);
@@ -258,18 +258,18 @@ const SystemReports = () => {
 
   const statusOptions = useMemo(() => {
     const map = {
-      lostItems:  ['All', 'lost', 'matched', 'returned'],
+      lostItems: ['All', 'lost', 'matched', 'returned'],
       foundItems: ['All', 'pending', 'approved', 'claimed', 'returned', 'stored'],
-      claims:     ['All', 'PENDING', 'APPROVED', 'REJECTED'],
+      claims: ['All', 'PENDING', 'APPROVED', 'REJECTED'],
       userAdmins: ['All', 'admin', 'superadmin'],
-      userStaff:  ['All', 'staff'],
+      userStaff: ['All', 'staff'],
       userStudents: ['All', 'student'],
       userSecurity: ['All', 'security'],
       userCleaners: ['All', 'clean'],
-      incidents:  ['All', 'open', 'in_progress', 'resolved'],
-      visitors:   ['All', 'inside', 'exited'],
+      incidents: ['All', 'open', 'in_progress', 'resolved'],
+      visitors: ['All', 'inside', 'exited'],
       accessLogs: ['All', 'IN', 'OUT'],
-      auditLogs:  ['All', 'LOGIN', 'LOGOUT', 'CREATE_USER', 'UPDATE_USER', 'DELETE_USER', 'SUBMIT_CLAIM', 'APPROVE_CLAIM', 'REJECT_CLAIM', 'CREATE_LOST_ITEM', 'CREATE_FOUND_ITEM', 'DELETE_ITEM', 'SCAN_QR', 'CREATE_ANNOUNCEMENT', 'DELETE_ANNOUNCEMENT'],
+      auditLogs: ['All', 'LOGIN', 'LOGOUT', 'CREATE_USER', 'UPDATE_USER', 'DELETE_USER', 'SUBMIT_CLAIM', 'APPROVE_CLAIM', 'REJECT_CLAIM', 'CREATE_LOST_ITEM', 'CREATE_FOUND_ITEM', 'DELETE_ITEM', 'SCAN_QR', 'CREATE_ANNOUNCEMENT', 'DELETE_ANNOUNCEMENT'],
     };
     return map[activeTab] || ['All'];
   }, [activeTab]);

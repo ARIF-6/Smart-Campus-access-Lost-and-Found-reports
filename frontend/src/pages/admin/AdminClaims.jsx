@@ -186,7 +186,33 @@ const AdminClaims = () => {
                       </td>
                       <td className="px-6 py-6">
                         <p className="text-sm font-bold text-slate-700">{claim.user?.fullName || claim.user?.name}</p>
-                        <p className="text-xs text-slate-400 font-medium">{claim.user?.email}</p>
+                        <p className="text-xs text-slate-400 font-medium mb-2">{claim.user?.email}</p>
+                        <div className="space-y-0.5">
+                          {claim.user?.studentId && (
+                            <p className="text-[10px] text-slate-500">
+                              <span className="font-black uppercase tracking-wider text-slate-400">ID: </span>
+                              {claim.user.studentId}
+                            </p>
+                          )}
+                          {claim.user?.faculty?.name && (
+                            <p className="text-[10px] text-slate-500">
+                              <span className="font-black uppercase tracking-wider text-slate-400">Faculty: </span>
+                              {claim.user.faculty.name}
+                            </p>
+                          )}
+                          {claim.user?.department?.name && (
+                            <p className="text-[10px] text-slate-500">
+                              <span className="font-black uppercase tracking-wider text-slate-400">Dept: </span>
+                              {claim.user.department.name}
+                            </p>
+                          )}
+                          {claim.user?.class?.name && (
+                            <p className="text-[10px] text-slate-500">
+                              <span className="font-black uppercase tracking-wider text-slate-400">Class: </span>
+                              {claim.user.class.name}
+                            </p>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-6">
                         <div className="max-w-[240px]">

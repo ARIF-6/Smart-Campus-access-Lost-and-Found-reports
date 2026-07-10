@@ -230,7 +230,7 @@ const ReportLostItemModal = ({ isOpen, onClose, onSuccess }) => {
 
             {/* Image Upload */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Upload Image</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Upload Image <span className="text-gray-400 font-normal">(Optional)</span></label>
               <div 
                 className={`relative group cursor-pointer border-2 border-dashed rounded-2xl p-6 transition-all ${imagePreview ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-400 hover:bg-gray-50'}`}
                 onClick={() => fileInputRef.current.click()}

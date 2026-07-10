@@ -294,7 +294,23 @@ exports.markItemReturned = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Item not found' });
   }
 
+  // Prevent double-return
+  if (item.status === 'returned') {
+    return res.status(400).json({ success: false, message: 'This item has already been marked as returned.' });
+  }
+
+  // Guard: block return if there is still a pending claim for this item
+  const pendingClaim = await Claim.findOne({ item: item._id, status: 'pending', isDeleted: false });
+  if (pendingClaim) {
+    return res.status(400).json({
+      success: false,
+      message: 'This item cannot be returned until the claim request has been accepted.'
+    });
+  }
+
   item.status = 'returned';
+  item.returnedAt = new Date();
+  item.returnedBy = req.user.id;
 
   const updatedItem = await item.save();
   
@@ -304,8 +320,8 @@ exports.markItemReturned = asyncHandler(async (req, res) => {
     if (claim) {
       await createNotification({
         userId: claim.user,
-        title: 'Claim Accepted',
-        message: 'your claim was accepted come an take it',
+        title: 'Item Returned',
+        message: `The item "${item.title}" has been handed over. Your claim is complete.`,
         type: 'CLAIM_APPROVED',
         relatedId: claim._id
       });
@@ -329,6 +345,7 @@ exports.markItemReturned = asyncHandler(async (req, res) => {
   
   return sendSuccess(res, 'Item marked as returned', updatedItem);
 });
+
 
 // @desc    Link found item to a lost item
 // @route   PATCH /api/found-items/:id/link-lost

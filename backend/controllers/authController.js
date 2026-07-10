@@ -252,7 +252,7 @@ exports.updateProfilePicture = asyncHandler(async (req, res) => {
     action: 'UPDATE_PROFILE_PICTURE',
     targetId: user._id,
     targetType: 'User',
-    details: `User updated profile picture: ${user.email}`,
+    details: `User updated profile picture: ${user.username || user.fullName}`,
     req
   });
 
@@ -278,7 +278,7 @@ exports.logoutUser = asyncHandler(async (req, res) => {
     action: 'LOGOUT',
     targetId: req.user.id,
     targetType: 'User',
-    details: `User logged out: ${req.user.email} (${req.user.role})`,
+    details: `User logged out: ${req.user.username || req.user.fullName} (${req.user.role})`,
     req
   });
   return sendSuccess(res, 'Logout successful');

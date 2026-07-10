@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/notification_provider.dart';
-import '../../providers/shift_provider.dart';
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
 import 'scanner_screen.dart';
@@ -11,7 +10,6 @@ import 'access_logs_screen.dart';
 import 'incidents_screen.dart';
 import 'visitors_screen.dart';
 import 'blacklist_screen.dart';
-import 'shift_screen.dart';
 import 'security_reports_screen.dart';
 import '../student/notifications_screen.dart';
 import '../../services/socket_service.dart';
@@ -141,24 +139,13 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
     final auth = Provider.of<AuthProvider>(context);
     final user = auth.user;
     final photoUrl = _getProfileImageUrl(user?['photoUrl']);
-    final shiftProvider = Provider.of<ShiftProvider>(context);
     // Real-time check: is the current wall-clock time within the shift window?
     final withinWindow = _isWithinShiftWindow(user);
 
     /// Tap handler for shift-gated action cards.
-    /// Only navigates when the guard has an active shift record AND the current
-    /// time is within their assigned window. Otherwise shows a descriptive sheet.
+    /// Navigates only when the current time is within the guard's assigned
+    /// shift window. No manual shift start is required.
     void requireShift(VoidCallback action) {
-      if (!shiftProvider.hasActiveShift) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Start your shift first to access this feature.'),
-            backgroundColor: Color(0xFF1B3A6B),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        return;
-      }
       if (!withinWindow) {
         // Show a modal bottom sheet explaining the shift window restriction.
         showModalBottomSheet(
@@ -223,7 +210,6 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
             RefreshIndicator(
               onRefresh: () async {
                 await _fetchLive();
-                await shiftProvider.fetchActiveShift();
               },
               color: AppConstants.primaryNavy,
               child: CustomScrollView(
@@ -323,13 +309,13 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                                     Container(
                                       width: 7, height: 7,
                                       decoration: BoxDecoration(
-                                        color: shiftProvider.hasActiveShift ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+                                        color: withinWindow ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
                                         shape: BoxShape.circle,
                                       ),
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      shiftProvider.hasActiveShift ? 'SHIFT ACTIVE' : 'NO ACTIVE SHIFT',
+                                      withinWindow ? 'IN SHIFT WINDOW' : 'OUTSIDE SHIFT',
                                       style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
                                     ),
                                   ],
@@ -433,7 +419,6 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                                 _actionCard('Visitor Reg.', 'Register campus visitors', Icons.person_add, const Color(0xFF00695C), () => requireShift(() => _go(const VisitorsScreen()))),
                                 _actionCard('Incidents', 'Report security events', Icons.warning_amber_rounded, const Color(0xFFD93025), () => requireShift(() => _go(const IncidentsScreen()))),
                                 _actionCard('Blacklist', 'Manage flagged persons', Icons.block, const Color(0xFF8B0000), () => requireShift(() => _go(const BlacklistScreen()))),
-                                _actionCard('My Shifts', 'Shift login & history', Icons.work_history, const Color(0xFF6200EA), () => _go(const ShiftScreen())),
                                 _actionCard('Reports', 'Daily & monthly stats', Icons.bar_chart, const Color(0xFFF57C00), () => requireShift(() => _go(const SecurityReportsScreen()))),
                               ],
                             ),

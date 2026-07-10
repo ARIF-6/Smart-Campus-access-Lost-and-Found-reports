@@ -15,7 +15,9 @@ class VisitorsScreen extends StatefulWidget {
 class _VisitorsScreenState extends State<VisitorsScreen> {
   final ApiService _api = ApiService();
   List<dynamic> _visitors = [];
+  List<dynamic> _hosts = [];
   bool _loading = true;
+  bool _hostsLoading = false;
 
   final SocketService _socketService = SocketService();
 
@@ -23,6 +25,7 @@ class _VisitorsScreenState extends State<VisitorsScreen> {
   void initState() {
     super.initState();
     _fetchVisitors();
+    _fetchHosts();
     _socketService.on('dashboard:refresh', (_) {
       if (mounted) _fetchVisitors();
     });
@@ -45,6 +48,25 @@ class _VisitorsScreenState extends State<VisitorsScreen> {
         });
     } catch (_) {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _fetchHosts() async {
+    if (mounted) setState(() => _hostsLoading = true);
+    try {
+      final res = await _api.get('/hosts?status=active');
+      if (mounted) {
+        setState(() {
+          if (res.data is Map && res.data['data'] != null) {
+            _hosts = res.data['data'];
+          } else if (res.data is List) {
+            _hosts = res.data;
+          }
+          _hostsLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _hostsLoading = false);
     }
   }
 
@@ -82,9 +104,6 @@ class _VisitorsScreenState extends State<VisitorsScreen> {
     if (_hasDigit.hasMatch(purpose)) {
       return _showError('Purpose cannot contain numbers.');
     }
-    if (_hasDigit.hasMatch(host)) {
-      return _showError('Host name cannot contain numbers.');
-    }
     return true;
   }
 
@@ -112,24 +131,28 @@ class _VisitorsScreenState extends State<VisitorsScreen> {
     final purposeCtrl = TextEditingController();
     final hostCtrl = TextEditingController();
 
+    bool isOtherSelected = false;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          top: 24,
-          left: 20,
-          right: 20,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: SingleChildScrollView(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      builder: (ctx) => StatefulBuilder(
+        builder: (BuildContext context, StateSetter setModalState) {
+          return Container(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+              top: 24,
+              left: 20,
+              right: 20,
+            ),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: SingleChildScrollView(
+              child:
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             // ── Header ──────────────────────────────────────────────────────
             Row(children: [
               Container(
@@ -171,13 +194,80 @@ class _VisitorsScreenState extends State<VisitorsScreen> {
               blockDigits: true,
             ),
             const SizedBox(height: 12),
-            // Host: letters + spaces only, no digits
-            _field(
-              'Host / Person Being Visited *',
-              hostCtrl,
-              textOnlyHint: 'e.g. Yahye Ali',
-              blockDigits: true,
+            // Host Dropdown
+            const Text('Host / Person Being Visited *', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            const SizedBox(height: 6),
+            if (_hostsLoading)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              )
+            else if (_hosts.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'No hosts available.',
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                ),
+              )
+            else
+            DropdownButtonFormField<String>(
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.grey.shade50,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.teal.shade400, width: 1.5)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+              hint: Text('Select Host', style: TextStyle(fontSize: 13, color: Colors.grey.shade400)),
+              items: [
+                ..._hosts.map<DropdownMenuItem<String>>((dynamic h) {
+                  return DropdownMenuItem<String>(
+                    value: h['name'].toString(),
+                    child: Text('${h['name']} (${h['campus']})', style: const TextStyle(fontSize: 14)),
+                  );
+                }),
+                const DropdownMenuItem<String>(
+                  value: 'Other',
+                  child: Text('Other', style: TextStyle(fontSize: 14)),
+                )
+              ],
+              onChanged: (val) {
+                if (val != null) {
+                  setModalState(() {
+                    isOtherSelected = (val == 'Other');
+                    if (!isOtherSelected) {
+                      hostCtrl.text = val;
+                    } else {
+                      hostCtrl.text = ''; // clear for typing
+                    }
+                  });
+                }
+              },
             ),
+            if (isOtherSelected) ...[
+              const SizedBox(height: 12),
+              _field('Please specify Host Name *', hostCtrl, blockDigits: false),
+            ],
             const SizedBox(height: 20),
 
             // ── Submit ──────────────────────────────────────────────────────
@@ -259,7 +349,8 @@ class _VisitorsScreenState extends State<VisitorsScreen> {
             const SizedBox(height: 16),
           ]),
         ),
-      ),
+      );
+    }),
     );
   }
 

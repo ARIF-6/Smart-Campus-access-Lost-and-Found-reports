@@ -6,7 +6,7 @@ import '../core/constants.dart';
 
 class ApiService {
   late Dio _dio;
-  
+
   ApiService() {
     _dio = Dio(BaseOptions(
       baseUrl: AppConstants.baseUrl,
@@ -19,7 +19,8 @@ class ApiService {
     try {
       (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
         final client = HttpClient();
-        client.badCertificateCallback = (X509Certificate cert, String host, int port) {
+        client.badCertificateCallback =
+            (X509Certificate cert, String host, int port) {
           if (host == 'smart-campus-access-lost-and-found-dbgg.onrender.com') {
             return true;
           }
@@ -30,7 +31,7 @@ class ApiService {
     } catch (_) {}
 
     _dio.interceptors.add(_RetryInterceptor(dio: _dio));
-    
+
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
         final prefs = await SharedPreferences.getInstance();
@@ -58,7 +59,8 @@ class ApiService {
     ));
   }
 
-  Future<Response> get(String path, {Map<String, dynamic>? queryParameters}) async {
+  Future<Response> get(String path,
+      {Map<String, dynamic>? queryParameters}) async {
     return await _dio.get(path, queryParameters: queryParameters);
   }
 
@@ -91,14 +93,16 @@ class _RetryInterceptor extends Interceptor {
   });
 
   @override
-  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
+  Future<void> onError(
+      DioException err, ErrorInterceptorHandler handler) async {
     final requestOptions = err.requestOptions;
 
     // Retry only on connection errors or timeouts, for non-GET requests or GET requests
-    final bool isNetworkError = err.type == DioExceptionType.connectionTimeout ||
-        err.type == DioExceptionType.sendTimeout ||
-        err.type == DioExceptionType.receiveTimeout ||
-        err.type == DioExceptionType.connectionError;
+    final bool isNetworkError =
+        err.type == DioExceptionType.connectionTimeout ||
+            err.type == DioExceptionType.sendTimeout ||
+            err.type == DioExceptionType.receiveTimeout ||
+            err.type == DioExceptionType.connectionError;
 
     int retryCount = requestOptions.extra['retryCount'] ?? 0;
 

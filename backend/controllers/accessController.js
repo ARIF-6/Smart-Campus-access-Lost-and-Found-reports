@@ -147,7 +147,7 @@ exports.scanQRCode = async (req, res) => {
           action: 'SCAN_QR',
           targetId: user._id,
           targetType: 'User',
-          details: `Recorded entry for ${user.email} via ${method || 'QR'}`,
+          details: `Recorded entry for ${user.username || user.fullName} via ${method || 'QR'}`,
           req,
         });
         emitDashboardRefresh('security');
@@ -178,7 +178,7 @@ exports.scanQRCode = async (req, res) => {
         action: 'SCAN_QR',
         targetId: user._id,
         targetType: 'User',
-        details: `Recorded exit for ${user.email} via ${method || 'QR'}`,
+        details: `Recorded exit for ${user.username || user.fullName} via ${method || 'QR'}`,
         req,
       });
       emitDashboardRefresh('security');
@@ -240,7 +240,7 @@ exports.scanQRCode = async (req, res) => {
       action: 'SCAN_QR',
       targetId: user._id,
       targetType: 'User',
-      details: `Scanned QR for user ${user.email} (Entry) via ${method || 'QR'}`,
+      details: `Scanned QR for user ${user.username || user.fullName} (Entry) via ${method || 'QR'}`,
       req,
     });
 

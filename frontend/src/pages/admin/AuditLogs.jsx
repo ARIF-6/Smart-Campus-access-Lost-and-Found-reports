@@ -15,6 +15,7 @@ const AuditLogs = () => {
   // Pagination & Filtering State
   const [keyword, setKeyword] = useState('');
   const [action, setAction] = useState('');
+  const [selectedRole, setSelectedRole] = useState('admin');
   const [filterDate, setFilterDate] = useState('');
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
@@ -35,6 +36,10 @@ const AuditLogs = () => {
         params.action = action;
       }
       
+      if ((action === 'LOGIN' || action === 'LOGOUT') && selectedRole) {
+        params.role = selectedRole;
+      }
+      
       if (keyword) {
         params.keyword = keyword;
       }
@@ -52,7 +57,7 @@ const AuditLogs = () => {
         navigate('/login');
       }
     }
-  }, [page, action, keyword, navigate]);
+  }, [page, action, keyword, selectedRole, navigate]);
 
   useEffect(() => {
     fetchLogs();
@@ -128,16 +133,41 @@ const AuditLogs = () => {
               label="Activity Type" 
               value={action} 
               options={actionOptions} 
-              onChange={(val) => { setAction(val); setPage(1); }} 
+              onChange={(val) => { setAction(val); setSelectedRole('admin'); setPage(1); }} 
             />
             <button 
-              onClick={() => { setKeyword(''); setAction(''); setFilterDate(''); setPage(1); }}
+              onClick={() => { setKeyword(''); setAction(''); setSelectedRole('admin'); setFilterDate(''); setPage(1); }}
               className="px-4 py-3 text-indigo-600 font-bold text-xs uppercase tracking-widest hover:bg-indigo-50 rounded-xl transition-all"
             >
               Reset
             </button>
           </div>
         </div>
+
+        {/* Role Tabs for Login/Logout */}
+        {(action === 'LOGIN' || action === 'LOGOUT') && (
+          <div className="flex border-b border-gray-100 space-x-8 mb-4">
+            {[
+              { label: 'Administrator', value: 'admin' },
+              { label: 'Staff', value: 'staff' },
+              { label: 'Security Guard', value: 'security' },
+              { label: 'Cleaner', value: 'clean' },
+              { label: 'Student', value: 'student' }
+            ].map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => { setSelectedRole(tab.value); setPage(1); }}
+                className={`pb-4 px-1 border-b-2 font-bold text-sm transition-all duration-200 ${
+                  selectedRole === tab.value
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Audit Data Table */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-8">
@@ -187,7 +217,9 @@ const AuditLogs = () => {
                       <td className="px-6 py-5">
                         <div className="flex flex-col">
                           <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest opacity-60 mb-1">{log.targetType || 'SYSTEM'}</span>
-                          <span className="text-[10px] text-gray-300 font-mono truncate max-w-[80px]">{log.targetId || ''}</span>
+                          <span className="text-xs font-semibold text-gray-700 truncate max-w-[150px]" title={log.targetName || log.targetId}>
+                            {log.targetName || log.targetId || ''}
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-5">

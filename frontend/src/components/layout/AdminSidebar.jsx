@@ -130,7 +130,7 @@ const AdminSidebar = ({ isOpen = false, onClose = () => {} }) => {
         { label: 'University',          path: '/admin/university',        icon: iconPath.university },
         { label: 'Categories',          path: '/admin/categories',        icon: iconPath.category },
         { label: 'Role Management',     path: '/admin/roles',             icon: iconPath.roles },
-        { label: 'Security Shifts',     path: '/admin/security-shifts',   icon: iconPath.shifts },
+
       ]
     },
     {

@@ -67,6 +67,15 @@ const foundItemSchema = new mongoose.Schema({
   deletedAt: {
     type: Date,
     default: null
+  },
+  returnedAt: {
+    type: Date,
+    default: null
+  },
+  returnedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
   }
 }, {
   timestamps: true

@@ -255,6 +255,16 @@ exports.createUser = async (req, res) => {
     } else if (['staff', 'clean', 'security'].includes(userRole)) {
       userData.campus = campus || null;
       if (userRole === 'security') {
+        if (shiftStartTime && shiftEndTime) {
+          if (shiftStartTime === shiftEndTime) {
+            return sendError(res, 'Start Shift and End Shift cannot be the same. Please select different times.', 400);
+          }
+          const [h1, m1] = shiftStartTime.split(':').map(Number);
+          const [h2, m2] = shiftEndTime.split(':').map(Number);
+          if ((h2 * 60 + m2) < (h1 * 60 + m1)) {
+            return sendError(res, 'End Shift must be later than the Start Shift.', 400);
+          }
+        }
         userData.assignedShift = assignedShift || 'none';
         userData.shiftStartTime = shiftStartTime || '';
         userData.shiftEndTime = shiftEndTime || '';
@@ -363,6 +373,18 @@ exports.updateUser = async (req, res) => {
     if (['staff', 'clean', 'security'].includes(userRole)) {
       user.campus = campus !== undefined ? (campus || null) : user.campus;
       if (userRole === 'security') {
+        const checkStart = shiftStartTime !== undefined ? shiftStartTime : user.shiftStartTime;
+        const checkEnd = shiftEndTime !== undefined ? shiftEndTime : user.shiftEndTime;
+        if (checkStart && checkEnd) {
+          if (checkStart === checkEnd) {
+            return sendError(res, 'Start Shift and End Shift cannot be the same. Please select different times.', 400);
+          }
+          const [h1, m1] = checkStart.split(':').map(Number);
+          const [h2, m2] = checkEnd.split(':').map(Number);
+          if ((h2 * 60 + m2) < (h1 * 60 + m1)) {
+            return sendError(res, 'End Shift must be later than the Start Shift.', 400);
+          }
+        }
         if (assignedShift !== undefined) user.assignedShift = assignedShift;
         if (shiftStartTime !== undefined) user.shiftStartTime = shiftStartTime;
         if (shiftEndTime !== undefined) user.shiftEndTime = shiftEndTime;

@@ -115,6 +115,15 @@ const handleSubmit = async (e) => {
   e.preventDefault();
   setIsLoading(true);
 
+  if (formData.role === 'security') {
+    const error = validateShiftTimes(formData.shiftStartTime, formData.shiftEndTime);
+    if (error) {
+      toast.error(error);
+      setIsLoading(false);
+      return;
+    }
+  }
+
   // Build either FormData (when photo chosen) or plain object
   let payload;
   if (photoFile) {
@@ -160,6 +169,19 @@ const handleSubmit = async (e) => {
 };
 
   const isStudent = formData.role === 'student';
+
+  const validateShiftTimes = (start, end) => {
+    if (!start || !end) return '';
+    if (start === end) return 'Start Shift and End Shift cannot be the same. Please select different times.';
+    const [h1, m1] = start.split(':').map(Number);
+    const [h2, m2] = end.split(':').map(Number);
+    if ((h2 * 60 + m2) < (h1 * 60 + m1)) {
+      return 'End Shift must be later than the Start Shift.';
+    }
+    return '';
+  };
+
+  const shiftError = formData.role === 'security' ? validateShiftTimes(formData.shiftStartTime, formData.shiftEndTime) : '';
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -423,6 +445,7 @@ const handleSubmit = async (e) => {
                                 onChange={(fieldName, val) => setFormData(prev => ({ ...prev, [fieldName]: val }))}
                               />
                             </div>
+                            {shiftError && <p className="text-xs text-red-500 font-medium mt-1">{shiftError}</p>}
                           </>
                         )}
 
@@ -460,7 +483,7 @@ const handleSubmit = async (e) => {
               <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-gray-200">
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || !!shiftError}
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 transition-all"
                 >
                   {isLoading ? 'Saving...' : 'Save Changes'}

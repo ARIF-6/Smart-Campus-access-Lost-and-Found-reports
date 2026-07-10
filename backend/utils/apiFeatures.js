@@ -27,7 +27,7 @@ class APIFeatures {
     const queryObj = { ...this.queryStr };
     
     // Fields to exclude from direct filtering
-    const excludedFields = ['keyword', 'sort', 'page', 'limit', 'fields'];
+    const excludedFields = ['keyword', 'sort', 'page', 'limit', 'fields', 'role'];
     excludedFields.forEach(el => delete queryObj[el]);
 
     // Handle advanced filtering for price/date ranges (if needed)
