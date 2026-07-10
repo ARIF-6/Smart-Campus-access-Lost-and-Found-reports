@@ -59,9 +59,9 @@ connectDB();
 app.use(compression());
 
 
-// 1. CORS — allow Vercel frontend (production) and localhost (development)
+// 1. CORS — allow Netlify frontend (production) and localhost (development)
 const ALLOWED_ORIGINS = [
-  process.env.FRONTEND_URL || 'https://smart-campus-access-lost-and-found.vercel.app',
+  process.env.FRONTEND_URL || 'https://smartcampusacces.netlify.app',
   'http://localhost:5173',
   'http://localhost:3000',
   'http://localhost:4173', // Vite preview
@@ -76,8 +76,8 @@ app.use(cors({
     if (origin.startsWith('http://localhost:') || origin === 'http://localhost' || origin.startsWith('http://127.0.0.1:') || origin === 'http://127.0.0.1') {
       return callback(null, true);
     }
-    // Also allow any vercel.app subdomain preview deployments
-    if (/^https:\/\/.*\.vercel\.app$/.test(origin)) return callback(null, true);
+    // Also allow any netlify.app subdomain preview deployments
+    if (/^https:\/\/.*\.netlify\.app$/.test(origin)) return callback(null, true);
     callback(new Error(`CORS: origin ${origin} not allowed`));
   },
   credentials: true,
