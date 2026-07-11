@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
 import '../../models/found_item.dart';
+import '../../core/error_handler.dart';
 
 class ClaimRequestScreen extends StatefulWidget {
   final FoundItem item;
@@ -56,25 +57,9 @@ class _ClaimRequestScreenState extends State<ClaimRequestScreen> {
       }
     } catch (e) {
       if (mounted) {
-        String errorMessage = 'Failed to submit claim';
-        
-        if (e is DioException) {
-          if (e.response?.data != null) {
-            // Check if backend returned a specific error message
-            final data = e.response?.data;
-            if (data is Map) {
-              errorMessage = data['message'] ?? errorMessage;
-            }
-          } else if (e.type == DioExceptionType.connectionTimeout) {
-            errorMessage = 'Connection timeout. Please check your internet.';
-          }
-        } else if (e.toString().contains('already submitted')) {
-          errorMessage = 'You have already submitted a claim for this item';
-        }
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorMessage),
+            content: Text(ErrorHandler.getFriendlyMessage(e)),
             backgroundColor: AppConstants.errorColor,
             behavior: SnackBarBehavior.floating,
           ),

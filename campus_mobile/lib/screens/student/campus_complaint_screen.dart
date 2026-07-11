@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../models/campus_complaint.dart';
 import '../../services/campus_environment_service.dart';
 import '../../core/constants.dart';
+import '../../core/error_handler.dart';
 
 class CampusComplaintScreen extends StatefulWidget {
   const CampusComplaintScreen({super.key});
@@ -48,7 +49,7 @@ class _CampusComplaintScreenState extends State<CampusComplaintScreen> {
         setState(() => _isFetchingTypes = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to load categories: $e'),
+            content: Text(ErrorHandler.getFriendlyMessage(e)),
             backgroundColor: AppConstants.errorColor,
           ),
         );
@@ -100,14 +101,9 @@ class _CampusComplaintScreenState extends State<CampusComplaintScreen> {
       }
     } catch (e) {
       if (mounted) {
-        String errorMessage = 'Error reporting issue. Please try again.';
-        if (e is Exception) {
-          final msg = e.toString();
-          errorMessage = msg.startsWith('Exception: ') ? msg.substring('Exception: '.length) : msg;
-        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorMessage),
+            content: Text(ErrorHandler.getFriendlyMessage(e)),
             backgroundColor: AppConstants.errorColor,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants.dart';
 import '../../core/widgets/widgets.dart';
 import '../../services/api_service.dart';
+import '../../core/error_handler.dart';
 
 class ReportLostItemScreen extends StatefulWidget {
   const ReportLostItemScreen({super.key});
@@ -148,16 +149,9 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
       }
     } catch (e) {
       if (mounted) {
-        String errorMessage = 'Failed to submit report';
-        if (e is DioException && e.response?.data != null) {
-          final data = e.response?.data;
-          if (data is Map) {
-            errorMessage = data['message'] ?? errorMessage;
-          }
-        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorMessage),
+            content: Text(ErrorHandler.getFriendlyMessage(e)),
             backgroundColor: AppConstants.errorColor,
             behavior: SnackBarBehavior.floating,
           ),

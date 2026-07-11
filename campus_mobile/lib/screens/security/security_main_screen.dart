@@ -465,11 +465,11 @@ class _AnimatedHeader extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: const LinearGradient(
-                        colors: [Color(0xFFFFD54F), Color(0xFFFF8F00)],
+                        colors: [Color(0xFF1A1A1A), Color(0xFF424242)],
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFFFD54F).withValues(alpha: 0.4),
+                          color: const Color(0xFF1A1A1A).withValues(alpha: 0.4),
                           blurRadius: 16,
                           spreadRadius: 2,
                         ),

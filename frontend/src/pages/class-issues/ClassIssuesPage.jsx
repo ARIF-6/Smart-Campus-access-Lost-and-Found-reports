@@ -165,8 +165,9 @@ const ClassIssuesPage = () => {
       await updateClassIssueStatus(id, { status: newStatus, note: 'Status updated via Admin Portal' });
       toast.success('Status updated');
       fetchIssues();
-    } catch {
-      toast.error('Failed to update status');
+    } catch (err) {
+      const serverMsg = err?.response?.data?.message || '';
+      toast.error(serverMsg || 'The supports doesn\'t reach the target');
     }
   };
 

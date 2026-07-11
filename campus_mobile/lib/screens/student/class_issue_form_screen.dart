@@ -6,6 +6,7 @@ import '../../models/class_issue.dart';
 import '../../services/class_issue_service.dart';
 import '../../core/constants.dart';
 import 'package:dio/dio.dart';
+import '../../core/error_handler.dart';
 
 class ClassIssueFormScreen extends StatefulWidget {
   const ClassIssueFormScreen({super.key});
@@ -142,19 +143,10 @@ class _ClassIssueFormScreenState extends State<ClassIssueFormScreen> {
               ],
             ),
           );
-        } else if (e is DioException && e.response != null && e.response?.data != null && e.response?.data is Map) {
-          final msg = (e.response?.data as Map)['message'] ?? 'An error occurred.';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(msg),
-              backgroundColor: AppConstants.errorColor,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Failed to submit report. Please try again later.'),
+              content: Text(ErrorHandler.getFriendlyMessage(e)),
               backgroundColor: AppConstants.errorColor,
               behavior: SnackBarBehavior.floating,
             ),

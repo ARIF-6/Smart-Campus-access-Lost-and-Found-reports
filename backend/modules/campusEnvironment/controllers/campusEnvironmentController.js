@@ -429,6 +429,19 @@ exports.updateStatus = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid status' });
   }
 
+  // ── Support threshold gate ──────────────────────────────────────────
+  // A campus issue requires at least 20 student supports before it can
+  // be marked as Resolved.
+  if (status === 'resolved') {
+    const CAMPUS_MIN_SUPPORTS = 20;
+    if ((complaint.supportCount || 0) < CAMPUS_MIN_SUPPORTS) {
+      return res.status(400).json({
+        success: false,
+        message: 'This campus issue cannot be resolved until it receives at least 20 student supports.'
+      });
+    }
+  }
+
   const oldStatus = complaint.status;
   complaint.status = status;
   await complaint.save();

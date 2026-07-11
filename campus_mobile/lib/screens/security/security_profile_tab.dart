@@ -26,7 +26,7 @@ class _SecurityProfileTabState extends State<SecurityProfileTab> with TickerProv
   static const _gradientStart = Color(0xFF0A1628);
   static const _gradientMid = Color(0xFF0D3B8E);
   static const _gradientEnd = Color(0xFF1565C0);
-  static const _accentGold = Color(0xFFFFD54F);
+  static const _accentGold = Color(0xFF1A1A1A);
 
   @override
   void initState() {

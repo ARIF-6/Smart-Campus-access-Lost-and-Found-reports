@@ -138,7 +138,7 @@ exports.getAllClaims = asyncHandler(async (req, res) => {
   const claims = await Claim.find({ isDeleted: false })
     .populate({
       path: 'user',
-      select: 'fullName email studentId faculty department class',
+      select: 'fullName email studentId faculty department class photoUrl',
       populate: [
         { path: 'faculty', select: 'name' },
         { path: 'department', select: 'name' },
@@ -178,7 +178,7 @@ exports.getMyClaims = asyncHandler(async (req, res) => {
 // @access  Private
 exports.getClaimById = asyncHandler(async (req, res) => {
   const claim = await Claim.findById(req.params.id)
-    .populate('user', 'fullName email studentId name')
+    .populate('user', 'fullName email studentId name photoUrl')
     .populate('item')
     .lean();
       

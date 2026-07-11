@@ -94,7 +94,7 @@ class _ClassIssuesHomeScreenState extends State<ClassIssuesHomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _statusCard('Pending', Colors.yellow, pendingCount, 'pending'),
+          _statusCard('Pending', Colors.black87, pendingCount, 'pending'),
           _statusCard('Resolved', Colors.green, resolvedCount, 'resolved'),
           _statusCard('Rejected', Colors.red, rejectedCount, 'rejected'),
         ],
@@ -118,10 +118,18 @@ class _ClassIssuesHomeScreenState extends State<ClassIssuesHomeScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(label,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: color == Colors.black87 ? Colors.white : null,
+                    )),
                 const SizedBox(height: 8),
                 Text('$count',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      color: color == Colors.black87 ? Colors.white : null,
+                    )),
               ],
             ),
           ),

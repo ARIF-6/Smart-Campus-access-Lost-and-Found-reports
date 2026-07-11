@@ -3,6 +3,8 @@ import { getComplaintDetails, updateComplaintStatus, assignComplaint } from '../
 import { toast } from 'react-hot-toast';
 import { getImageUrl } from '../../utils/imageUtils';
 
+const CAMPUS_MIN_SUPPORTS = 20;
+
 const ComplaintDetailsModal = ({ complaintId, staffUsers, onClose, onUpdate }) => {
   const [complaint, setComplaint] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -28,8 +30,17 @@ const ComplaintDetailsModal = ({ complaintId, staffUsers, onClose, onUpdate }) =
     }
   };
 
+  // Returns true when attempting to resolve but support threshold is not met
+  const resolveBlocked =
+    manageStatus === 'resolved' &&
+    (complaint?.supportCount || 0) < CAMPUS_MIN_SUPPORTS;
+
   // Update complaint status and add comment
   const handleManageSubmit = async () => {
+    if (resolveBlocked) {
+      toast.error('This campus issue cannot be resolved until it receives at least 20 student supports.');
+      return;
+    }
     try {
       await updateComplaintStatus(complaintId, { status: manageStatus, note: manageComment });
       toast.success('Complaint updated successfully');
@@ -37,7 +48,7 @@ const ComplaintDetailsModal = ({ complaintId, staffUsers, onClose, onUpdate }) =
       fetchDetails();
       if (onUpdate) onUpdate();
     } catch (e) {
-      toast.error('Failed to update complaint');
+      toast.error(e?.response?.data?.message || 'Failed to update complaint');
     }
   };
 
@@ -296,6 +307,32 @@ const ComplaintDetailsModal = ({ complaintId, staffUsers, onClose, onUpdate }) =
           {activeTab === 'manage' && (
             <div className="p-6 bg-white rounded-xl shadow-md border border-slate-100">
               <h3 className="text-lg font-bold mb-6 text-slate-800">Manage Complaint</h3>
+
+              {/* Support counter */}
+              <div className="mb-5 flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-2xl font-black text-indigo-600">{complaint.supportCount || 0}</span>
+                <div>
+                  <p className="text-xs font-bold text-slate-700">Student Supports</p>
+                  <p className="text-[11px] text-slate-400">
+                    {(complaint.supportCount || 0) >= CAMPUS_MIN_SUPPORTS
+                      ? '✅ Threshold reached — issue can be resolved'
+                      : `⚠️ ${CAMPUS_MIN_SUPPORTS - (complaint.supportCount || 0)} more needed to enable Resolve`}
+                  </p>
+                </div>
+              </div>
+
+              {/* Resolve-blocked warning */}
+              {resolveBlocked && (
+                <div className="mb-5 flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm">
+                  <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  </svg>
+                  <p className="text-amber-800 font-semibold">
+                    This campus issue cannot be resolved until it receives at least 20 student supports.
+                  </p>
+                </div>
+              )}
+
               <div className="mb-6">
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                   Status
@@ -307,7 +344,9 @@ const ComplaintDetailsModal = ({ complaintId, staffUsers, onClose, onUpdate }) =
                 >
                   <option value="pending">Pending</option>
                   <option value="in_review">In Review</option>
-                  <option value="resolved">Resolved</option>
+                  <option value="resolved" disabled={(complaint.supportCount || 0) < CAMPUS_MIN_SUPPORTS}>
+                    Resolved{(complaint.supportCount || 0) < CAMPUS_MIN_SUPPORTS ? ` (need ${CAMPUS_MIN_SUPPORTS} supports)` : ''}
+                  </option>
                   <option value="completed">Completed</option>
                   <option value="rejected">Rejected</option>
                 </select>
@@ -325,8 +364,13 @@ const ComplaintDetailsModal = ({ complaintId, staffUsers, onClose, onUpdate }) =
                 ></textarea>
               </div>
               <button
-                className="px-6 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl shadow-md shadow-indigo-200 hover:bg-indigo-700 hover:shadow-lg hover:-translate-y-0.5 transition-all"
+                className={`px-6 py-2.5 text-sm font-bold rounded-xl shadow-md transition-all ${
+                  resolveBlocked
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                    : 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700 hover:shadow-lg hover:-translate-y-0.5'
+                }`}
                 onClick={handleManageSubmit}
+                disabled={resolveBlocked}
               >
                 Submit
               </button>

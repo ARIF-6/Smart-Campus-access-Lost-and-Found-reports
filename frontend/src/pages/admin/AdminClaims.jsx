@@ -7,12 +7,103 @@ import { getImageUrl } from '../../utils/imageUtils';
 import { useSocket } from '../../context/SocketContext';
 import { useAutoRefreshSignal } from '../../context/AutoRefreshContext';
 
+/* ─────────────────────────────────────────────
+   Student Identity Modal
+───────────────────────────────────────────── */
+const StudentIdentityModal = ({ isOpen, onClose, user }) => {
+  if (!isOpen || !user) return null;
+
+  const getVal = (val) => {
+    if (!val) return '—';
+    if (typeof val === 'object') return val.name || '—';
+    return val;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Modal Card */}
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-fadeIn">
+        {/* Header Gradient */}
+        <div className="bg-gradient-to-br from-indigo-600 to-violet-600 px-6 pt-8 pb-16 text-white text-center">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/25 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <p className="text-white/70 text-[11px] font-black uppercase tracking-[0.2em] mb-1">Student Identity</p>
+          <h3 className="text-xl font-black tracking-tight">{user.fullName || user.name || '—'}</h3>
+        </div>
+
+        {/* Photo — overlapping header */}
+        <div className="flex justify-center -mt-12 mb-4 relative z-10">
+          <div className="w-24 h-24 rounded-2xl border-4 border-white shadow-xl overflow-hidden bg-indigo-100">
+            {user.photoUrl ? (
+              <img
+                src={getImageUrl(user.photoUrl)}
+                alt={user.fullName || user.name}
+                className="w-full h-full object-cover"
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-indigo-400 font-black text-3xl">
+                {(user.fullName || user.name || 'U').charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Info Grid */}
+        <div className="px-6 pb-6 space-y-3">
+          {[
+            { label: 'Student ID', value: user.studentId },
+            { label: 'Full Name',  value: user.fullName || user.name },
+            { label: 'Faculty',    value: getVal(user.faculty) },
+            { label: 'Department', value: getVal(user.department) },
+            { label: 'Class',      value: getVal(user.class) },
+          ].map(({ label, value }) => (
+            <div
+              key={label}
+              className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-xl px-4 py-3"
+            >
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{label}</span>
+              <span className="text-sm font-bold text-slate-700">{value || '—'}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-slate-100 px-6 py-4 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-200"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────
+   Main Page
+───────────────────────────────────────────── */
 const AdminClaims = () => {
   const [claims, setClaims] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [filterDate, setFilterDate] = useState("");
+  const [selectedUser, setSelectedUser] = useState(null);
   const socket = useSocket();
   const { refreshKey } = useAutoRefreshSignal();
 
@@ -21,7 +112,7 @@ const AdminClaims = () => {
     if (socket) {
       const handleRefresh = () => {
         console.log('Real-time update: Refreshing claims list...');
-        fetchClaims(false); // Fetch without showing full page loader
+        fetchClaims(false);
       };
 
       socket.on('dashboard:refresh', handleRefresh);
@@ -42,7 +133,6 @@ const AdminClaims = () => {
     try {
       if (showLoading) setLoading(true);
       const data = await getAllClaims();
-      // Extract the claims array from the response object
       const claimsArray = Array.isArray(data) ? data : (data?.items || data?.data || []);
       setClaims(claimsArray);
     } catch (err) {
@@ -53,16 +143,12 @@ const AdminClaims = () => {
   }, []);
 
   useEffect(() => { fetchClaims(); }, [fetchClaims]);
-
-  // Auto-refresh: re-fetch when the global 30s signal fires
   useEffect(() => { if (refreshKey > 0) fetchClaims(false); }, [refreshKey]);
 
   const handleStatusUpdate = async (id, newStatus) => {
     try {
       setActionLoading(id);
       await updateClaimStatus(id, { status: newStatus });
-      
-      // Instant UI Update (Optimistic)
       setClaims(prev => prev.map(c => c._id === id ? { ...c, status: newStatus } : c));
       toast.success(`Claim ${newStatus} successfully`);
     } catch (err) {
@@ -72,29 +158,27 @@ const AdminClaims = () => {
     }
   };
 
-
-
   const filteredClaims = claims.filter(claim => {
-    let statusMatch = true;
-    if (statusFilter !== "all") {
-      statusMatch = claim.status === statusFilter;
-    }
-    
+    let statusMatch = statusFilter === "all" || claim.status === statusFilter;
     let dateMatch = true;
     if (filterDate && claim.createdAt) {
       try {
         const claimDate = new Date(claim.createdAt).toISOString().split('T')[0];
         dateMatch = claimDate === filterDate;
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) { /* ignore */ }
     }
-    
     return statusMatch && dateMatch;
   });
 
   return (
     <AdminLayout title="Claim Management">
+      {/* Student Identity Modal */}
+      <StudentIdentityModal
+        isOpen={!!selectedUser}
+        onClose={() => setSelectedUser(null)}
+        user={selectedUser}
+      />
+
       <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h2 className="text-4xl font-black text-slate-900 tracking-tight">Claim Requests</h2>
@@ -113,8 +197,8 @@ const AdminClaims = () => {
                 key={filter}
                 onClick={() => setStatusFilter(filter)}
                 className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                  statusFilter === filter 
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' 
+                  statusFilter === filter
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
                   : 'text-slate-400 hover:text-slate-600'
                 }`}
               >
@@ -163,6 +247,7 @@ const AdminClaims = () => {
                 ) : (
                   filteredClaims.map((claim) => (
                     <tr key={claim._id} className="group hover:bg-slate-50/50 transition-colors">
+                      {/* Item Preview */}
                       <td className="px-8 py-6">
                         <div className="flex items-center gap-4">
                           <div className="w-14 h-14 rounded-2xl bg-slate-100 overflow-hidden border-2 border-white shadow-sm flex-shrink-0">
@@ -184,54 +269,47 @@ const AdminClaims = () => {
                           </div>
                         </div>
                       </td>
+
+                      {/* Claimed By — name + email only */}
                       <td className="px-6 py-6">
                         <p className="text-sm font-bold text-slate-700">{claim.user?.fullName || claim.user?.name}</p>
-                        <p className="text-xs text-slate-400 font-medium mb-2">{claim.user?.email}</p>
-                        <div className="space-y-0.5">
-                          {claim.user?.studentId && (
-                            <p className="text-[10px] text-slate-500">
-                              <span className="font-black uppercase tracking-wider text-slate-400">ID: </span>
-                              {claim.user.studentId}
-                            </p>
-                          )}
-                          {claim.user?.faculty?.name && (
-                            <p className="text-[10px] text-slate-500">
-                              <span className="font-black uppercase tracking-wider text-slate-400">Faculty: </span>
-                              {claim.user.faculty.name}
-                            </p>
-                          )}
-                          {claim.user?.department?.name && (
-                            <p className="text-[10px] text-slate-500">
-                              <span className="font-black uppercase tracking-wider text-slate-400">Dept: </span>
-                              {claim.user.department.name}
-                            </p>
-                          )}
-                          {claim.user?.class?.name && (
-                            <p className="text-[10px] text-slate-500">
-                              <span className="font-black uppercase tracking-wider text-slate-400">Class: </span>
-                              {claim.user.class.name}
-                            </p>
-                          )}
-                        </div>
+                        <p className="text-xs text-slate-400 font-medium">{claim.user?.email}</p>
                       </td>
+
+                      {/* Message / Proof */}
                       <td className="px-6 py-6">
                         <div className="max-w-[240px]">
                           <p className="text-sm text-slate-600 italic leading-relaxed line-clamp-2">"{claim.message}"</p>
                           <p className="text-[10px] text-slate-300 font-mono mt-2">{new Date(claim.createdAt).toLocaleString()}</p>
                         </div>
                       </td>
+
+                      {/* Status Badge */}
                       <td className="px-6 py-6">
                         <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
-                          claim.status === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                          claim.status === 'pending'  ? 'bg-amber-50 text-amber-600 border-amber-100' :
                           claim.status === 'approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                           'bg-rose-50 text-rose-600 border-rose-100'
                         }`}>
                           {claim.status}
                         </span>
                       </td>
+
+                      {/* Verification Actions */}
                       <td className="px-8 py-6 text-right">
                         {claim.status === 'pending' ? (
-                          <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex justify-end items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {/* Eye icon for pending too */}
+                            <button
+                              onClick={() => setSelectedUser(claim.user)}
+                              title="View Student Identity"
+                              className="p-2 rounded-xl bg-slate-100 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-all"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            </button>
                             <button
                               onClick={() => handleStatusUpdate(claim._id, 'approved')}
                               disabled={actionLoading === claim._id}
@@ -248,9 +326,22 @@ const AdminClaims = () => {
                             </button>
                           </div>
                         ) : (
-                          <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                            Processed
-                          </span>
+                          /* Processed row: "Processed" label + eye icon */
+                          <div className="flex justify-end items-center gap-2">
+                            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                              Processed
+                            </span>
+                            <button
+                              onClick={() => setSelectedUser(claim.user)}
+                              title="View Student Identity"
+                              className="p-2 rounded-xl bg-slate-100 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-all"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>

@@ -338,12 +338,17 @@ exports.getIssueDetails = asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 })
     .lean();
 
+  const classStudentCount = issue.classId
+    ? await User.countDocuments({ class: issue.classId, role: 'student', isDeleted: false })
+    : 0;
+
   return sendSuccess(res, 'Issue details fetched successfully', {
     ...issue,
     facultyName: resolvedFaculty || 'Not Available',
     departmentName: resolvedDepartment || 'Not Available',
     hallName: hallName || issue.building || 'Not Available',
     className: resolvedClassName || issue.className || 'Not Available',
+    classStudentCount,
     tracking
   });
 });
@@ -380,6 +385,23 @@ exports.updateStatus = asyncHandler(async (req, res) => {
 
   if (!oldIssue) {
     return res.status(404).json({ success: false, message: 'Issue not found' });
+  }
+
+  // ── Support threshold gate ──────────────────────────────────────────
+  // A class issue requires support from more than 50% of class students
+  // before it can be marked as Resolved.
+  if (status === 'resolved') {
+    const classStudentCount = oldIssue.classId
+      ? await User.countDocuments({ class: oldIssue.classId, role: 'student', isDeleted: false })
+      : 0;
+    const requiredSupports = Math.floor(classStudentCount / 2) + 1;
+    const currentSupports = oldIssue.supportCount || 0;
+    if (currentSupports < requiredSupports) {
+      return res.status(400).json({
+        success: false,
+        message: 'The supports does not reach the target'
+      });
+    }
   }
 
   const issue = await ClassIssueComplaint.findByIdAndUpdate(

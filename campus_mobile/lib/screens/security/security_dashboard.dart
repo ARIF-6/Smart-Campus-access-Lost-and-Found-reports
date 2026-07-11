@@ -14,6 +14,123 @@ import 'security_reports_screen.dart';
 import '../student/notifications_screen.dart';
 import '../../services/socket_service.dart';
 
+/* ─────────────────────────────────────────────
+   Tactile Scaling Action Card Widget
+───────────────────────────────────────────── */
+class AnimatedActionCard extends StatefulWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const AnimatedActionCard({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  State<AnimatedActionCard> createState() => _AnimatedActionCardState();
+}
+
+class _AnimatedActionCardState extends State<AnimatedActionCard> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+      lowerBound: 0.94,
+      upperBound: 1.0,
+    );
+    _scaleAnimation = _controller;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _controller.reverse(),
+      onTapUp: (_) {
+        _controller.forward();
+        widget.onTap();
+      },
+      onTapCancel: () => _controller.forward(),
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade100),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: widget.color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(widget.icon, color: widget.color, size: 20),
+                  ),
+                  Icon(Icons.arrow_forward_ios_rounded, size: 10, color: Colors.grey.shade300),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.title,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, height: 1.1),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    widget.subtitle,
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 9.5, height: 1.1),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Security Dashboard Screen
+───────────────────────────────────────────── */
 class SecurityDashboard extends StatefulWidget {
   final VoidCallback? openDrawer;
   const SecurityDashboard({super.key, this.openDrawer});
@@ -87,9 +204,6 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
     return '${AppConstants.serverUrl}/$p';
   }
 
-  /// Returns true when the current time is inside the guard's assigned window.
-  /// Keeps the dashboard in sync with the same logic used by ShiftScreen and
-  /// ScannerScreen so behaviour is consistent across the app.
   bool _isWithinShiftWindow(Map<String, dynamic>? user) {
     if (user == null) return false;
     final role = (user['role'] as String?)?.toLowerCase();
@@ -139,15 +253,10 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
     final auth = Provider.of<AuthProvider>(context);
     final user = auth.user;
     final photoUrl = _getProfileImageUrl(user?['photoUrl']);
-    // Real-time check: is the current wall-clock time within the shift window?
     final withinWindow = _isWithinShiftWindow(user);
 
-    /// Tap handler for shift-gated action cards.
-    /// Navigates only when the current time is within the guard's assigned
-    /// shift window. No manual shift start is required.
     void requireShift(VoidCallback action) {
       if (!withinWindow) {
-        // Show a modal bottom sheet explaining the shift window restriction.
         showModalBottomSheet(
           context: context,
           shape: const RoundedRectangleBorder(
@@ -203,7 +312,6 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
         onTap: () => FocusScope.of(context).unfocus(),
         child: Stack(
           children: [
-            // Decorative bg circles
             Positioned(top: -80, right: -80, child: Container(width: 280, height: 280, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.04)))),
             Positioned(top: 80, right: -120, child: Container(width: 200, height: 200, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.03)))),
 
@@ -215,7 +323,7 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  // ── Navy Header ─────────────────────────────────────
+                  // Sliver Navy Header
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 56, 16, 26),
@@ -328,7 +436,7 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                     ),
                   ),
 
-                  // ── White Bottom Content Sheet ─────────────────────
+                  // Bottom Content Sheet
                   SliverToBoxAdapter(
                     child: Container(
                       constraints: BoxConstraints(minHeight: MediaQuery.of(context).size.height * 0.72),
@@ -344,61 +452,72 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // ── Live Campus Status Card (replaces banking card) ──
+                            // Live Campus Status Section
                             const Text(
                               'Live Campus Status',
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0D1B38)),
                             ),
                             const SizedBox(height: 14),
                             if (!_liveLoading) ...[
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(22),
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF0D1F4E), AppConstants.primaryNavy, Color(0xFF1E4080)],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
+                              TweenAnimationBuilder<double>(
+                                tween: Tween<double>(begin: 0.9, end: 1.0),
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeOutBack,
+                                builder: (context, scale, child) {
+                                  return Transform.scale(
+                                    scale: scale,
+                                    child: child,
+                                  );
+                                },
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(22),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFF0D1F4E), AppConstants.primaryNavy, Color(0xFF1E4080)],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(26),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppConstants.primaryNavy.withValues(alpha: 0.35),
+                                        blurRadius: 28,
+                                        offset: const Offset(0, 12),
+                                      ),
+                                    ],
                                   ),
-                                  borderRadius: BorderRadius.circular(26),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppConstants.primaryNavy.withValues(alpha: 0.35),
-                                      blurRadius: 28,
-                                      offset: const Offset(0, 12),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        _liveStatModern('Inside', '${_live['inside'] ?? 0}', Icons.people_outline, Colors.white),
-                                        Container(height: 36, width: 1, color: Colors.white24),
-                                        _liveStatModern('Entries', '${_live['entries'] ?? 0}', Icons.login_rounded, const Color(0xFF22C55E)),
-                                        Container(height: 36, width: 1, color: Colors.white24),
-                                        _liveStatModern('Exits', '${_live['exits'] ?? 0}', Icons.logout_rounded, const Color(0xFFEF4444)),
-                                      ],
-                                    ),
-                                    const Padding(
-                                      padding: EdgeInsets.symmetric(vertical: 16),
-                                      child: Divider(color: Colors.white12, height: 1),
-                                    ),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                      children: [
-                                        _liveStatModern('Incidents', '${_live['todayIncidents'] ?? 0}', Icons.warning_amber_rounded, Colors.orangeAccent),
-                                        _liveStatModern('Visitors', '${_live['todayVisitors'] ?? 0}', Icons.person_add_alt_1_rounded, Colors.cyanAccent),
-                                      ],
-                                    ),
-                                  ],
+                                  child: Column(
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          _liveStatModern('Inside', '${_live['inside'] ?? 0}', Icons.people_outline, Colors.white),
+                                          Container(height: 36, width: 1, color: Colors.white24),
+                                          _liveStatModern('Entries', '${_live['entries'] ?? 0}', Icons.login_rounded, const Color(0xFF22C55E)),
+                                          Container(height: 36, width: 1, color: Colors.white24),
+                                          _liveStatModern('Exits', '${_live['exits'] ?? 0}', Icons.logout_rounded, const Color(0xFFEF4444)),
+                                        ],
+                                      ),
+                                      const Padding(
+                                        padding: EdgeInsets.symmetric(vertical: 16),
+                                        child: Divider(color: Colors.white12, height: 1),
+                                      ),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                        children: [
+                                          _liveStatModern('Incidents', '${_live['todayIncidents'] ?? 0}', Icons.warning_amber_rounded, Colors.orangeAccent),
+                                          _liveStatModern('Visitors', '${_live['todayVisitors'] ?? 0}', Icons.person_add_alt_1_rounded, Colors.cyanAccent),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 28),
                             ],
 
-                            // ── Security Controls ────────────────────────────
+                            // Security Controls Section
                             const Text(
                               'Security Controls',
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0D1B38)),
@@ -412,14 +531,14 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                               physics: const NeverScrollableScrollPhysics(),
                               crossAxisSpacing: 12,
                               mainAxisSpacing: 12,
-                              childAspectRatio: 1.1,
+                              childAspectRatio: 1.35, // Flattened/miniaturized card size
                               children: [
-                                _actionCard('QR Scanner', 'Scan student ID', Icons.qr_code_scanner, const Color(0xFF1A73E8), () => requireShift(() => _go(const ScannerScreen()))),
-                                _actionCard('Access Logs', 'Entry & exit history', Icons.list_alt, const Color(0xFF1E8E3E), () => requireShift(() => _go(const AccessLogsScreen()))),
-                                _actionCard('Visitor Reg.', 'Register campus visitors', Icons.person_add, const Color(0xFF00695C), () => requireShift(() => _go(const VisitorsScreen()))),
-                                _actionCard('Incidents', 'Report security events', Icons.warning_amber_rounded, const Color(0xFFD93025), () => requireShift(() => _go(const IncidentsScreen()))),
-                                _actionCard('Blacklist', 'Manage flagged persons', Icons.block, const Color(0xFF8B0000), () => requireShift(() => _go(const BlacklistScreen()))),
-                                _actionCard('Reports', 'Daily & monthly stats', Icons.bar_chart, const Color(0xFFF57C00), () => requireShift(() => _go(const SecurityReportsScreen()))),
+                                AnimatedActionCard(title: 'QR Scanner', subtitle: 'Scan student ID', icon: Icons.qr_code_scanner, color: const Color(0xFF1A73E8), onTap: () => requireShift(() => _go(const ScannerScreen()))),
+                                AnimatedActionCard(title: 'Access Logs', subtitle: 'Entry & exit history', icon: Icons.list_alt, color: const Color(0xFF1E8E3E), onTap: () => requireShift(() => _go(const AccessLogsScreen()))),
+                                AnimatedActionCard(title: 'Visitor Reg.', subtitle: 'Register visitors', icon: Icons.person_add, color: const Color(0xFF00695C), onTap: () => requireShift(() => _go(const VisitorsScreen()))),
+                                AnimatedActionCard(title: 'Incidents', subtitle: 'Report events', icon: Icons.warning_amber_rounded, color: const Color(0xFFD93025), onTap: () => requireShift(() => _go(const IncidentsScreen()))),
+                                AnimatedActionCard(title: 'Blacklist', subtitle: 'Manage blacklist', icon: Icons.block, color: const Color(0xFF8B0000), onTap: () => requireShift(() => _go(const BlacklistScreen()))),
+                                AnimatedActionCard(title: 'Reports', subtitle: 'Daily/monthly stats', icon: Icons.bar_chart, color: const Color(0xFFF57C00), onTap: () => requireShift(() => _go(const SecurityReportsScreen()))),
                               ],
                             ),
                             const SizedBox(height: 20),
@@ -539,42 +658,6 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
               letterSpacing: 0.5),
         ),
       ],
-    );
-  }
-
-  Widget _actionCard(String title, String subtitle, IconData icon, Color color,
-      VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.grey.shade100),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 4))
-          ],
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const Spacer(),
-          Text(title,
-              style:
-                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          Text(subtitle,
-              style: const TextStyle(color: Colors.grey, fontSize: 11)),
-        ]),
-      ),
     );
   }
 

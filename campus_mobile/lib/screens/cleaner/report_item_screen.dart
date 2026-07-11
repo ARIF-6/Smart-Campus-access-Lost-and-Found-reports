@@ -10,6 +10,7 @@ import '../../services/api_service.dart';
 import '../../widgets/web_camera_capture.dart';
 import '../../core/permission_helper.dart';
 import '../../services/socket_service.dart';
+import '../../core/error_handler.dart';
 
 class ReportItemScreen extends StatefulWidget {
   const ReportItemScreen({super.key});
@@ -24,6 +25,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
   final _descController = TextEditingController();
   final _locController = TextEditingController();
 
+  String _reportType = 'Found'; 
   String? _selectedCategory;
   XFile? _imageFile;
   Uint8List? _webImage;
@@ -33,14 +35,20 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
   final ImagePicker _picker = ImagePicker();
   static const _themeColor = Color(0xFF0D47A1);
 
-  List<Map<String, dynamic>> _categories = [];
+  List<Map<String, dynamic>> _categories = [
+    {
+      'value': 'Other',
+      'label': 'Other',
+      'icon': Icons.category_rounded,
+    }
+  ];
 
   final SocketService _socketService = SocketService();
 
   @override
   void initState() {
     super.initState();
-    _selectedCategory = null;
+    _selectedCategory = 'Other';
     _fetchCategories();
     _socketService.on('category:updated', (_) {
       if (mounted) _fetchCategories();
@@ -64,13 +72,27 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
             ? response.data
             : (response.data['data'] ?? []);
         setState(() {
-          _categories = data.map((e) => {
-                'value': e['name'] ?? '',
-                'label': e['name'] ?? '',
-                'icon': Icons.category_rounded,
-              }).toList();
-          if (_selectedCategory == null && _categories.isNotEmpty) {
-            _selectedCategory = _categories.first['value'] as String;
+          _categories = data
+              .map((e) => {
+                    'value': e is Map ? (e['name']?.toString() ?? '') : '',
+                    'label': e is Map ? (e['name']?.toString() ?? '') : '',
+                    'icon': Icons.category_rounded,
+                  })
+              .where((e) => (e['value'] as String).isNotEmpty)
+              .toList();
+
+          final hasOther = _categories.any((c) => (c['value'] as String).toLowerCase() == 'other' || (c['value'] as String).toLowerCase() == 'others');
+          if (!hasOther) {
+            _categories.add({
+              'value': 'Other',
+              'label': 'Other',
+              'icon': Icons.category_rounded,
+            });
+          }
+          if (_selectedCategory == null || !_categories.any((c) => c['value'] == _selectedCategory)) {
+            if (_categories.isNotEmpty) {
+              _selectedCategory = _categories.first['value'] as String;
+            }
           }
         });
       }

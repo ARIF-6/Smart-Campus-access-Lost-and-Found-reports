@@ -266,7 +266,7 @@ class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
   Widget _buildStatusBadge(String status) {
     Color color;
     switch (status) {
-      case 'pending': color = Colors.amber; break;
+      case 'pending': color = Colors.black87; break;
       case 'in_review': color = Colors.blue; break;
       case 'resolved': color = Colors.green; break;
       case 'completed': color = Colors.green; break;

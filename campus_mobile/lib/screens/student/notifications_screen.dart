@@ -50,7 +50,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'ACCESS_LOG':
         return Colors.blue;
       case 'MATCH':
-        return Colors.amber;
+        return Colors.black87;
       case 'LOST_ITEM_REPORTED':
         return Colors.orange;
       default:

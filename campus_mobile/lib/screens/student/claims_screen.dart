@@ -2,12 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
 import '../../models/claim.dart';
-import '../../models/campus_complaint.dart';
-import '../../services/campus_environment_service.dart';
-import '../../models/class_issue.dart';
-import '../../services/class_issue_service.dart';
-import 'class_issue_details_screen.dart';
-import 'complaint_details_screen.dart';
+import '../../core/error_handler.dart';
 
 const _blue = Color(0xFF2563EB);
 const _indigo = Color(0xFF4C3BCF);
@@ -19,45 +14,27 @@ class ClaimsScreen extends StatefulWidget {
   State<ClaimsScreen> createState() => _ClaimsScreenState();
 }
 
-class _ClaimsScreenState extends State<ClaimsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _ClaimsScreenState extends State<ClaimsScreen> {
   final ApiService _api = ApiService();
   final SocketService _socketService = SocketService();
-  final CampusEnvironmentService _complaintSvc = CampusEnvironmentService();
-  final ClassIssueService _classIssueSvc = ClassIssueService();
 
   List<Claim> _claims = [];
-  List<CampusComplaint> _complaints = [];
-  List<ClassIssue> _classIssues = [];
-
   bool _loadingClaims = true;
-  bool _loadingCampus = true;
-
   String _claimFilter = 'all';
-  String _campusFilter = 'all';
-  String _classFilter = 'all';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _loadAll();
-    _socketService.on('claim:updated', (_) {
-      if (mounted) _loadClaims();
-    });
+    _loadClaims();
+    _socketService.on('claim:created', (_) => _loadClaims());
+    _socketService.on('claim:statusUpdated', (_) => _loadClaims());
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
-    _socketService.off('claim:updated');
+    _socketService.off('claim:created');
+    _socketService.off('claim:statusUpdated');
     super.dispose();
-  }
-
-  void _loadAll() {
-    _loadClaims();
-    _loadCampusIssues();
   }
 
   Future<void> _loadClaims() async {
@@ -80,34 +57,7 @@ class _ClaimsScreenState extends State<ClaimsScreen>
       if (mounted) {
         setState(() => _loadingClaims = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load claims: ${e.toString()}')),
-        );
-      }
-    }
-  }
-
-  Future<void> _loadCampusIssues() async {
-    if (mounted) setState(() => _loadingCampus = true);
-    try {
-      // Parallel fetching
-      final results = await Future.wait([
-        _complaintSvc.getMyComplaints(),
-        _classIssueSvc.getMyIssues(),
-      ]);
-      
-      if (mounted) {
-        setState(() {
-          _complaints = results[0] as List<CampusComplaint>;
-          _classIssues = results[1] as List<ClassIssue>;
-          _loadingCampus = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading campus issues: $e');
-      if (mounted) {
-        setState(() => _loadingCampus = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load issues: ${e.toString()}')),
+          SnackBar(content: Text(ErrorHandler.getFriendlyMessage(e))),
         );
       }
     }
@@ -116,26 +66,6 @@ class _ClaimsScreenState extends State<ClaimsScreen>
   List<Claim> get _filteredClaims {
     if (_claimFilter == 'all') return _claims;
     return _claims.where((c) => c.status == _claimFilter).toList();
-  }
-
-  // Campus Environment Issues
-  List<_CampusItem> get _filteredCampus {
-    final all = _complaints.map((c) => _CampusItem.fromComplaint(c)).toList();
-    all.sort((a, b) => b.date.compareTo(a.date));
-
-    if (_campusFilter == 'all') return all;
-    final f = _campusFilter == 'resolved' ? ['resolved', 'completed'] : [_campusFilter];
-    return all.where((i) => f.contains(i.status)).toList();
-  }
-
-  // Separate Class Issues
-  List<_CampusItem> get _filteredClassIssues {
-    final all = _classIssues.map((i) => _CampusItem.fromClassIssue(i)).toList();
-    all.sort((a, b) => b.date.compareTo(a.date));
-
-    if (_classFilter == 'all') return all;
-    final f = _classFilter == 'resolved' ? ['resolved', 'completed'] : [_classFilter];
-    return all.where((i) => f.contains(i.status)).toList();
   }
 
   @override
@@ -170,81 +100,47 @@ class _ClaimsScreenState extends State<ClaimsScreen>
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: _indigo),
-            onPressed: _loadAll,
+            onPressed: _loadClaims,
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(50),
-          child: Container(
-            color: Colors.white,
-            child: TabBar(
-              controller: _tabController,
-              labelColor: _blue,
-              unselectedLabelColor: Colors.grey.shade400,
-              indicatorColor: _blue,
-              indicatorWeight: 3,
-              indicatorSize: TabBarIndicatorSize.label,
-              labelStyle: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 14),
-              unselectedLabelStyle:
-                  const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-              tabs: const [
-                Tab(text: 'My Claims'),
-                Tab(text: 'Campus Issues'),
-                Tab(text: 'Class Issues'),
-              ],
-            ),
-          ),
-        ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildClaimsTab(),
-          _buildCampusTab(),
-          _buildClassIssuesTab(),
+          _filterRow(
+            filters: const ['all', 'pending', 'approved', 'rejected'],
+            labels: const ['All', 'Pending', 'Approved', 'Rejected'],
+            selected: _claimFilter,
+            onSelect: (v) => setState(() => _claimFilter = v),
+            isBlueTheme: true,
+          ),
+          Expanded(
+            child: _loadingClaims
+                ? const Center(
+                    child: CircularProgressIndicator(color: _blue))
+                : _filteredClaims.isEmpty
+                    ? _emptyState(
+                        Icons.assignment_late_outlined,
+                        'No claims yet',
+                        'Items you claim will appear here',
+                        action: _loadClaims,
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadClaims,
+                        color: _blue,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                          itemCount: _filteredClaims.length,
+                          itemBuilder: (_, i) =>
+                              _claimCard(_filteredClaims[i]),
+                        ),
+                      ),
+          ),
         ],
       ),
     );
   }
 
-  // ── MY CLAIMS TAB ──────────────────────────────────────────────
-  Widget _buildClaimsTab() {
-    return Column(
-      children: [
-        _filterRow(
-          filters: const ['all', 'pending', 'approved', 'rejected'],
-          labels: const ['All', 'Pending', 'Approved', 'Rejected'],
-          selected: _claimFilter,
-          onSelect: (v) => setState(() => _claimFilter = v),
-          isBlueTheme: true,
-        ),
-        Expanded(
-          child: _loadingClaims
-              ? const Center(
-                  child: CircularProgressIndicator(color: _blue))
-              : _filteredClaims.isEmpty
-                  ? _emptyState(
-                      Icons.assignment_late_outlined,
-                      'No claims yet',
-                      'Items you claim will appear here',
-                      action: _loadClaims,
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _loadClaims,
-                      color: _blue,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                        itemCount: _filteredClaims.length,
-                        itemBuilder: (_, i) =>
-                            _claimCard(_filteredClaims[i]),
-                      ),
-                    ),
-        ),
-      ],
-    );
-  }
-
+  // ── MY CLAIMS CARD ─────────────────────────────────────────────
   Widget _claimCard(Claim claim) {
     final statusColor = _statusColor(claim.status);
     final imageUrl = claim.fullItemImageUrl;
@@ -338,10 +234,10 @@ class _ClaimsScreenState extends State<ClaimsScreen>
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
-                // Claim / Claimed button
+                // Claimed button (disabled)
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: null, // already claimed
+                    onPressed: null,
                     icon: const Icon(
                       Icons.check_circle_rounded,
                       size: 16,
@@ -470,233 +366,6 @@ class _ClaimsScreenState extends State<ClaimsScreen>
     );
   }
 
-  Widget _buildCampusTab() {
-    return Column(
-      children: [
-        _filterRow(
-          filters: const ['all', 'pending', 'resolved', 'rejected'],
-          labels: const ['All', 'Pending', 'Resolved', 'Rejected'],
-          selected: _campusFilter,
-          onSelect: (v) => setState(() => _campusFilter = v),
-          isBlueTheme: true,
-        ),
-        Expanded(
-          child: _loadingCampus
-              ? const Center(
-                  child: CircularProgressIndicator(color: _blue))
-              : _filteredCampus.isEmpty
-                  ? _emptyState(
-                      Icons.eco_outlined,
-                      'No issues found',
-                      'Your campus reports will appear here',
-                      action: _loadCampusIssues,
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _loadCampusIssues,
-                      color: _blue,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                        itemCount: _filteredCampus.length,
-                        itemBuilder: (_, i) =>
-                            _campusCard(_filteredCampus[i]),
-                      ),
-                    ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildClassIssuesTab() {
-    return Column(
-      children: [
-        _filterRow(
-          filters: const ['all', 'pending', 'resolved', 'rejected'],
-          labels: const ['All', 'Pending', 'Resolved', 'Rejected'],
-          selected: _classFilter,
-          onSelect: (v) => setState(() => _classFilter = v),
-          isBlueTheme: true,
-        ),
-        Expanded(
-          child: _loadingCampus
-              ? const Center(
-                  child: CircularProgressIndicator(color: _blue))
-              : _filteredClassIssues.isEmpty
-                  ? _emptyState(
-                      Icons.school_outlined,
-                      'No issues found',
-                      'Your classroom reports will appear here',
-                      action: _loadCampusIssues,
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _loadCampusIssues,
-                      color: _blue,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                        itemCount: _filteredClassIssues.length,
-                        itemBuilder: (_, i) =>
-                            _campusCard(_filteredClassIssues[i]),
-                      ),
-                    ),
-        ),
-      ],
-    );
-  }
-
-  Widget _campusCard(_CampusItem item) {
-    final statusColor = _statusColor(item.status);
-
-    return GestureDetector(
-      onTap: item.onTap != null ? () => item.onTap!(context) : null,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 16,
-                offset: const Offset(0, 4))
-          ],
-        ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Icon box
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: item.typeColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: item.imageUrl != null && item.imageUrl!.isNotEmpty
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: Image.network(item.imageUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Icon(
-                                    item.typeIcon,
-                                    color: item.typeColor,
-                                    size: 32)),
-                          )
-                        : Icon(item.typeIcon,
-                            color: item.typeColor, size: 32),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: item.typeColor.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                item.type,
-                                style: TextStyle(
-                                    color: item.typeColor,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.4),
-                              ),
-                            ),
-                            _statusBadge(item.status, statusColor),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          item.title,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: Color(0xFF1E293B)),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          item.subtitle,
-                          style: TextStyle(
-                              color: Colors.grey.shade500, fontSize: 12),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 8),
-                        _infoChip(
-                          Icons.calendar_today_rounded,
-                          '${item.date.day} ${_month(item.date.month)}, ${item.date.year}',
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Divider(height: 1, color: Colors.grey.shade100),
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: null,
-                      icon: Icon(Icons.send_rounded,
-                          size: 15, color: Colors.grey.shade400),
-                      label: Text('Reported',
-                          style: TextStyle(
-                              color: Colors.grey.shade400,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13)),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        side: BorderSide(color: Colors.grey.shade200),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: item.onTap != null
-                          ? () => item.onTap!(context)
-                          : null,
-                      icon: const Icon(Icons.info_outline_rounded, size: 15),
-                      label: const Text('View Details',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w700, fontSize: 13)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _blue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-
   // ── SHARED WIDGETS ─────────────────────────────────────────────
   Widget _filterRow({
     required List<String> filters,
@@ -711,13 +380,12 @@ class _ClaimsScreenState extends State<ClaimsScreen>
       child: Row(
         children: List.generate(filters.length, (i) {
           final isSelected = selected == filters[i];
-          
-          // Selection colors
-          final Color bgColor = isBlueTheme 
+
+          final Color bgColor = isBlueTheme
               ? (isSelected ? _blue : _blue.withValues(alpha: 0.45))
               : (isSelected ? _blue : Colors.grey.shade50);
-          
-          final Color textColor = isBlueTheme 
+
+          final Color textColor = isBlueTheme
               ? Colors.white
               : (isSelected ? Colors.white : Colors.grey.shade600);
 
@@ -735,10 +403,14 @@ class _ClaimsScreenState extends State<ClaimsScreen>
                   decoration: BoxDecoration(
                     color: bgColor,
                     borderRadius: BorderRadius.circular(14),
-                    border: isBlueTheme ? null : Border.all(
-                      color: isSelected ? _blue : Colors.grey.shade200,
-                      width: 1,
-                    ),
+                    border: isBlueTheme
+                        ? null
+                        : Border.all(
+                            color: isSelected
+                                ? _blue
+                                : Colors.grey.shade200,
+                            width: 1,
+                          ),
                     boxShadow: isSelected
                         ? [
                             BoxShadow(
@@ -752,8 +424,14 @@ class _ClaimsScreenState extends State<ClaimsScreen>
                     child: Text(
                       labels[i],
                       style: TextStyle(
-                        color: isSelected ? Colors.white : (isBlueTheme ? Colors.white.withValues(alpha: 0.85) : textColor),
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                        color: isSelected
+                            ? Colors.white
+                            : (isBlueTheme
+                                ? Colors.white.withValues(alpha: 0.85)
+                                : textColor),
+                        fontWeight: isSelected
+                            ? FontWeight.w800
+                            : FontWeight.w600,
                         fontSize: 11,
                         letterSpacing: 0.2,
                       ),
@@ -808,7 +486,8 @@ class _ClaimsScreenState extends State<ClaimsScreen>
     );
   }
 
-  Widget _emptyState(IconData icon, String title, String sub, {VoidCallback? action}) {
+  Widget _emptyState(IconData icon, String title, String sub,
+      {VoidCallback? action}) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -821,7 +500,8 @@ class _ClaimsScreenState extends State<ClaimsScreen>
                 color: _blue.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 52, color: _blue.withValues(alpha: 0.5)),
+              child:
+                  Icon(icon, size: 52, color: _blue.withValues(alpha: 0.5)),
             ),
             const SizedBox(height: 20),
             Text(title,
@@ -832,10 +512,11 @@ class _ClaimsScreenState extends State<ClaimsScreen>
             const SizedBox(height: 8),
             Text(sub,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                style:
+                    TextStyle(color: Colors.grey.shade500, fontSize: 13)),
             const SizedBox(height: 24),
             OutlinedButton.icon(
-              onPressed: action ?? _loadAll,
+              onPressed: action ?? _loadClaims,
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: const Text('Refresh'),
               style: OutlinedButton.styleFrom(
@@ -902,63 +583,4 @@ class _ClaimsScreenState extends State<ClaimsScreen>
     ];
     return months[m];
   }
-}
-
-// ── Unified campus item model ──────────────────────────────────
-class _CampusItem {
-  final String title;
-  final String subtitle;
-  final String status;
-  final String type;
-  final Color typeColor;
-  final IconData typeIcon;
-  final String? imageUrl;
-  final DateTime date;
-  final Function(BuildContext)? onTap;
-
-  _CampusItem({
-    required this.title,
-    required this.subtitle,
-    required this.status,
-    required this.type,
-    required this.typeColor,
-    required this.typeIcon,
-    this.imageUrl,
-    required this.date,
-    this.onTap,
-  });
-
-  factory _CampusItem.fromComplaint(CampusComplaint c) => _CampusItem(
-        title: c.issueType,
-        subtitle: c.description,
-        status: c.status,
-        type: 'Environment',
-        typeColor: const Color(0xFF10B981),
-        typeIcon: Icons.eco_rounded,
-        imageUrl: c.fullImageUrls.isNotEmpty ? c.fullImageUrls[0] : null,
-        date: c.createdAt,
-        onTap: (ctx) => Navigator.push(
-          ctx,
-          MaterialPageRoute(
-              builder: (_) =>
-                  ComplaintDetailsScreen(complaintId: c.id)),
-        ),
-      );
-
-  factory _CampusItem.fromClassIssue(ClassIssue i) => _CampusItem(
-        title: i.title,
-        subtitle: '${i.classroom} · ${i.building}',
-        status: i.status,
-        type: 'Class Issue',
-        typeColor: const Color(0xFF6366F1),
-        typeIcon: Icons.school_rounded,
-        imageUrl: i.fullImageUrls.isNotEmpty ? i.fullImageUrls.first : null,
-        date: i.createdAt,
-        onTap: (ctx) => Navigator.push(
-          ctx,
-          MaterialPageRoute(
-              builder: (_) =>
-                  ClassIssueDetailsScreen(issueId: i.id)),
-        ),
-      );
 }

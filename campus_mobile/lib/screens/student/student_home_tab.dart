@@ -1051,7 +1051,16 @@ class _StudentHomeTabState extends State<StudentHomeTab>
               behavior: SnackBarBehavior.floating));
           return;
         }
-        if (item.isClaimedByUser) return;
+        if (item.isClaimedByUser) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('You have already claimed this item.'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
+        }
         _nav(ClaimRequestScreen(item: item));
       },
       child: Container(

@@ -235,7 +235,7 @@ class _ShiftScreenState extends State<ShiftScreen> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 14, vertical: 10),
                                 decoration: BoxDecoration(
-                                  color: Colors.amber.shade900
+                                   color: Colors.black87
                                       .withValues(alpha: 0.7),
                                   borderRadius: BorderRadius.circular(10),
                                 ),

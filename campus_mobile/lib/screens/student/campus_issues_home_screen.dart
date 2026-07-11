@@ -195,7 +195,7 @@ class _CampusIssuesHomeScreenState extends State<CampusIssuesHomeScreen> {
             margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
             padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
+              color: color == Colors.black87 ? color : color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -206,13 +206,16 @@ class _CampusIssuesHomeScreenState extends State<CampusIssuesHomeScreen> {
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: color,
+                    color: color == Colors.black87 ? Colors.white : color,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   label,
-                  style: TextStyle(color: color, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: color == Colors.black87 ? Colors.white : color,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -223,7 +226,7 @@ class _CampusIssuesHomeScreenState extends State<CampusIssuesHomeScreen> {
 
     return Row(
       children: [
-        card('Pending', pending, Colors.yellow, 'pending'),
+        card('Pending', pending, Colors.black87, 'pending'),
         card('Resolved', resolved, Colors.green, 'resolved'),
         card('Rejected', rejected, Colors.red, 'rejected'),
       ],

@@ -75,14 +75,24 @@ const ClassIssueDetailsModal = ({ issueId, staffUsers, onClose, onUpdate }) => {
   };
 
   const handleUpdateStatus = async () => {
+    // Client-side guard: mirrors backend validation
+    if (updateData.status === 'resolved') {
+      const classStudentCount = issue?.classStudentCount || 0;
+      const requiredSupports  = Math.floor(classStudentCount / 2) + 1;
+      const currentSupports   = issue?.supportCount || 0;
+      if (currentSupports < requiredSupports) {
+        toast.error('The supports does not reach the target');
+        return;
+      }
+    }
     try {
       setUpdating(true);
       await updateClassIssueStatus(issueId, updateData);
       toast.success('Status updated');
       fetchDetails();
       onUpdate();
-    } catch {
-      toast.error('Failed to update status');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to update status');
     } finally {
       setUpdating(false);
     }
@@ -483,35 +493,76 @@ const ClassIssueDetailsModal = ({ issueId, staffUsers, onClose, onUpdate }) => {
                   <div className="text-xs text-slate-400 mt-0.5">Change the progress of this issue</div>
                 </div>
                 <div className="p-5 space-y-4">
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">New Status</label>
-                    <select
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-indigo-400/30 focus:border-indigo-300 outline-none transition-all"
-                      value={updateData.status}
-                      onChange={(e) => setUpdateData({ ...updateData, status: e.target.value })}
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="in_review">In Review</option>
-                      <option value="resolved">Resolved</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Note (optional)</label>
-                    <textarea
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-indigo-400/30 focus:border-indigo-300 outline-none h-28 resize-none transition-all"
-                      placeholder="Reason for status change..."
-                      value={updateData.note}
-                      onChange={(e) => setUpdateData({ ...updateData, note: e.target.value })}
-                    />
-                  </div>
-                  <button
-                    onClick={handleUpdateStatus}
-                    disabled={updating}
-                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-sm shadow-lg shadow-indigo-200 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {updating ? 'Saving…' : '✓ Save Status Update'}
-                  </button>
+
+                  {/* Support threshold indicator */}
+                  {(() => {
+                    const classStudentCount = issue?.classStudentCount || 0;
+                    const required = Math.floor(classStudentCount / 2) + 1;
+                    const current  = issue?.supportCount || 0;
+                    const blocked  = updateData.status === 'resolved' && current < required;
+                    return (
+                      <>
+                        <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                          <span className="text-2xl font-black text-indigo-600">{current}</span>
+                          <div>
+                            <p className="text-xs font-bold text-slate-700">Student Supports</p>
+                            <p className="text-[11px] text-slate-400">
+                              {current >= required
+                                ? `✅ Threshold reached (${required} needed) — issue can be resolved`
+                                : `⚠️ ${required - current} more needed to enable Resolve (class has ${classStudentCount} students)`}
+                            </p>
+                          </div>
+                        </div>
+
+                        {blocked && (
+                          <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm">
+                            <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            </svg>
+                            <p className="text-amber-800 font-semibold">
+                              The supports does not reach the target
+                            </p>
+                          </div>
+                        )}
+
+                        <div>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">New Status</label>
+                          <select
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-indigo-400/30 focus:border-indigo-300 outline-none transition-all"
+                            value={updateData.status}
+                            onChange={(e) => setUpdateData({ ...updateData, status: e.target.value })}
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="in_review">In Review</option>
+                            <option value="resolved" disabled={current < required}>
+                              Resolved{current < required ? ` (need ${required} supports)` : ''}
+                            </option>
+                            <option value="rejected">Rejected</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Note (optional)</label>
+                          <textarea
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-indigo-400/30 focus:border-indigo-300 outline-none h-28 resize-none transition-all"
+                            placeholder="Reason for status change..."
+                            value={updateData.note}
+                            onChange={(e) => setUpdateData({ ...updateData, note: e.target.value })}
+                          />
+                        </div>
+                        <button
+                          onClick={handleUpdateStatus}
+                          disabled={updating || blocked}
+                          className={`w-full py-3 rounded-xl font-black text-sm shadow-lg active:scale-[0.98] transition-all ${
+                            blocked
+                              ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                              : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed'
+                          }`}
+                        >
+                          {updating ? 'Saving…' : '✓ Save Status Update'}
+                        </button>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 

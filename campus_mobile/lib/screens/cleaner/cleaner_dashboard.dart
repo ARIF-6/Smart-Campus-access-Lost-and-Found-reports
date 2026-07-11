@@ -444,7 +444,7 @@ class _HomeTabState extends State<_HomeTab> {
                                 label: 'Stored',
                                 value: _storedItems,
                                 icon: Icons.store_mall_directory_outlined,
-                                color: Colors.amber),
+                                color: Colors.black87),
                             _StatCard(
                                 label: 'Returned',
                                 value: _returnedItems,

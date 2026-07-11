@@ -34,7 +34,7 @@ class IssueCard extends StatelessWidget {
   Color _getStatusColor(String s) {
     switch (s.toLowerCase()) {
       case 'pending':
-        return Colors.yellow;
+        return Colors.black87;
       case 'resolved':
       case 'closed':
         return Colors.green;

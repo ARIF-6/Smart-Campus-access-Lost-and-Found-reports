@@ -5,10 +5,13 @@ import 'package:dio/dio.dart';
 import 'package:http_parser/http_parser.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import '../../services/api_service.dart';
 import '../../widgets/web_camera_capture.dart';
 import '../../core/permission_helper.dart';
 import '../../services/socket_service.dart';
+import '../../core/error_handler.dart';
+import '../../core/constants.dart';
 
 class StudentReportItemScreen extends StatefulWidget {
   final String? initialType;
@@ -32,18 +35,23 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
   final ApiService _apiService = ApiService();
   final ImagePicker _picker = ImagePicker();
 
-  List<String> _categories = [];
-  bool _showCustomTitleField = false;
+  List<String> _categories = ['Other'];
+  bool _showCustomTitleField = true;
 
   final SocketService _socketService = SocketService();
 
   @override
   void initState() {
     super.initState();
+    _selectedCategory = 'Other';
     if (widget.initialType != null) {
       _reportType = widget.initialType!;
     }
     _loadCategories();
+    // Re-check categories if auth states or widget updates occur
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadCategories();
+    });
     _socketService.on('category:updated', (_) {
       if (mounted) _loadCategories();
     });
@@ -65,77 +73,74 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
         final List<dynamic> data = response.data is List
             ? response.data
             : (response.data['data'] ?? []);
-        final List<String> fetched = data.map((item) => item['name'] as String).toList();
+        final List<String> fetched = data
+            .map((item) => item is Map ? (item['name']?.toString() ?? '') : '')
+            .where((name) => name.isNotEmpty)
+            .toList();
 
         setState(() {
           _categories = fetched;
-          // Ensure 'Other' exists in categories list
           final hasOther = _categories.any((c) => c.toLowerCase() == 'other' || c.toLowerCase() == 'others');
           if (!hasOther) {
             _categories.add('Other');
           }
           if (_categories.isNotEmpty) {
-            _selectedCategory = _categories.first;
+            // Keep current selection if valid, else pick first
+            if (_selectedCategory == null || !_categories.contains(_selectedCategory)) {
+              _selectedCategory = _categories.first;
+            }
             _showCustomTitleField = _selectedCategory!.toLowerCase() == 'other' || _selectedCategory!.toLowerCase() == 'others';
           }
         });
       }
     } catch (e) {
       debugPrint('Error loading categories: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ErrorHandler.getFriendlyMessage(e)),
+            backgroundColor: AppConstants.errorColor,
+          ),
+        );
+      }
     }
   }
 
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-
-    // Image is required
-    if (_imageFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please attach a photo of the item'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
+    if (_selectedCategory == null) return;
 
     setState(() => _isLoading = true);
+
     try {
+      String endpoint = '/items/lost';
+      if (_reportType.toLowerCase() == 'found') {
+        endpoint = '/items/found';
+      }
+
       MultipartFile? imageFile;
-      if (_imageFile != null) {
-        if (kIsWeb) {
-          imageFile = MultipartFile.fromBytes(
-            _webImage!,
-            filename: _imageFile!.name,
-            contentType: MediaType('image', 'jpeg'),
-          );
-        } else {
-          imageFile = await MultipartFile.fromFile(
-            _imageFile!.path,
-            filename: _imageFile!.name,
-            contentType: MediaType('image', 'jpeg'),
-          );
-        }
+      if (kIsWeb && _webImage != null) {
+        imageFile = MultipartFile.fromBytes(
+          _webImage!,
+          filename: 'upload.jpg',
+          contentType: MediaType('image', 'jpeg'),
+        );
+      } else if (!kIsWeb && _imageFile != null) {
+        imageFile = await MultipartFile.fromFile(
+          _imageFile!.path,
+          filename: _imageFile!.name,
+          contentType: MediaType('image', 'jpeg'),
+        );
       }
 
-      final isLost = _reportType == 'Lost';
-      final endpoint = isLost ? '/lost-items' : '/found-items';
-      
       final Map<String, dynamic> data = {
-        'title': _showCustomTitleField ? _titleController.text.trim() : (_selectedCategory ?? 'Item'),
+        'title': (_selectedCategory == 'Other') ? _titleController.text.trim() : _selectedCategory,
         'description': _descController.text.trim(),
-        'category': _selectedCategory?.toLowerCase() ?? '',
+        'category': _selectedCategory,
+        'locationFound': _locController.text.trim(),
+        'location': _locController.text.trim(),
       };
-
-      if (isLost) {
-        data['locationLost'] = _locController.text.trim();
-        data['dateLost'] = DateTime.now().toIso8601String();
-      } else {
-        data['locationFound'] = _locController.text.trim();
-        data['dateFound'] = DateTime.now().toIso8601String();
-      }
 
       if (imageFile != null) {
         data['image'] = imageFile;
@@ -154,18 +159,10 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
         Navigator.pop(context);
       }
     } catch (e) {
-      String msg = 'An unexpected error occurred';
-      if (e is DioException) {
-        if (e.response?.data is Map) {
-          msg = e.response?.data['message'] ?? e.message;
-        } else {
-          msg = e.message ?? 'Server error';
-        }
-      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $msg'),
+            content: Text(ErrorHandler.getFriendlyMessage(e)),
             backgroundColor: Colors.red,
           ),
         );

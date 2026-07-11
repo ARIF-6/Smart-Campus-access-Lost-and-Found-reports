@@ -122,7 +122,16 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                         );
                         return;
                       }
-                      if (item.isClaimedByUser) return;
+                      if (item.isClaimedByUser) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('You have already claimed this item.'),
+                            backgroundColor: Colors.orange,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -186,7 +195,7 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                       actionWidget = _infoLabel(
                         icon: Icons.hourglass_top_rounded,
                         text: 'Claim Submitted',
-                        color: Colors.amber.shade700,
+                        color: Colors.black87,
                       );
                     } else {
                       actionWidget = SizedBox(

@@ -290,7 +290,7 @@ class _ClassIssueDetailsScreenState extends State<ClassIssueDetailsScreen> {
     Color color;
     switch (status) {
       case 'pending':
-        color = Colors.amber;
+        color = Colors.black87;
         break;
       case 'in_review':
         color = Colors.blue;
