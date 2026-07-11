@@ -1,4 +1,4 @@
-import 'package:dio/dio';
+import 'package:dio/dio.dart';
 
 class ErrorHandler {
   static String getFriendlyMessage(dynamic error) {
