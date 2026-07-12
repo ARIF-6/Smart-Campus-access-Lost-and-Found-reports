@@ -102,11 +102,48 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
     final user = Provider.of<AuthProvider>(context, listen: false).user;
     if (!_isWithinShiftWindow(user)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Access denied: you are outside your assigned shift window.'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
+        showModalBottomSheet(
+          context: context,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          builder: (sheetCtx) => Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.access_time_filled_rounded, size: 56, color: Colors.orange.shade700),
+                const SizedBox(height: 16),
+                const Text(
+                  'Outside Shift Window',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  _getShiftWindowMessage(user),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, color: Colors.black54, height: 1.5),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Student Entry and Exit operations are only allowed during your assigned shift window.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: Colors.black38, height: 1.4),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1B3A6B),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => Navigator.pop(sheetCtx),
+                    child: const Text('OK', style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       }
@@ -348,20 +385,18 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
             backgroundColor: Colors.white,
             elevation: 0,
           ),
-          body: withinWindow
-              ? Stack(
-                  children: [
-                    _cameraActive ? _buildCameraView() : _buildHomeView(),
-                    if (_scanState != _ScanState.idle)
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        child: _buildResultSheet(),
-                      ),
-                  ],
-                )
-              : _buildShiftBlockedView(user),
+          body: Stack(
+            children: [
+              _cameraActive ? _buildCameraView() : _buildHomeView(),
+              if (_scanState != _ScanState.idle)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: _buildResultSheet(),
+                ),
+            ],
+          ),
         );
       },
     );

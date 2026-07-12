@@ -255,56 +255,7 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
     final photoUrl = _getProfileImageUrl(user?['photoUrl']);
     final withinWindow = _isWithinShiftWindow(user);
 
-    void requireShift(VoidCallback action) {
-      if (!withinWindow) {
-        showModalBottomSheet(
-          context: context,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          builder: (sheetCtx) => Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.access_time_filled_rounded, size: 56, color: Colors.orange.shade700),
-                const SizedBox(height: 16),
-                const Text(
-                  'Outside Shift Window',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  _getShiftWindowMessage(user),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 14, color: Colors.black54, height: 1.5),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Student Entry and Exit operations are only allowed during your assigned shift window.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: Colors.black38, height: 1.4),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1B3A6B),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () => Navigator.pop(sheetCtx),
-                    child: const Text('OK', style: TextStyle(color: Colors.white)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-        return;
-      }
-      action();
-    }
+
 
     return Scaffold(
       backgroundColor: AppConstants.primaryNavy,
@@ -533,12 +484,12 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                               mainAxisSpacing: 12,
                               childAspectRatio: 1.35, // Flattened/miniaturized card size
                               children: [
-                                AnimatedActionCard(title: 'QR Scanner', subtitle: 'Scan student ID', icon: Icons.qr_code_scanner, color: const Color(0xFF1A73E8), onTap: () => requireShift(() => _go(const ScannerScreen()))),
-                                AnimatedActionCard(title: 'Access Logs', subtitle: 'Entry & exit history', icon: Icons.list_alt, color: const Color(0xFF1E8E3E), onTap: () => requireShift(() => _go(const AccessLogsScreen()))),
-                                AnimatedActionCard(title: 'Visitor Reg.', subtitle: 'Register visitors', icon: Icons.person_add, color: const Color(0xFF00695C), onTap: () => requireShift(() => _go(const VisitorsScreen()))),
-                                AnimatedActionCard(title: 'Incidents', subtitle: 'Report events', icon: Icons.warning_amber_rounded, color: const Color(0xFFD93025), onTap: () => requireShift(() => _go(const IncidentsScreen()))),
-                                AnimatedActionCard(title: 'Blacklist', subtitle: 'Manage blacklist', icon: Icons.block, color: const Color(0xFF8B0000), onTap: () => requireShift(() => _go(const BlacklistScreen()))),
-                                AnimatedActionCard(title: 'Reports', subtitle: 'Daily/monthly stats', icon: Icons.bar_chart, color: const Color(0xFFF57C00), onTap: () => requireShift(() => _go(const SecurityReportsScreen()))),
+                                AnimatedActionCard(title: 'QR Scanner', subtitle: 'Scan student ID', icon: Icons.qr_code_scanner, color: const Color(0xFF1A73E8), onTap: () => _go(const ScannerScreen())),
+                                AnimatedActionCard(title: 'Access Logs', subtitle: 'Entry & exit history', icon: Icons.list_alt, color: const Color(0xFF1E8E3E), onTap: () => _go(const AccessLogsScreen())),
+                                AnimatedActionCard(title: 'Visitor Reg.', subtitle: 'Register visitors', icon: Icons.person_add, color: const Color(0xFF00695C), onTap: () => _go(const VisitorsScreen())),
+                                AnimatedActionCard(title: 'Incidents', subtitle: 'Report events', icon: Icons.warning_amber_rounded, color: const Color(0xFFD93025), onTap: () => _go(const IncidentsScreen())),
+                                AnimatedActionCard(title: 'Blacklist', subtitle: 'Manage blacklist', icon: Icons.block, color: const Color(0xFF8B0000), onTap: () => _go(const BlacklistScreen())),
+                                AnimatedActionCard(title: 'Reports', subtitle: 'Daily/monthly stats', icon: Icons.bar_chart, color: const Color(0xFFF57C00), onTap: () => _go(const SecurityReportsScreen())),
                               ],
                             ),
                             const SizedBox(height: 20),
