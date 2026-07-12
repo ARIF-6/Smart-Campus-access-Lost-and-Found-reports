@@ -47,9 +47,21 @@ class AuthProvider extends ChangeNotifier {
       if (_token != null) {
         _socketService.connect(_token!);
         _listenForShiftUpdates();
+        // Fetch latest profile fields (such as shift times) immediately on start
+        fetchLatestProfile();
       }
     }
     notifyListeners();
+  }
+
+  Future<void> fetchLatestProfile() async {
+    if (_token == null) return;
+    try {
+      final response = await _apiService.get('/auth/profile');
+      if (response.statusCode == 200 && response.data != null) {
+        await updateUserLocally(response.data);
+      }
+    } catch (_) {}
   }
 
   /// Registers a socket listener for real-time shift updates pushed by the

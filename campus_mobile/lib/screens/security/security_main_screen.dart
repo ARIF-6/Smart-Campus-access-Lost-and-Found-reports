@@ -44,6 +44,8 @@ class _SecurityMainScreenState extends State<SecurityMainScreen>
       if (!mounted) return;
       Provider.of<ShiftProvider>(context, listen: false).fetchActiveShift();
       Provider.of<NotificationProvider>(context, listen: false).fetchNotifications();
+      // Fetch latest profile immediately so any shift schedule change by admin is reflected
+      Provider.of<AuthProvider>(context, listen: false).fetchLatestProfile();
     });
 
     _socketService.on('security:alert', (data) {
@@ -145,6 +147,8 @@ class _SecurityMainScreenState extends State<SecurityMainScreen>
         if (!mounted) return;
         Provider.of<ShiftProvider>(context, listen: false).fetchActiveShift();
         Provider.of<NotificationProvider>(context, listen: false).fetchNotifications();
+        // Re-fetch latest profile so admin-updated shift times are applied immediately
+        Provider.of<AuthProvider>(context, listen: false).fetchLatestProfile();
       },
       child: Scaffold(
         key: _scaffoldKey,
@@ -313,52 +317,8 @@ class _SecurityDrawerState extends State<_SecurityDrawer>
                 // ── Logout ───────────────────────────────────
                 _AnimatedLogout(
                   ctrl: _localCtrl,
-                  hasActiveShift: hasActiveShift,
+                  hasActiveShift: false,
                   onTap: () async {
-                    if (hasActiveShift) {
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20)),
-                          title: const Row(
-                            children: [
-                              Icon(Icons.warning_amber_rounded,
-                                  color: Colors.orange),
-                              SizedBox(width: 8),
-                              Text('Shift Still Active'),
-                            ],
-                          ),
-                          content: const Text(
-                            'You cannot sign out while your shift is active. Please end your shift first.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: const Text('Cancel'),
-                            ),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
-                              ),
-                              onPressed: () {
-                                Navigator.pop(ctx);
-                                Navigator.pop(context);
-                                Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (_) => const ShiftScreen()));
-                              },
-                              child: const Text('End Shift',
-                                  style: TextStyle(color: Colors.white)),
-                            ),
-                          ],
-                        ),
-                      );
-                      return;
-                    }
                     await auth.logout();
                     if (context.mounted) {
                       Navigator.of(context)
