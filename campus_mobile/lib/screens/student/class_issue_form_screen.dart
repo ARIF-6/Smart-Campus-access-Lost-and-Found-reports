@@ -125,9 +125,6 @@ class _ClassIssueFormScreenState extends State<ClassIssueFormScreen> {
     } catch (e) {
       if (mounted) {
         if (e is DioException && e.response?.statusCode == 409) {
-          // Extract the server's message (contains issue title + current status)
-          final serverMsg = (e.response?.data is Map)
-              ? ((e.response?.data as Map)['message'] ?? 'This issue has already been reported.')
           showDialog(
             context: context,
             barrierDismissible: false,
