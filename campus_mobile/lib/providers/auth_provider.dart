@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../core/constants.dart';
 import 'package:dio/dio.dart';
 import '../services/socket_service.dart';
+import '../core/error_handler.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -102,16 +103,7 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       // ... existing error handling ...
       if (e is DioException) {
-        if (e.type == DioExceptionType.connectionTimeout ||
-            e.type == DioExceptionType.sendTimeout ||
-            e.type == DioExceptionType.receiveTimeout ||
-            e.type == DioExceptionType.connectionError) {
-          _errorMessage = 'Cannot reach server. Check your connection.';
-        } else if (e.response != null && e.response!.data is Map) {
-          _errorMessage = e.response!.data['message'] ?? 'Login failed';
-        } else {
-          _errorMessage = 'Login failed. Please try again.';
-        }
+        _errorMessage = ErrorHandler.getFriendlyMessage(e);
       } else {
         _errorMessage = 'An unexpected error occurred';
       }

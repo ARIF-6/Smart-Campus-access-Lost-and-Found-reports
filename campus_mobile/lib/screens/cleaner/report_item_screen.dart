@@ -203,7 +203,15 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.toString().replaceAll('DioException', 'Network error')}'), backgroundColor: AppConstants.errorColor));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ErrorHandler.getFriendlyMessage(e)),
+            backgroundColor: AppConstants.errorColor,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
