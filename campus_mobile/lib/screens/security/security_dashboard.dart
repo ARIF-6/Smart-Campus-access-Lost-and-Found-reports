@@ -209,7 +209,7 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
     final role = (user['role'] as String?)?.toLowerCase();
     if (role == 'admin' || role == 'superadmin' || role == 'staff') return true;
 
-    final now = DateTime.now().toUtc();
+    final now = DateTime.now();
     final nowMins = now.hour * 60 + now.minute;
 
     final startStr = user['shiftStartTime'] as String? ?? '';
@@ -337,6 +337,13 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                                         ),
                                     ],
                                   );
+                                },
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
+                                onPressed: () {
+                                  _fetchLive();
+                                  Provider.of<AuthProvider>(context, listen: false).fetchLatestProfile();
                                 },
                               ),
                               const SizedBox(width: 8),

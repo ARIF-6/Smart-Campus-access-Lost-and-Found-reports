@@ -31,8 +31,8 @@ const checkShiftWindow = async (req, res, next) => {
     }
 
     // Now check if current server time matches the guard's shift start/end times if assigned.
-
-    const now = new Date();
+    // Server runs on UTC (Render). Shift times are stored in Egypt local time, so convert.
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' }));
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
     // ── Option 1: Use admin-assigned custom start/end times ──────────────────

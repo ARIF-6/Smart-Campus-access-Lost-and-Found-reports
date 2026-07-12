@@ -92,61 +92,63 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
     return value;
   }
 
+  void _showShiftBlockedBottomSheet(Map<String, dynamic>? user) {
+    if (mounted) {
+      showModalBottomSheet(
+        context: context,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (sheetCtx) => Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.access_time_filled_rounded, size: 56, color: Colors.orange.shade700),
+              const SizedBox(height: 16),
+              const Text(
+                'Outside Shift Window',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                _getShiftWindowMessage(user),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 14, color: Colors.black54, height: 1.5),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Student Entry and Exit operations are only allowed during your assigned shift window.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Colors.black38, height: 1.4),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1B3A6B),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () => Navigator.pop(sheetCtx),
+                  child: const Text('OK', style: TextStyle(color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _verifyAccess(String identifier, String method, {String? status}) async {
     if (_scanState == _ScanState.loading) return;
     final cleanIdentifier = identifier.trim();
     if (cleanIdentifier.isEmpty) return;
 
-    // Real-time shift-window guard: re-check against the latest user data before
-    // submitting to the backend — even if the UI overlay is somehow bypassed.
     final user = Provider.of<AuthProvider>(context, listen: false).user;
     if (!_isWithinShiftWindow(user)) {
-      if (mounted) {
-        showModalBottomSheet(
-          context: context,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          builder: (sheetCtx) => Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.access_time_filled_rounded, size: 56, color: Colors.orange.shade700),
-                const SizedBox(height: 16),
-                const Text(
-                  'Outside Shift Window',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  _getShiftWindowMessage(user),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 14, color: Colors.black54, height: 1.5),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Student Entry and Exit operations are only allowed during your assigned shift window.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: Colors.black38, height: 1.4),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1B3A6B),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () => Navigator.pop(sheetCtx),
-                    child: const Text('OK', style: TextStyle(color: Colors.white)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }
+      _showShiftBlockedBottomSheet(user);
       return;
     }
     _lastMethod = method;
@@ -324,7 +326,7 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
     final role = (user['role'] as String?)?.toLowerCase();
     if (role == 'admin' || role == 'superadmin' || role == 'staff') return true;
 
-    final now = DateTime.now().toUtc();
+    final now = DateTime.now();
     final nowMins = now.hour * 60 + now.minute;
 
     final startStr = user['shiftStartTime'] as String? ?? '';
@@ -481,7 +483,14 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
           ScaleTransition(
             scale: _pulseAnim,
             child: GestureDetector(
-              onTap: _startScan,
+              onTap: () {
+                final user = Provider.of<AuthProvider>(context, listen: false).user;
+                if (!_isWithinShiftWindow(user)) {
+                  _showShiftBlockedBottomSheet(user);
+                } else {
+                  _startScan();
+                }
+              },
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(48),
@@ -517,7 +526,14 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
           ),
           const SizedBox(height: 24),
           OutlinedButton.icon(
-            onPressed: _showManualEntryDialog,
+            onPressed: () {
+              final user = Provider.of<AuthProvider>(context, listen: false).user;
+              if (!_isWithinShiftWindow(user)) {
+                _showShiftBlockedBottomSheet(user);
+              } else {
+                _showManualEntryDialog();
+              }
+            },
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(double.infinity, 54),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

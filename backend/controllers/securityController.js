@@ -293,7 +293,12 @@ exports.addToBlacklist = asyncHandler(async (req, res) => {
 exports.getBlacklist = asyncHandler(async (req, res) => {
   let query = {};
   if (req.user.role === 'security') {
-    query = { isActive: true };
+    query = { 
+      $or: [
+        { isActive: true },
+        { addedBy: req.user.id }
+      ]
+    };
   } else if (req.user.role === 'staff') {
     if (req.user.campus) {
       const guards = await User.find({ role: 'security', campus: req.user.campus, isDeleted: false }).select('_id');
@@ -385,7 +390,7 @@ exports.startShift = asyncHandler(async (req, res) => {
 
   // Admins / staff can start any time
   if (!['admin', 'staff'].includes(userRole)) {
-    const now        = new Date();
+    const now        = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' }));
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
     const customStart = req.user.shiftStartTime; // e.g. "08:00"
