@@ -128,13 +128,12 @@ class _ClassIssueFormScreenState extends State<ClassIssueFormScreen> {
           // Extract the server's message (contains issue title + current status)
           final serverMsg = (e.response?.data is Map)
               ? ((e.response?.data as Map)['message'] ?? 'This issue has already been reported.')
-              : 'This issue has already been reported.';
           showDialog(
             context: context,
             barrierDismissible: false,
             builder: (context) => AlertDialog(
               title: const Text('Issue Already Active', style: TextStyle(fontWeight: FontWeight.bold)),
-              content: Text(serverMsg),
+              content: const Text('An identical issue is already active. Please wait for it to be resolved before submitting a new one.'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),

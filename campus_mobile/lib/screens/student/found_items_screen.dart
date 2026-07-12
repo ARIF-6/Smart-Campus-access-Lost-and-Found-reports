@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-
+import '../../core/error_handler.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
@@ -54,7 +54,12 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        debugPrint('Error fetching found items: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ErrorHandler.getFriendlyMessage(e)),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }
