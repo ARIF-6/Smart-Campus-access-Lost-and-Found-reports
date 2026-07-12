@@ -52,8 +52,9 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error picking image: $e'),
+            content: const Text('Could not open image picker. Please try again.'),
             backgroundColor: AppConstants.errorColor,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }

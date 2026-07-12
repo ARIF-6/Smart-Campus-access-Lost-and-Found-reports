@@ -22,7 +22,9 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Trigger non-blocking backend warmup (cold start mitigation)
     try {
-      ApiService().get('/dashboard/system-status').catchError((_) => null);
+      ApiService().get('/dashboard/system-status').catchError((_) async {
+        // Ignore warmup errors silently
+      });
     } catch (_) {}
 
     _controller = AnimationController(

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:dio/dio.dart';
 import '../../core/constants.dart';
+import '../../core/error_handler.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../services/api_service.dart';
@@ -46,14 +46,9 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
           _isLoading = false;
         });
       }
-    } on DioException catch (e) {
-      setState(() {
-        _error = e.response?.data['message'] ?? 'Failed to load items';
-        _isLoading = false;
-      });
     } catch (e) {
       setState(() {
-        _error = 'An error occurred';
+        _error = ErrorHandler.getFriendlyMessage(e);
         _isLoading = false;
       });
     }

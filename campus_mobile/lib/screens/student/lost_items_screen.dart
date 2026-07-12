@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants.dart';
 import '../../core/widgets/widgets.dart';
+import '../../core/error_handler.dart';
 import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
 import '../../models/lost_item.dart';
@@ -59,7 +60,11 @@ class _LostItemsScreenState extends State<LostItemsScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching lost items: $e')),
+          SnackBar(
+            content: Text(ErrorHandler.getFriendlyMessage(e)),
+            backgroundColor: AppConstants.errorColor,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
