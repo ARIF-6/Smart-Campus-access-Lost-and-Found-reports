@@ -209,7 +209,7 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
     final role = (user['role'] as String?)?.toLowerCase();
     if (role == 'admin' || role == 'superadmin' || role == 'staff') return true;
 
-    final now = DateTime.now();
+    final now = DateTime.now().toUtc();
     final nowMins = now.hour * 60 + now.minute;
 
     final startStr = user['shiftStartTime'] as String? ?? '';

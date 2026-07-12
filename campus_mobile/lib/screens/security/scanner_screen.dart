@@ -287,7 +287,7 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
     final role = (user['role'] as String?)?.toLowerCase();
     if (role == 'admin' || role == 'superadmin' || role == 'staff') return true;
 
-    final now = DateTime.now();
+    final now = DateTime.now().toUtc();
     final nowMins = now.hour * 60 + now.minute;
 
     final startStr = user['shiftStartTime'] as String? ?? '';

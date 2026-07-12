@@ -55,7 +55,7 @@ class _ShiftScreenState extends State<ShiftScreen> {
       return true;
     }
 
-    final now = DateTime.now();
+    final now = DateTime.now().toUtc();
     final nowMins = now.hour * 60 + now.minute;
 
     final startStr = user['shiftStartTime'] as String? ?? '';
