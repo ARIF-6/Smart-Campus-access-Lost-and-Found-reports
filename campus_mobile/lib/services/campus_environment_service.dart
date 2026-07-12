@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/campus_complaint.dart';
 import 'api_service.dart';
 
@@ -64,9 +64,6 @@ Future<void> submitComplaint({
   List<XFile>? images,
 }) async {
   try {
-    // Debug log request data (location removed)
-    debugPrint('Submitting complaint with title: $title, issueType: $issueType');
-
     // Resolve issueType if it's a placeholder for a new category
     String resolvedIssueTypeId = issueType;
     if (issueType == 'other') {
@@ -114,25 +111,9 @@ Future<void> submitComplaint({
 
     await _apiService.post('/campus-environment', data: formData);
   } on DioException catch (dioError) {
-    // Log response for debugging
-    debugPrint('Complaint submission response status: ${dioError.response?.statusCode}');
-    // Extract friendly message based on status code
-    final status = dioError.response?.statusCode;
-    String message = 'Something went wrong. Please try again later.';
-    if (status == 409) {
-      message = dioError.response?.data['message'] ??
-          'Sorry, this issue has already been reported. Please support the existing complaint instead.';
-    } else if (status == 401) {
-      message = 'Session expired. Please log in again.';
-    } else if (status == 500) {
-      message = 'Something went wrong. Please try again later.';
-    } else if (dioError.type == DioExceptionType.connectionError) {
-      message = 'Please check your internet connection.';
-    }
-    // Throw as a generic Exception with friendly message
-    throw Exception(message);
+    // Rethrow as-is so ErrorHandler.getFriendlyMessage can read the status code
+    rethrow;
   } catch (e) {
-    // Re‑throw any other unexpected errors
     rethrow;
   }
 }

@@ -114,10 +114,9 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
     setState(() => _isLoading = true);
 
     try {
-      String endpoint = '/items/lost';
-      if (_reportType.toLowerCase() == 'found') {
-        endpoint = '/items/found';
-      }
+      // ── Correct endpoint per report type ─────────────────────────────
+      final bool isLost = _reportType.toLowerCase() == 'lost';
+      final String endpoint = isLost ? '/lost-items' : '/found-items';
 
       MultipartFile? imageFile;
       if (kIsWeb && _webImage != null) {
@@ -134,12 +133,15 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
         );
       }
 
+      final String location = _locController.text.trim();
       final Map<String, dynamic> data = {
         'title': (_selectedCategory == 'Other') ? _titleController.text.trim() : _selectedCategory,
         'description': _descController.text.trim(),
         'category': _selectedCategory,
-        'locationFound': _locController.text.trim(),
-        'location': _locController.text.trim(),
+        // Backend expects different field names per type
+        if (isLost) 'locationLost': location,
+        if (!isLost) 'locationFound': location,
+        'location': location,
       };
 
       if (imageFile != null) {

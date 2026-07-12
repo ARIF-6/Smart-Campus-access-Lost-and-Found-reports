@@ -92,8 +92,9 @@ exports.createComplaint = asyncHandler(async (req, res) => {
       location: location && location.trim() !== '' ? location : 'Unknown Location',
       faculty: faculty || req.user.faculty,
       department: department || req.user.department,
-      class: className || req.user.class,
-      hall: hallName || req.user.hall,
+      // class/hall may not be valid ObjectIds in the JWT — always default to null
+      class: null,
+      hall: null,
       status: 'pending'
     });
   } catch (err) {
