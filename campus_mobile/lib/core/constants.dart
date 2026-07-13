@@ -17,9 +17,13 @@ class AppConstants {
   static const String _kProdBackendUrl = 'https://smart-campus-access-lost-and-found-dbgg.onrender.com';
   //                                      ↑ REPLACE THIS with your public backend URL
 
+  // Set this to true if you are running the backend server locally on your machine.
+  // Set to false to connect directly to the live production database/server.
+  static const bool useLocalBackend = false;
+
   // API URL
   static String get baseUrl {
-    if (kReleaseMode) {
+    if (kReleaseMode || !useLocalBackend) {
       return '$_kProdBackendUrl/api';
     }
     if (kIsWeb) {
@@ -35,7 +39,7 @@ class AppConstants {
   }
 
   static String get serverUrl {
-    if (kReleaseMode) {
+    if (kReleaseMode || !useLocalBackend) {
       return _kProdBackendUrl;
     }
     if (kIsWeb) {
