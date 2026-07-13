@@ -99,20 +99,17 @@ exports.loginUser = asyncHandler(async (req, res) => {
       role: 'student',
       isDeleted: false,
       studentId: { $regex: new RegExp('^' + identifier.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') }
-    }).select('+password').populate('class').populate('faculty').populate('department');
+    }).select('+password').lean();
   }
 
   // 2. Try finding Admin, Staff, Security Guard, or Cleaner using exact case-sensitive username match
   let staffUser = null;
   if (identifier && !studentUser) {
-    // Standard Mongoose query for username exact match is case-sensitive (unless explicitly collated/regexed)
-    // However, to guarantee case sensitivity at database level or in-memory, we can query it directly
-    // and then double-check the exact string match, or query specifically.
     const tempUser = await User.findOne({
       role: { $in: ['admin', 'staff', 'security', 'cleaner', 'superadmin'] },
       isDeleted: false,
       username: identifier
-    }).select('+password').populate('class').populate('faculty').populate('department');
+    }).select('+password').lean();
 
     if (tempUser && tempUser.username === identifier) {
       staffUser = tempUser;
@@ -125,12 +122,22 @@ exports.loginUser = asyncHandler(async (req, res) => {
     return res.status(401).json({ success: false, message: 'Invalid username or password' });
   }
 
+  // 3. Prevent Students, Security Guards, or Cleaners from logging in to the web app
+  // Check if the user trying to log in has an unauthorized role for this application
+  if (user && !['admin', 'staff', 'superadmin'].includes(user.role)) {
+    return res.status(403).json({
+      success: false,
+      message: "You are not an Administrator or Staff member. Please log in using an Administrator or Staff account."
+    });
+  }
+
   if (user.isActive === false) {
     return res.status(403).json({ success: false, message: 'Your account is inactive. Please contact the administrator.' });
   }
 
   // Check if password matches
-  const isMatch = await user.matchPassword(cleanPassword);
+  const bcrypt = require('bcryptjs');
+  const isMatch = await bcrypt.compare(cleanPassword, user.password);
 
   if (!isMatch) {
     return res.status(401).json({ success: false, message: 'Invalid username or password' });

@@ -212,80 +212,67 @@ exports.getVisitors = asyncHandler(async (req, res) => {
 
 // ─────────────────── BLACKLIST ───────────────────
 
-// @desc    Add to blacklist
-// @route   POST /api/security/blacklist
 exports.addToBlacklist = asyncHandler(async (req, res) => {
   const { name, studentId, qrCode, reason, description } = req.body;
+  const resolvedStudentId = studentId ? studentId.trim() : '';
 
-  if (req.user.role === 'security') {
-    if (!studentId && !name) {
-      return res.status(400).json({ success: false, message: 'Student ID or Student Name is required' });
-    }
-    if (!reason) {
-      return res.status(400).json({ success: false, message: 'Reason is required' });
-    }
-
-    let studentName = name ? name.trim() : '';
-    let resolvedStudentId = studentId ? studentId.trim() : '';
-    let qr = qrCode || '';
-
-    if (resolvedStudentId && studentName) {
-      const student = await User.findOne({ studentId: { $regex: new RegExp(`^${resolvedStudentId}$`, 'i') } });
-      if (!student) {
-        return res.status(400).json({ success: false, message: 'This Student ID is invalid' });
-      }
-      const dbName = (student.fullName || student.name || '').toLowerCase().trim();
-      const inputName = studentName.toLowerCase().trim();
-      if (dbName !== inputName && !dbName.includes(inputName) && !inputName.includes(dbName)) {
-        return res.status(400).json({ success: false, message: 'This Student ID and Name do not match' });
-      }
-      studentName = student.fullName || student.name;
-      qr = student.qrCode || '';
-    } else if (resolvedStudentId) {
-      const student = await User.findOne({ studentId: { $regex: new RegExp(`^${resolvedStudentId}$`, 'i') } });
-      if (!student) {
-        return res.status(400).json({ success: false, message: 'This Student ID is invalid' });
-      }
-      studentName = student.fullName || student.name;
-      qr = student.qrCode || '';
-    }
-    // If only a name is provided (no studentId), accept it as-is (person may not be in the system)
-
-    const entry = await Blacklist.create({
-      addedBy: req.user.id,
-      name: studentName,
-      studentId: resolvedStudentId,
-      qrCode: qr,
-      reason,
-      description: description || '',
-      status: 'pending',
-      isActive: false
-    });
-
-    // Notify admins
-    await createNotification({
-      recipientRole: 'admin',
-      title: 'New Blacklist Request',
-      message: `Security guard ${req.user.fullName} requested to blacklist student ${entry.name}.`,
-      type: 'SECURITY_ALERT',
-      module: 'Security'
-    });
-
-    return sendSuccess(res, 'Blacklist request submitted to admin for decision', entry, 201);
-  } else {
-    // Admin, staff, superadmin - direct active blacklist entry
-    const entry = await Blacklist.create({
-      addedBy: req.user.id,
-      name: name || 'Unknown',
-      studentId: studentId || '',
-      qrCode: qrCode || '',
-      reason,
-      description: description || '',
-      status: 'approved',
-      isActive: true
-    });
-    return sendSuccess(res, 'Blacklist entry created successfully', entry, 201);
+  if (!resolvedStudentId) {
+    return res.status(400).json({ success: false, message: 'Invalid Student ID. Please enter a valid registered Student ID.' });
   }
+
+  // Validate Student ID against User database
+  const student = await User.findOne({
+    role: 'student',
+    isDeleted: { $ne: true },
+    studentId: { $regex: new RegExp('^' + resolvedStudentId.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') }
+  });
+
+  if (!student) {
+    return res.status(400).json({ success: false, message: 'Invalid Student ID. Please enter a valid registered Student ID.' });
+  }
+
+  const studentName = student.fullName || student.name || name || 'Unknown';
+  const qr = student.qrCode || qrCode || '';
+
+  const isGuard = req.user.role === 'security';
+
+  const entry = await Blacklist.create({
+    addedBy: req.user.id,
+    name: studentName,
+    studentId: student.studentId,
+    qrCode: qr,
+    reason: reason || 'Violation',
+    description: description || '',
+    status: isGuard ? 'pending' : 'accepted',
+    isActive: !isGuard
+  });
+
+  if (isGuard) {
+    // Notify admins
+    try {
+      const { createNotification } = require('./notificationController');
+      await createNotification({
+        recipientRole: 'admin',
+        title: 'New Blacklist Request',
+        message: `Security guard ${req.user.fullName} requested to blacklist student ${entry.name}.`,
+        type: 'SECURITY_ALERT',
+        module: 'Security'
+      });
+    } catch (_) {}
+  }
+
+  // Socket refresh
+  try {
+    const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+    emitGlobalEvent('dashboard:refresh', {});
+  } catch (_) {}
+
+  return sendSuccess(
+    res,
+    isGuard ? 'Blacklist request submitted to admin for decision' : 'Blacklist entry created successfully',
+    entry,
+    201
+  );
 });
 
 // @desc    Get blacklist
@@ -317,19 +304,15 @@ exports.getBlacklist = asyncHandler(async (req, res) => {
   return sendSuccess(res, 'Blacklist fetched successfully', list);
 });
 
-// @desc    Remove from blacklist
+// @desc    Remove from blacklist (Permanent Delete)
 // @route   DELETE /api/security/blacklist/:id
 exports.removeFromBlacklist = asyncHandler(async (req, res) => {
-  const entry = await Blacklist.findById(req.params.id);
+  const entry = await Blacklist.findByIdAndDelete(req.params.id);
   if (!entry) {
     return res.status(404).json({ success: false, message: 'Blacklist entry not found' });
   }
   
-  entry.isActive = false;
-  entry.status = 'rejected';
-  await entry.save();
-  
-  return sendSuccess(res, 'Removed from blacklist successfully');
+  return sendSuccess(res, 'Blacklist record deleted permanently');
 });
 
 // @desc    Approve blacklist request
@@ -368,6 +351,33 @@ exports.rejectBlacklist = asyncHandler(async (req, res) => {
   await entry.save();
 
   return sendSuccess(res, 'Blacklist request rejected', entry);
+});
+
+// @desc    Update blacklist status (Admin/Staff only)
+// @route   PATCH /api/security/blacklist/:id/status
+exports.updateBlacklistStatus = asyncHandler(async (req, res) => {
+  const { status } = req.body;
+  if (!['pending', 'in review', 'rejected', 'accepted'].includes(status)) {
+    return res.status(400).json({ success: false, message: 'Invalid status value' });
+  }
+
+  const entry = await Blacklist.findById(req.params.id);
+  if (!entry) {
+    return res.status(404).json({ success: false, message: 'Blacklist entry not found' });
+  }
+
+  entry.status = status;
+  // If status is accepted, mark as active; otherwise inactive
+  entry.isActive = (status === 'accepted');
+  await entry.save();
+
+  // Socket refresh
+  try {
+    const { emitGlobalEvent } = require('../socket/events/notificationEvents');
+    emitGlobalEvent('dashboard:refresh', {});
+  } catch (_) {}
+
+  return sendSuccess(res, 'Blacklist status updated successfully', entry);
 });
 
 // ─────────────────── SHIFTS ───────────────────

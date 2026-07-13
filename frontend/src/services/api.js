@@ -490,6 +490,11 @@ export const rejectBlacklist = async (id) => {
   return response.data;
 };
 
+export const updateBlacklistStatus = async (id, status) => {
+  const response = await api.patch(`/security/blacklist/${id}/status`, { status });
+  return response.data;
+};
+
 // Live & Reports
 export const getSecurityLiveStatus = async () => {
   const response = await api.get('/security/live');

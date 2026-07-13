@@ -247,21 +247,54 @@ class _BlacklistScreenState extends State<BlacklistScreen> {
                               ),
                               const SizedBox(width: 12),
                               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text(entry['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                Text(entry['name'] ?? 'Unknown Student', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                                 if ((entry['studentId'] ?? '').isNotEmpty)
-                                  Text('ID: ${entry['studentId']}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                  Text('Student ID: ${entry['studentId']}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                               ])),
+                              // Status Badge
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: entry['status'] == 'accepted' ? Colors.green.shade50 :
+                                         entry['status'] == 'rejected' ? Colors.red.shade50 :
+                                         entry['status'] == 'in review' ? Colors.blue.shade50 :
+                                         Colors.amber.shade50,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: entry['status'] == 'accepted' ? Colors.green.shade200 :
+                                           entry['status'] == 'rejected' ? Colors.red.shade200 :
+                                           entry['status'] == 'in review' ? Colors.blue.shade200 :
+                                           Colors.amber.shade200,
+                                  ),
+                                ),
+                                child: Text(
+                                  entry['status'] == 'in review' ? 'In Review' :
+                                  entry['status'] == 'accepted' ? 'Accepted' :
+                                  entry['status'] == 'rejected' ? 'Rejected' : 'Pending',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: entry['status'] == 'accepted' ? Colors.green.shade800 :
+                                           entry['status'] == 'rejected' ? Colors.red.shade800 :
+                                           entry['status'] == 'in review' ? Colors.blue.shade800 :
+                                           Colors.amber.shade800,
+                                  ),
+                                ),
+                              ),
                             ]),
                             const SizedBox(height: 10),
                             Text('Reason: ${entry['reason'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                             if ((entry['description'] ?? '').isNotEmpty)
-                              Text(entry['description'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(entry['description'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                              ),
                             const SizedBox(height: 8),
                             Row(children: [
                               Icon(Icons.calendar_today, size: 12, color: Colors.grey.shade400),
                               const SizedBox(width: 4),
                               Text(
-                                DateFormat('MM/dd/yyyy').format(DateTime.parse(entry['createdAt'])),
+                                'Submitted: ${DateFormat('MM/dd/yyyy').format(DateTime.parse(entry['createdAt']))}',
                                 style: const TextStyle(fontSize: 12, color: Colors.grey),
                               ),
                               if (!isSecurity) ...[
@@ -270,20 +303,20 @@ class _BlacklistScreenState extends State<BlacklistScreen> {
                                   onPressed: () => showDialog(
                                     context: context,
                                     builder: (_) => AlertDialog(
-                                      title: const Text('Remove from Blacklist?'),
-                                      content: Text('Remove ${entry['name']} from the watch list?'),
+                                      title: const Text('Delete Blacklist Record?'),
+                                      content: Text('Permanently delete the blacklist record for ${entry['name']}?'),
                                       actions: [
                                         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
                                         ElevatedButton(
                                           onPressed: () { Navigator.pop(context); _remove(entry['_id']); },
-                                          child: const Text('Remove'),
+                                          child: const Text('Delete'),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  icon: const Icon(Icons.remove_circle_outline, size: 16),
-                                  label: const Text('Remove', style: TextStyle(fontSize: 12)),
-                                  style: TextButton.styleFrom(foregroundColor: Colors.green),
+                                  icon: const Icon(Icons.delete_outline, size: 16),
+                                  label: const Text('Delete', style: TextStyle(fontSize: 12)),
+                                  style: TextButton.styleFrom(foregroundColor: Colors.red),
                                 ),
                               ]
                             ]),

@@ -29,8 +29,8 @@ const blacklistSchema = new mongoose.Schema({
 
   status: {
     type: String,
-    enum: ['pending', 'approved', 'rejected'],
-    default: 'approved'
+    enum: ['pending', 'in review', 'rejected', 'accepted'],
+    default: 'pending'
   },
   isActive: {
     type: Boolean,

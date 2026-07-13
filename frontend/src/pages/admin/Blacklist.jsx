@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '../../components/layout/AdminLayout';
-import { getBlacklist, addToBlacklist, removeFromBlacklist, approveBlacklist, rejectBlacklist } from '../../services/api';
+import { getBlacklist, addToBlacklist, removeFromBlacklist, approveBlacklist, rejectBlacklist, updateBlacklistStatus } from '../../services/api';
 import SearchBar from '../../components/common/SearchBar';
 import Filter from '../../components/common/Filter';
 import Pagination from '../../components/common/Pagination';
@@ -42,6 +42,10 @@ const Blacklist = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.studentId.trim()) {
+      toast.error('Invalid Student ID. Please enter a valid registered Student ID.');
+      return;
+    }
     try {
       await addToBlacklist(formData);
       toast.success('Subject added to blacklist');
@@ -50,6 +54,16 @@ const Blacklist = () => {
       setFormData({ name: '', studentId: '', reason: '', description: '' });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error adding to blacklist');
+    }
+  };
+
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      await updateBlacklistStatus(id, newStatus);
+      toast.success('Status updated successfully');
+      fetchBlacklist();
+    } catch (err) {
+      toast.error('Failed to update status');
     }
   };
 
@@ -74,23 +88,14 @@ const Blacklist = () => {
   };
 
   const handleRemove = async (id) => {
-    if (window.confirm('Are you sure you want to remove this person from the blacklist?')) {
+    if (window.confirm('Are you sure you want to delete this blacklist record?')) {
       try {
         await removeFromBlacklist(id);
-        toast.success('Subject cleared from blacklist');
+        toast.success('Blacklist record deleted permanently');
         fetchBlacklist();
       } catch (err) {
         toast.error('Error removing subject');
       }
-    }
-  };
-
-  const getSeverityBadge = (severity) => {
-    switch (severity) {
-      case 'banned': return 'bg-red-100 text-red-700 border-red-200';
-      case 'suspicious': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-      case 'watch': return 'bg-blue-100 text-blue-700 border-blue-200';
-      default: return 'bg-gray-100 text-gray-700 border-gray-200';
     }
   };
 
@@ -175,43 +180,30 @@ const Blacklist = () => {
                       </div>
                     </td>
                     <td className="px-6 py-5">
-                      <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                        item.status === 'approved' ? 'bg-green-50 text-green-700 border-green-200' :
-                        item.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
-                        'bg-yellow-50 text-yellow-750 border-yellow-200'
-                      }`}>
-                        {item.status || 'approved'}
-                      </span>
+                      <select
+                        value={item.status || 'pending'}
+                        onChange={(e) => handleStatusChange(item._id, e.target.value)}
+                        className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border outline-none bg-white cursor-pointer ${
+                          item.status === 'accepted' ? 'bg-green-50 text-green-700 border-green-200' :
+                          item.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                          item.status === 'in review' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                          'bg-yellow-50 text-yellow-750 border-yellow-200'
+                        }`}
+                      >
+                        <option value="pending" className="text-yellow-750 font-black">Pending</option>
+                        <option value="in review" className="text-blue-700 font-black">In Review</option>
+                        <option value="rejected" className="text-red-700 font-black">Rejected</option>
+                        <option value="accepted" className="text-green-700 font-black">Accepted</option>
+                      </select>
                     </td>
                     <td className="px-6 py-5 text-right">
-                      {item.status === 'pending' ? (
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleApprove(item._id)}
-                            className="text-emerald-600 hover:text-emerald-700 p-2 hover:bg-emerald-50 rounded-lg transition-all"
-                            title="Approve Request"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M5 13l4 4L19 7" /></svg>
-                          </button>
-                          <button
-                            onClick={() => handleReject(item._id)}
-                            className="text-rose-600 hover:text-rose-700 p-2 hover:bg-rose-50 rounded-lg transition-all"
-                            title="Reject Request"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M6 18L18 6M6 6l12 12" /></svg>
-                          </button>
-                        </div>
-                      ) : item.status === 'approved' || item.isActive ? (
-                        <button
-                          onClick={() => handleRemove(item._id)}
-                          className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-all"
-                          title="Remove from Blacklist"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
-                      ) : (
-                        <span className="text-xs text-gray-400 italic">No Action</span>
-                      )}
+                      <button
+                        onClick={() => handleRemove(item._id)}
+                        className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-all"
+                        title="Delete blacklist record"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
                     </td>
                   </tr>
                 ))}

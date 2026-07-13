@@ -46,7 +46,11 @@ router.post('/blacklist', [
   validate
 ], addToBlacklist);
 router.get('/blacklist', getBlacklist);
-router.delete('/blacklist/:id', allowRoles('admin', 'staff'), removeFromBlacklist);
+router.delete('/blacklist/:id', allowRoles('admin'), removeFromBlacklist);
+router.patch('/blacklist/:id/status', allowRoles('admin', 'staff'), exports.updateBlacklistStatus || ((req, res, next) => {
+  const { updateBlacklistStatus } = require('../controllers/securityController');
+  updateBlacklistStatus(req, res, next);
+}));
 router.patch('/blacklist/:id/approve', allowRoles('admin', 'staff'), approveBlacklist);
 router.patch('/blacklist/:id/reject', allowRoles('admin', 'staff'), rejectBlacklist);
 
