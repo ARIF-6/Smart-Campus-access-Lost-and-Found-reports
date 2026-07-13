@@ -28,7 +28,7 @@ android {
         // minSdk 21 = Android 5.0 — required by mobile_scanner, permission_handler,
         //             socket_io_client, and other plugins. Do NOT lower this.
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
