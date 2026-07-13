@@ -253,12 +253,13 @@ exports.editHall = async (req, res) => {
 exports.getClassStudents = async (req, res) => {
   try {
     const { classId } = req.params;
+    const mongoose = require('mongoose');
     const ClassModel = require('../models/Class');
     const User = require('../models/User');
     const Hall = require('../models/Hall');
 
     const classDetail = await ClassModel.findById(classId)
-      .populate('classLeader', 'fullName email studentId')
+      .populate('classLeader', 'fullName email studentId isClassLeader isActive photoUrl')
       .populate({
         path: 'departmentId',
         select: 'name facultyId',
@@ -274,11 +275,21 @@ exports.getClassStudents = async (req, res) => {
       .populate('campus', 'name')
       .lean();
 
-    // Find all students belonging to this class (matched via the ObjectId ref on User.class)
+    // Build query: students whose `class` field matches classId.
+    // Also include the class leader by their _id in case their `class` field
+    // is out of sync (e.g. was set before the class was created or has a type mismatch).
+    const classObjectId = new mongoose.Types.ObjectId(classId);
+    const leaderUserId = classDetail.classLeader?._id || classDetail.classLeader || null;
+
+    const orConditions = [{ class: classObjectId }];
+    if (leaderUserId) {
+      orConditions.push({ _id: leaderUserId });
+    }
+
     const students = await User.find({
       role: 'student',
       isDeleted: { $ne: true },
-      class: classId
+      $or: orConditions
     })
       .select('fullName email studentId phone isClassLeader isActive photoUrl class')
       .populate('class', 'name academicYear')
@@ -345,10 +356,16 @@ exports.assignClassLeader = async (req, res) => {
       { $set: { isClassLeader: false } }
     );
 
-    // Set new class leader
+    // Set new class leader — always ensure class field is set to this classId
     newLeader.isClassLeader = true;
-    newLeader.class = classId;
+    newLeader.class = classId;  // ensure the class reference is correct
     await newLeader.save();
+
+    // Also fix any out-of-sync: ensure the leader's class field is persisted with $set directly
+    await User.updateOne(
+      { _id: studentId },
+      { $set: { class: classId, isClassLeader: true } }
+    );
 
     // Assign class leader in Class document
     classDetail.classLeader = studentId;
