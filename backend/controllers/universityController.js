@@ -389,9 +389,30 @@ exports.assignClassLeader = async (req, res) => {
   }
 };
 
+const crypto = require('crypto');
+
+const ensureValidCampusQR = async (campus) => {
+  const now = new Date();
+  if (!campus.qrCode || !campus.qrExpiresAt || now >= campus.qrExpiresAt) {
+    campus.qrCode = `CAMPUS-${campus._id}-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
+    campus.qrGeneratedAt = now;
+    // Set to expire at midnight of the next day (roughly 24 hours)
+    const tomorrowMidnight = new Date();
+    tomorrowMidnight.setDate(tomorrowMidnight.getDate() + 1);
+    tomorrowMidnight.setHours(0, 0, 0, 0);
+    campus.qrExpiresAt = tomorrowMidnight;
+    await campus.save();
+  }
+  return campus;
+};
+
 exports.getCampuses = async (req, res) => {
   try {
     const campuses = await Campus.find();
+    // Dynamically ensure every campus has a valid active QR code
+    for (let i = 0; i < campuses.length; i++) {
+      campuses[i] = await ensureValidCampusQR(campuses[i]);
+    }
     return res.status(200).json({ success: true, data: campuses });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
@@ -409,7 +430,8 @@ exports.createCampus = async (req, res) => {
     if (existing) {
       return res.status(400).json({ success: false, message: 'Campus name already exists' });
     }
-    const newCampus = await Campus.create({ name });
+    let newCampus = await Campus.create({ name });
+    newCampus = await ensureValidCampusQR(newCampus);
     
     try {
       const { emitGlobalEvent } = require('../socket/events/notificationEvents');
@@ -427,8 +449,9 @@ exports.updateCampus = async (req, res) => {
     const { id } = req.params;
     const { name } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Campus Name is required' });
-    const campus = await Campus.findByIdAndUpdate(id, { name }, { new: true, runValidators: true });
+    let campus = await Campus.findByIdAndUpdate(id, { name }, { new: true, runValidators: true });
     if (!campus) return res.status(404).json({ success: false, message: 'Campus not found' });
+    campus = await ensureValidCampusQR(campus);
     
     try {
       const { emitGlobalEvent } = require('../socket/events/notificationEvents');
@@ -603,6 +626,145 @@ exports.deleteHall = async (req, res) => {
     return res.status(200).json({ success: true, message: 'Hall deleted successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
+  }
+};
+
+/**
+ * GET /api/university/campuses/:id/qr
+ * Returns the campus QR code details as JSON (for admin dashboard display).
+ */
+exports.getCampusQR = async (req, res) => {
+  try {
+    const { id } = req.params;
+    let campus = await Campus.findById(id);
+    if (!campus) return res.status(404).json({ success: false, message: 'Campus not found' });
+
+    // Ensure QR is fresh
+    campus = await ensureValidCampusQR(campus);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        _id: campus._id,
+        name: campus.name,
+        qrCode: campus.qrCode,
+        qrGeneratedAt: campus.qrGeneratedAt,
+        qrExpiresAt: campus.qrExpiresAt,
+        isExpired: new Date() >= new Date(campus.qrExpiresAt),
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server Error', error: err.message });
+  }
+};
+
+/**
+ * GET /api/university/campuses/:id/qr/pdf
+ * Generates and streams a printable PDF for the campus QR code using pdfkit + qrcode.
+ */
+exports.getCampusQRPDF = async (req, res) => {
+  try {
+    const QRCode = require('qrcode');
+    const PDFDocument = require('pdfkit');
+    const { id } = req.params;
+
+    let campus = await Campus.findById(id);
+    if (!campus) return res.status(404).json({ success: false, message: 'Campus not found' });
+
+    campus = await ensureValidCampusQR(campus);
+
+    // Generate QR code as a PNG buffer
+    const qrImageBuffer = await QRCode.toBuffer(campus.qrCode, {
+      errorCorrectionLevel: 'H',
+      margin: 2,
+      width: 400,
+      color: { dark: '#1B3A6B', light: '#FFFFFF' },
+    });
+
+    // Build PDF
+    const doc = new PDFDocument({ size: 'A4', margin: 60 });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="campus-qr-${campus.name.replace(/\s+/g, '-')}.pdf"`
+    );
+    doc.pipe(res);
+
+    // ── Header bar ─────────────────────────────────────────────────────
+    doc.rect(0, 0, doc.page.width, 100).fill('#1B3A6B');
+
+    doc.fillColor('#FFFFFF')
+       .fontSize(22)
+       .font('Helvetica-Bold')
+       .text('Smart Campus Access', 60, 28, { align: 'center' })
+       .fontSize(13)
+       .font('Helvetica')
+       .text('Official Campus QR Code', 60, 56, { align: 'center' });
+
+    // ── Campus name ────────────────────────────────────────────────────
+    doc.fillColor('#1B3A6B')
+       .fontSize(28)
+       .font('Helvetica-Bold')
+       .text(campus.name, 60, 130, { align: 'center' });
+
+    // ── QR image ────────────────────────────────────────────────────────
+    const qrSize = 260;
+    const qrX = (doc.page.width - qrSize) / 2;
+    doc.image(qrImageBuffer, qrX, 185, { width: qrSize, height: qrSize });
+
+    // ── Border around QR ────────────────────────────────────────────────
+    doc.rect(qrX - 12, 185 - 12, qrSize + 24, qrSize + 24)
+       .stroke('#1B3A6B');
+
+    // ── Details section ────────────────────────────────────────────────
+    const detailsY = 185 + qrSize + 40;
+    const formattedGen = campus.qrGeneratedAt
+      ? new Date(campus.qrGeneratedAt).toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
+      : 'N/A';
+    const formattedExp = campus.qrExpiresAt
+      ? new Date(campus.qrExpiresAt).toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
+      : 'N/A';
+
+    doc.fillColor('#374151').fontSize(11).font('Helvetica-Bold')
+       .text('QR Code Token:', 60, detailsY);
+    doc.fillColor('#6B7280').font('Courier').fontSize(9)
+       .text(campus.qrCode, 60, detailsY + 16, { width: doc.page.width - 120 });
+
+    doc.fillColor('#374151').fontSize(11).font('Helvetica-Bold')
+       .text('Generated:', 60, detailsY + 42);
+    doc.fillColor('#6B7280').font('Helvetica').fontSize(10)
+       .text(formattedGen, 155, detailsY + 42);
+
+    doc.fillColor('#374151').fontSize(11).font('Helvetica-Bold')
+       .text('Expires:', 60, detailsY + 62);
+    doc.fillColor('#EF4444').font('Helvetica-Bold').fontSize(10)
+       .text(formattedExp, 155, detailsY + 62);
+
+    // ── Instruction ────────────────────────────────────────────────────
+    doc.roundedRect(60, detailsY + 94, doc.page.width - 120, 52, 8)
+       .fill('#F0F9FF');
+    doc.fillColor('#1B3A6B').fontSize(10).font('Helvetica-Bold')
+       .text('📲 Scan Instructions', 72, detailsY + 104);
+    doc.fillColor('#374151').fontSize(9).font('Helvetica')
+       .text(
+         'Students must open the Smart Campus mobile app, tap "Scan", point the camera at this QR code, then enter their Student ID to record campus entry or exit.',
+         72, detailsY + 118, { width: doc.page.width - 144 }
+       );
+
+    // ── Footer ─────────────────────────────────────────────────────────
+    doc.rect(0, doc.page.height - 48, doc.page.width, 48).fill('#F3F4F6');
+    doc.fillColor('#9CA3AF').fontSize(8).font('Helvetica')
+       .text(
+         `This QR code is valid for the current day only and rotates automatically at midnight. | Generated: ${new Date().toISOString()}`,
+         60, doc.page.height - 32, { align: 'center' }
+       );
+
+    doc.end();
+  } catch (err) {
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: 'Failed to generate PDF', error: err.message });
+    }
   }
 };
 

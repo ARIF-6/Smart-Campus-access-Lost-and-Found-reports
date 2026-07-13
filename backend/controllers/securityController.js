@@ -217,7 +217,7 @@ exports.addToBlacklist = asyncHandler(async (req, res) => {
   const resolvedStudentId = studentId ? studentId.trim() : '';
 
   if (!resolvedStudentId) {
-    return res.status(400).json({ success: false, message: 'Invalid Student ID. Please enter a valid registered Student ID.' });
+    return res.status(400).json({ success: false, message: 'This id is not exist' });
   }
 
   // Validate Student ID against User database
@@ -228,7 +228,7 @@ exports.addToBlacklist = asyncHandler(async (req, res) => {
   });
 
   if (!student) {
-    return res.status(400).json({ success: false, message: 'Invalid Student ID. Please enter a valid registered Student ID.' });
+    return res.status(400).json({ success: false, message: 'This id is not exist' });
   }
 
   const studentName = student.fullName || student.name || name || 'Unknown';

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
-import 'package:dio/dio.dart';
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
 import '../../models/found_item.dart';

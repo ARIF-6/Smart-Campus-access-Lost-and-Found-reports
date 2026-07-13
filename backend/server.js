@@ -50,6 +50,7 @@ const roleRoutes = require("./routes/roleRoutes");
 const campusEnvironmentRoutes = require("./modules/campusEnvironment/routes/campusEnvironmentRoutes");
 const classIssueRoutes = require("./modules/classIssues/routes/classIssueRoutes");
 const hostRoutes = require("./routes/hostRoutes");
+const campusAttendanceRoutes = require("./routes/campusAttendanceRoutes");
 const app = express();
 
 // Connect to database
@@ -82,7 +83,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-client-platform'],
 }));
 
 
@@ -166,6 +167,12 @@ app.use("/api/roles", roleRoutes);
 app.use("/api/campus-environment", campusEnvironmentRoutes);
 app.use("/api/class-issues", classIssueRoutes);
 app.use("/api/hosts", hostRoutes);
+app.use("/api/campus-attendance", campusAttendanceRoutes);
+
+// Lightweight ping endpoint — used for cold-start warmup. No auth, no DB.
+app.get("/api/ping", (req, res) => {
+  res.json({ ok: true, ts: Date.now() });
+});
 
 app.get("/", (req, res) => {
   res.send("API is running...");

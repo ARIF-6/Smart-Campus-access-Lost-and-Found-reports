@@ -119,20 +119,14 @@ class _BlacklistScreenState extends State<BlacklistScreen> {
 
                     if (inputVal.isEmpty || reasonVal.isEmpty) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
-                        const SnackBar(content: Text('Please enter name/ID and reason'), backgroundColor: Colors.orange));
+                        const SnackBar(content: Text('Please enter Student ID and reason'), backgroundColor: Colors.orange));
                       return;
                     }
-
-                    // Check if input is Student ID (e.g. C113028 or starts with digit)
-                    final isStudentId = RegExp(r'^[Cc]\d+$').hasMatch(inputVal) || RegExp(r'^\d+$').hasMatch(inputVal);
-                    final nameVal = isStudentId ? '' : inputVal;
-                    final idVal = isStudentId ? inputVal : '';
 
                     setModal(() => isSubmitting = true);
                     try {
                       await _api.post('/security/blacklist', data: {
-                        'name': nameVal,
-                        'studentId': idVal,
+                        'studentId': inputVal, // always treat input as Student ID
                         'reason': reasonVal,
                       });
                       

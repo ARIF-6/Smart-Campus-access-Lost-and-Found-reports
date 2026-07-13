@@ -23,8 +23,11 @@ import {
   getCampuses,
   createCampus,
   updateCampus,
-  deleteCampus
+  deleteCampus,
+  getCampusQR,
+  downloadCampusQRPDF,
 } from '../../services/api';
+import { QRCodeSVG } from 'qrcode.react';
 
 const UniversityManagement = () => {
   const [activeTab, setActiveTab] = useState('campuses'); // campuses, faculties, departments, halls, classes
@@ -66,6 +69,12 @@ const UniversityManagement = () => {
   const [isEditLoading, setIsEditLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, name, type }
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
+
+  // Campus QR modal state
+  const [selectedCampusQR, setSelectedCampusQR] = useState(null); // { _id, name, qrCode, qrGeneratedAt, qrExpiresAt, isExpired }
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [isQRLoading, setIsQRLoading] = useState(false);
+  const [isPDFLoading, setIsPDFLoading] = useState(false);
 
   const { refreshKey } = useAutoRefreshSignal();
 
@@ -518,6 +527,7 @@ const UniversityManagement = () => {
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">#</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Campus Name</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">QR Status</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Date Registered</th>
                     <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
@@ -566,12 +576,43 @@ const UniversityManagement = () => {
               <tbody className="bg-white divide-y divide-gray-100 text-sm font-semibold text-gray-700">
                 {/* ... */}
                 {activeTab === 'campuses' && filteredItems.map((c, index) => (
-                  <tr key={c._id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr key={c._id} className="hover:bg-indigo-50/30 transition-colors cursor-pointer">
                     <td className="px-6 py-4 text-gray-500 font-bold w-16">{index + 1}</td>
                     <td className="px-6 py-4 text-gray-900 font-bold">{c.name}</td>
+                    <td className="px-6 py-4">
+                      {c.qrExpiresAt ? (
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                          new Date() < new Date(c.qrExpiresAt)
+                            ? 'bg-green-50 text-green-700 border-green-200'
+                            : 'bg-red-50 text-red-600 border-red-200'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${new Date() < new Date(c.qrExpiresAt) ? 'bg-green-500' : 'bg-red-500'}`} />
+                          {new Date() < new Date(c.qrExpiresAt) ? 'QR Active' : 'QR Expired'}
+                        </span>
+                      ) : <span className="text-gray-300 italic text-xs">No QR</span>}
+                    </td>
                     <td className="px-6 py-4 text-xs text-gray-400">{new Date(c.createdAt || Date.now()).toLocaleDateString()}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={async () => {
+                            setIsQRLoading(true);
+                            setIsQRModalOpen(true);
+                            try {
+                              const qrData = await getCampusQR(c._id);
+                              setSelectedCampusQR(qrData);
+                            } catch {
+                              toast.error('Failed to load campus QR code');
+                              setIsQRModalOpen(false);
+                            } finally {
+                              setIsQRLoading(false);
+                            }
+                          }}
+                          className="p-1.5 bg-violet-50/60 border border-violet-100 hover:border-violet-300 text-violet-600 hover:text-violet-800 rounded-lg transition-all"
+                          title="View QR Code"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" /></svg>
+                        </button>
                         <button onClick={() => openEdit(c, 'campuses')} className="p-1.5 bg-indigo-50/50 border border-indigo-100/50 hover:border-indigo-205 text-indigo-600 hover:text-indigo-800 rounded-lg transition-all" title="Edit"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
                         <button onClick={() => openDelete(c, 'campuses')} className="p-1.5 bg-red-50/50 border border-red-100/50 hover:border-red-200 text-red-500 hover:text-red-700 rounded-lg transition-all" title="Delete"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                       </div>
@@ -1185,6 +1226,110 @@ const UniversityManagement = () => {
                     })()}
                   </div>
                 </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CAMPUS QR CODE MODAL ────────────────────────────────────────── */}
+      {isQRModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 py-8">
+            <div className="fixed inset-0 bg-gray-600 opacity-60" onClick={() => setIsQRModalOpen(false)} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10 animate-scaleUp">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <span className="text-[10px] uppercase font-black tracking-widest text-indigo-500">Campus Access Code</span>
+                  <h3 className="text-xl font-black text-gray-900 mt-1">
+                    {selectedCampusQR ? selectedCampusQR.name : 'Loading...'}
+                  </h3>
+                </div>
+                <button onClick={() => setIsQRModalOpen(false)} className="text-gray-400 hover:text-gray-700 p-2 rounded-full hover:bg-gray-50 transition-all">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+
+              {isQRLoading || !selectedCampusQR ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <div className="w-9 h-9 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin" />
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Generating Secure QR...</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center">
+                  {/* Status Badge */}
+                  <div className="mb-4">
+                    {new Date() < new Date(selectedCampusQR.qrExpiresAt) ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-200 shadow-sm">
+                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                        Active & Valid
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200 shadow-sm">
+                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                        Expired / Needs Refresh
+                      </span>
+                    )}
+                  </div>
+
+                  {/* QR Image Display */}
+                  <div className="p-4 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 mb-6 flex justify-center items-center shadow-inner">
+                    <QRCodeSVG
+                      value={selectedCampusQR.qrCode}
+                      size={200}
+                      level="H"
+                      includeMargin={true}
+                      className="rounded-lg bg-white p-2"
+                    />
+                  </div>
+
+                  {/* QR Details */}
+                  <div className="w-full space-y-3 mb-6 bg-gray-50/50 p-4 rounded-xl border border-gray-200">
+                    <div className="flex justify-between text-xs font-medium">
+                      <span className="text-gray-400">QR Code Token:</span>
+                      <span className="font-mono text-gray-800 break-all select-all font-bold">{selectedCampusQR.qrCode}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-medium">
+                      <span className="text-gray-400">Generated At:</span>
+                      <span className="text-gray-700 font-bold">{new Date(selectedCampusQR.qrGeneratedAt).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-medium">
+                      <span className="text-gray-400">Expires At:</span>
+                      <span className="text-gray-700 font-bold">{new Date(selectedCampusQR.qrExpiresAt).toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  {/* Action Button */}
+                  <button
+                    onClick={async () => {
+                      setIsPDFLoading(true);
+                      try {
+                        await downloadCampusQRPDF(selectedCampusQR._id, selectedCampusQR.name);
+                        toast.success('Printable PDF downloaded successfully');
+                      } catch {
+                        toast.error('Failed to download PDF');
+                      } finally {
+                        setIsPDFLoading(false);
+                      }
+                    }}
+                    disabled={isPDFLoading}
+                    className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-indigo-200 active:scale-[0.98] flex items-center justify-center gap-2"
+                  >
+                    {isPDFLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                        Generating Document...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Download Printable PDF
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
             </div>
           </div>

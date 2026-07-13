@@ -18,6 +18,7 @@ import 'class_issues_home_screen.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'dart:ui';
+import 'campus_attendance_flow_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────
 //  Color tokens (banking-app palette)
@@ -62,6 +63,7 @@ class _StudentHomeTabState extends State<StudentHomeTab>
   ];
 
   final List<_Feature> _features = const [
+    _Feature(Icons.qr_code_scanner_rounded, 'Scan', 'scan'),
     _Feature(Icons.search_off_rounded, 'Lost Items', 'lost'),
     _Feature(Icons.check_circle_outline_rounded, 'Found Items', 'found'),
     _Feature(Icons.eco_outlined, 'Campus', 'campus'),
@@ -142,6 +144,9 @@ class _StudentHomeTabState extends State<StudentHomeTab>
     _searchController.clear();
     _searchFocusNode.unfocus();
     switch (key) {
+      case 'scan':
+        _nav(const CampusAttendanceFlowScreen());
+        break;
       case 'lost':
         _nav(const LostItemsScreen());
         break;
@@ -700,6 +705,8 @@ class _StudentHomeTabState extends State<StudentHomeTab>
   // ── Quick Actions (banking 4-button grid) ─────────────────────────
   Widget _buildQuickActions() {
     final actions = [
+      _Action(Icons.qr_code_scanner_rounded, 'Scan', const Color(0xFF8B5CF6),
+          () => _nav(const CampusAttendanceFlowScreen())),
       _Action(Icons.search_off_rounded, 'Lost Items', const Color(0xFFEF4444),
           () => _nav(const LostItemsScreen())),
       _Action(Icons.check_circle_outline_rounded, 'Found Items',

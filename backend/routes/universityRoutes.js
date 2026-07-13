@@ -23,6 +23,8 @@ const {
   deleteCampus,
   getClassStudents,
   assignClassLeader,
+  getCampusQR,
+  getCampusQRPDF,
 } = require('../controllers/universityController');
 const { protect } = require('../middleware/authMiddleware');
 const { adminOrStaff } = require('../middleware/roleMiddleware');
@@ -38,6 +40,10 @@ router.get('/campuses', getCampuses);
 router.post('/campuses', protect, adminOrStaff, createCampus);
 router.put('/campuses/:id', protect, adminOrStaff, updateCampus);
 router.delete('/campuses/:id', protect, adminOrStaff, deleteCampus);
+
+// Campus QR endpoints
+router.get('/campuses/:id/qr', protect, adminOrStaff, getCampusQR);
+router.get('/campuses/:id/qr/pdf', protect, adminOrStaff, getCampusQRPDF);
 
 // Faculty CRUD
 router.post('/faculties', protect, adminOrStaff, createFaculty);

@@ -20,11 +20,18 @@ class ErrorHandler {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
+        // The server is reachable but not responding — likely a Render cold start
+        return 'The server is taking too long to respond. Please wait a moment and try again.';
       case DioExceptionType.receiveTimeout:
+        // Server accepted the request but is slow to send back data
+        return 'Server is responding slowly. Please try again in a moment.';
       case DioExceptionType.connectionError:
-      case DioExceptionType.cancel:
+        // Device cannot reach the server at all — likely no internet
+        return 'Cannot reach the server. Please check your internet connection and try again.';
       case DioExceptionType.badCertificate:
-        return 'Check your connection. Try again.';
+        return 'A security error occurred. Please contact support.';
+      case DioExceptionType.cancel:
+        return 'Request was cancelled. Please try again.';
       case DioExceptionType.badResponse:
         return _fromResponse(e.response);
       case DioExceptionType.unknown:
@@ -36,32 +43,46 @@ class ErrorHandler {
   // ── HTTP response branch ────────────────────────────────────────────────────
   static String _fromResponse(Response? response) {
     if (response == null) {
-      return 'Check your connection. Try again.';
+      return 'Cannot reach the server. Please check your internet connection and try again.';
     }
 
     final status = response.statusCode ?? 0;
     final data   = response.data;
 
-    // Check for our specific business rule message: "The supports does not reach the target"
+    // Pass through known business-rule messages from the backend
     if (data is Map) {
       final rawMsg = (data['message'] ?? data['error'] ?? '').toString();
+      // Specific messages we want to surface to the user verbatim
       if (rawMsg == 'The supports does not reach the target') {
         return 'The supports does not reach the target';
       }
+      if (rawMsg.contains('Invalid Student ID')) {
+        return rawMsg;
+      }
     }
 
-    // Strict mapping of status codes to completely hide technical/database messages
+    // Strict mapping of status codes to safe user-facing messages
     if (status == 400) {
-      return 'Invalid request. Please try again.';
+      // Surface the backend message directly — it contains useful validation info
+      if (data is Map) {
+        final rawMsg = (data['message'] ?? '').toString();
+        if (rawMsg.isNotEmpty) return rawMsg;
+      }
+      return 'Invalid request. Please check your details and try again.';
     }
     if (status == 401) {
       return 'Incorrect username or password. Please try again.';
     }
     if (status == 403) {
+      // Surface the backend message for 403 — it may be a business-rule message
+      if (data is Map) {
+        final rawMsg = (data['message'] ?? '').toString();
+        if (rawMsg.isNotEmpty) return rawMsg;
+      }
       return 'Access denied. You do not have permission for this action.';
     }
     if (status == 404) {
-      return 'The requested page or item could not be found. Please try again.';
+      return 'The requested item could not be found. Please try again.';
     }
     if (status == 409) {
       return 'This request has already been processed or is active.';
@@ -70,21 +91,22 @@ class ErrorHandler {
       return 'Validation failed. Please verify your details and try again.';
     }
     if (status >= 500) {
-      return 'Check your connection. Try again.';
+      return 'The server encountered an error. Please try again in a moment.';
     }
-    return 'Check your connection. Try again.';
+    return 'Something went wrong. Please try again.';
   }
 
   // ── String-based fallback ───────────────────────────────────────────────────
   static String _fromString(String s) {
-    if (s.contains('connection') ||
-        s.contains('socketexception') ||
+    if (s.contains('socketexception') ||
         s.contains('network') ||
         s.contains('unreachable') ||
-        s.contains('timeout') ||
         s.contains('errno = 104') ||
         s.contains('broken pipe')) {
-      return 'Check your connection. Try again.';
+      return 'Cannot reach the server. Please check your internet connection and try again.';
+    }
+    if (s.contains('timeout') || s.contains('connection')) {
+      return 'The server is taking too long to respond. Please wait a moment and try again.';
     }
     return 'Something went wrong. Please try again.';
   }

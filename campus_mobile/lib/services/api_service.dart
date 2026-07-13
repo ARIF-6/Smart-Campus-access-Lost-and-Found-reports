@@ -4,15 +4,35 @@ import 'package:dio/io.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants.dart';
 
+/// Singleton-style API service with in-memory token caching.
+/// The token is loaded from SharedPreferences once and then stored in memory,
+/// eliminating repeated async disk reads on every HTTP request.
 class ApiService {
   late Dio _dio;
+
+  // ── In-memory token cache ─────────────────────────────────────────────────
+  static String? _cachedToken;
+
+  /// Call this immediately after login so subsequent requests use the token
+  /// without waiting for SharedPreferences.
+  static void setToken(String token) {
+    _cachedToken = token;
+  }
+
+  /// Call this on logout to invalidate the in-memory cache.
+  static void clearToken() {
+    _cachedToken = null;
+  }
 
   ApiService() {
     _dio = Dio(BaseOptions(
       baseUrl: AppConstants.baseUrl,
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 60),
-      sendTimeout: const Duration(seconds: 30),
+      connectTimeout: const Duration(seconds: 20),  // reduced from 30s
+      receiveTimeout: const Duration(seconds: 45),  // reduced from 60s
+      sendTimeout: const Duration(seconds: 20),     // reduced from 30s
+      headers: {
+        'Accept-Encoding': 'gzip, deflate', // enable compression
+      },
     ));
 
     // Trust Let's Encrypt / Custom SSL on older Android devices for our Render host
@@ -34,8 +54,18 @@ class ApiService {
 
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final prefs = await SharedPreferences.getInstance();
-        final token = prefs.getString(AppConstants.tokenKey);
+        options.headers['x-client-platform'] = 'mobile';
+
+        // Use in-memory cached token first; fall back to SharedPreferences only
+        // on the first request or after a restart (cache miss).
+        String? token = _cachedToken;
+        if (token == null) {
+          final prefs = await SharedPreferences.getInstance();
+          token = prefs.getString(AppConstants.tokenKey);
+          if (token != null) {
+            _cachedToken = token; // populate cache for subsequent requests
+          }
+        }
         if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
         }
@@ -88,8 +118,8 @@ class _RetryInterceptor extends Interceptor {
 
   _RetryInterceptor({
     required this.dio,
-    this.maxRetries = 3,
-    this.retryInterval = const Duration(seconds: 2),
+    this.maxRetries = 2,           // reduced from 3
+    this.retryInterval = const Duration(milliseconds: 1500), // reduced from 2s
   });
 
   @override
@@ -110,7 +140,7 @@ class _RetryInterceptor extends Interceptor {
       retryCount++;
       requestOptions.extra['retryCount'] = retryCount;
 
-      // Delay before retrying (exponential backoff)
+      // Exponential backoff: 1.5s, 3s
       final delay = retryInterval * retryCount;
       await Future.delayed(delay);
 

@@ -16,16 +16,21 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _scaleAnim;
   late Animation<double> _slideAnim;
 
+  Future<void> _warmupBackend() async {
+    try {
+      await ApiService().get('/ping');
+    } catch (_) {
+      // Ignore warmup errors silently
+    }
+  }
+
   @override
   void initState() {
     super.initState();
 
     // Trigger non-blocking backend warmup (cold start mitigation)
-    try {
-      ApiService().get('/dashboard/system-status').catchError((_) async {
-        // Ignore warmup errors silently
-      });
-    } catch (_) {}
+    // /api/ping is a zero-auth, zero-DB endpoint that wakes the Render instance.
+    _warmupBackend();
 
     _controller = AnimationController(
       vsync: this,
@@ -44,7 +49,8 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    Future.delayed(const Duration(seconds: 3), () {
+    // Reduced from 3s to 1.5s — halves the visible wait time on every app open
+    Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) Navigator.of(context).pushReplacementNamed('/login');
     });
   }
@@ -103,9 +109,10 @@ class _SplashScreenState extends State<SplashScreen>
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // Logo card
                             Container(
-                              padding: const EdgeInsets.all(28),
+                              width: 120,
+                              height: 120,
+                              padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(32),
@@ -117,10 +124,9 @@ class _SplashScreenState extends State<SplashScreen>
                                   ),
                                 ],
                               ),
-                              child: const Icon(
-                                Icons.school_rounded,
-                                size: 72,
-                                color: AppConstants.primaryNavy,
+                              child: Image.asset(
+                                'assets/images/webandapplogo.png',
+                                fit: BoxFit.contain,
                               ),
                             ),
                             const SizedBox(height: 36),

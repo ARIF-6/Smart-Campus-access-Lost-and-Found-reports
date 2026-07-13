@@ -110,7 +110,7 @@ Future<void> submitComplaint({
     }
 
     await _apiService.post('/campus-environment', data: formData);
-  } on DioException catch (dioError) {
+  } on DioException catch (_) {
     // Rethrow as-is so ErrorHandler.getFriendlyMessage can read the status code
     rethrow;
   } catch (e) {

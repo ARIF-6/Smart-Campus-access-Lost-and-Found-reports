@@ -275,9 +275,11 @@ const AdminSidebar = ({ isOpen = false, onClose = () => {} }) => {
           {/* Logo */}
           {!isCollapsed && (
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-sm text-white flex-shrink-0">
-                SC
-              </div>
+              <img
+                src="/logo.png"
+                alt="Smart Campus Logo"
+                className="w-8 h-8 rounded-lg object-contain flex-shrink-0"
+              />
               <span className="text-[15px] font-bold text-gray-800 tracking-tight truncate">Smart Campus</span>
             </div>
           )}

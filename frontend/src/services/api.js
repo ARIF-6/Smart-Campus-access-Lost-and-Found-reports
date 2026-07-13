@@ -2,6 +2,7 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`,
+  timeout: 30000, // 30-second timeout — prevents requests hanging on slow connections
   headers: {
     'Content-Type': 'application/json',
   },
@@ -30,6 +31,13 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    // Handle request timeout
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      return Promise.reject({
+        ...error,
+        userMessage: 'The server is taking too long to respond. Please try again.',
+      });
+    }
     // Global 401 handler: token missing, expired, or invalid → force re-login
     if (error.response && error.response.status === 401) {
       const message = error.response?.data?.message || '';
@@ -728,6 +736,45 @@ export const deleteCampus = async (id) => {
   return response.data;
 };
 
+/* ──────────────────────────────────────────────────
+   Campus QR Code Endpoints
+────────────────────────────────────────────────── */
+
+/** Returns campus QR details (token, generated/expiry dates) as JSON. */
+export const getCampusQR = async (id) => {
+  const response = await api.get(`/university/campuses/${id}/qr`);
+  return response.data;
+};
+
+/**
+ * Triggers a browser PDF download for the printable campus QR code sheet.
+ * Uses a blob stream so the token is never exposed in the URL bar.
+ */
+export const downloadCampusQRPDF = async (id, campusName) => {
+  const token = localStorage.getItem('token');
+  const baseURL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`;
+  const response = await fetch(`${baseURL}/university/campuses/${id}/qr/pdf`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to generate PDF');
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `campus-qr-${(campusName || 'campus').replace(/\s+/g, '-')}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+/* ──────────────────────────────────────────────────
+   Campus Attendance Endpoints
+────────────────────────────────────────────────── */
+
+export const getCampusAttendanceRecords = async (params = {}) => {
+  const response = await api.get('/campus-attendance/records', { params });
+  return response.data;
+};
+
 export default api;
-
-

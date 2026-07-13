@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '../../components/layout/AdminLayout';
-import { getAccessLogs } from '../../services/api';
+import { getAccessLogs, getCampuses } from '../../services/api';
 import { useAutoRefreshSignal } from '../../context/AutoRefreshContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -19,9 +19,27 @@ const AccessLogs = () => {
   const [filterByDate, setFilterByDate] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [campuses, setCampuses] = useState([]);
+  const [activeCampusTab, setActiveCampusTab] = useState('All');
   const { refreshKey } = useAutoRefreshSignal();
   const { user } = useAuth();
   const isStaff = user?.role === 'staff';
+
+  useEffect(() => {
+    const fetchCampusesList = async () => {
+      try {
+        const response = await getCampuses();
+        if (response && response.success && response.data) {
+          setCampuses(response.data);
+        } else if (Array.isArray(response)) {
+          setCampuses(response);
+        }
+      } catch (err) {
+        console.error('Failed to fetch campuses:', err);
+      }
+    };
+    fetchCampusesList();
+  }, []);
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -48,6 +66,16 @@ const AccessLogs = () => {
 
   // Auto-refresh: re-fetch when the global 30s signal fires
   useEffect(() => { if (refreshKey > 0) fetchLogs(); }, [refreshKey]);
+
+  // Dynamically build the tab names (All + Database Campuses + any extra from logs)
+  const tabNames = ['All', ...new Set([
+    ...campuses.map(c => c.name),
+    ...logs.map(log => log.campus).filter(Boolean)
+  ])];
+
+  const filteredLogs = activeCampusTab === 'All'
+    ? logs
+    : logs.filter(log => log.campus === activeCampusTab);
 
   return (
     <AdminLayout title="Access Logs">
@@ -96,10 +124,40 @@ const AccessLogs = () => {
             )}
 
             <span className="px-4 py-2 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-100 uppercase tracking-wider whitespace-nowrap">
-              {logs.length} {logs.length === 1 ? 'Entry' : 'Entries'}
+              {filteredLogs.length} {filteredLogs.length === 1 ? 'Entry' : 'Entries'}
             </span>
           </div>
         </div>
+
+        {/* Campus Tabs */}
+        {!loading && !error && tabNames.length > 1 && (
+          <div className="flex border-b border-gray-100 bg-gray-50/20 overflow-x-auto scrollbar-none px-6 py-3 gap-2">
+            {tabNames.map((tab) => {
+              const isActive = activeCampusTab === tab;
+              const count = tab === 'All'
+                ? logs.length
+                : logs.filter(log => log.campus === tab).length;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveCampusTab(tab)}
+                  className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
+                    isActive
+                      ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-100'
+                      : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <span>{tab === 'All' ? 'All Campuses' : tab}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
+                    isActive ? 'bg-indigo-700 text-white' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Body */}
         {loading ? (
@@ -131,6 +189,19 @@ const AccessLogs = () => {
               </button>
             )}
           </div>
+        ) : filteredLogs.length === 0 ? (
+          <div className="p-20 text-center text-gray-400">
+            <div className="text-5xl mb-4">🏫</div>
+            <p className="text-base font-semibold text-gray-500 mb-1">
+              No access logs found for {activeCampusTab === 'All' ? 'any campus' : activeCampusTab}
+            </p>
+            <button
+              onClick={() => setActiveCampusTab('All')}
+              className="mt-3 px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors"
+            >
+              View all campuses
+            </button>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -138,6 +209,8 @@ const AccessLogs = () => {
                 <tr className="text-xs font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
                   <th className="px-6 py-4 font-black">User</th>
                   <th className="px-6 py-4 font-black">Role</th>
+                  <th className="px-6 py-4 font-black">Campus</th>
+                  <th className="px-6 py-4 font-black">Source</th>
                   <th className="px-6 py-4 font-black">Event Type</th>
                   <th className="px-6 py-4 font-black">Entry Time</th>
                   <th className="px-6 py-4 font-black">Exit Time</th>
@@ -145,7 +218,7 @@ const AccessLogs = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {logs.map((log, index) => (
+                {filteredLogs.map((log, index) => (
                   <tr key={log._id || `log-${index}`} className="hover:bg-gray-50/80 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -161,6 +234,14 @@ const AccessLogs = () => {
                     <td className="px-6 py-4">
                       <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${log.student?.role === 'admin' ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600'}`}>
                         {log.student?.role || 'student'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-xs font-bold text-gray-700">
+                      {log.campus || 'Main Gate'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border ${log.source === 'Campus QR Code' ? 'bg-violet-50 text-violet-700 border-violet-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
+                        {log.source || 'Security Guard'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -185,8 +266,8 @@ const AccessLogs = () => {
                         : <span className="text-gray-300 italic">Still on premises</span>}
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className={`px-3 py-1 text-[10px] font-black rounded-full uppercase shadow-sm border ${log.status === 'IN' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-gray-50 text-gray-700 border-gray-100'}`}>
-                        {log.status}
+                      <span className={`px-3 py-1 text-[10px] font-black rounded-full uppercase shadow-sm border ${(log.status === 'IN' || log.status === 'Inside') ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-gray-50 text-gray-700 border-gray-100'}`}>
+                        {(log.status === 'IN' || log.status === 'Inside') ? 'Inside' : 'Outside'}
                       </span>
                     </td>
                   </tr>

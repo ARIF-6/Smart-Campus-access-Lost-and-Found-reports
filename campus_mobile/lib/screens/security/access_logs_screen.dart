@@ -60,6 +60,8 @@ class _AccessLogsScreenState extends State<AccessLogsScreen> {
         final student = rawLog['student'];
         final name = student != null ? student['name'] : 'Unknown';
         final img = student != null ? student['photoUrl'] : null;
+        final campusName = rawLog['campus'] ?? 'Main Gate';
+        final source = rawLog['source'] ?? 'Security Guard';
 
         if (rawLog['entryTime'] != null) {
           entries++;
@@ -70,7 +72,8 @@ class _AccessLogsScreenState extends State<AccessLogsScreen> {
             'type': 'ENTRY',
             'time': DateFormat('HH:mm').format(dt),
             'timestamp': dt,
-            'location': 'Main Gate (QR)',
+            'location': campusName,
+            'source': source,
             'img': img,
           });
         }
@@ -83,7 +86,8 @@ class _AccessLogsScreenState extends State<AccessLogsScreen> {
             'type': 'EXIT',
             'time': DateFormat('HH:mm').format(dt),
             'timestamp': dt,
-            'location': 'Main Gate (QR)',
+            'location': campusName,
+            'source': source,
             'img': img,
           });
         }
@@ -191,6 +195,8 @@ class _AccessLogsScreenState extends State<AccessLogsScreen> {
         : AppConstants.statusInvalid.withValues(alpha: 0.1);
     final Color badgeText =
         isEntry ? AppConstants.primaryColor : AppConstants.statusInvalid;
+    final String location = log['location'] ?? 'Main Gate';
+    final String source = log['source'] ?? 'Security Guard';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -199,7 +205,7 @@ class _AccessLogsScreenState extends State<AccessLogsScreen> {
         children: [
           Container(
               width: 4,
-              height: 80,
+              height: 96,
               decoration: BoxDecoration(
                   color: stripColor,
                   borderRadius: const BorderRadius.horizontal(
@@ -220,29 +226,47 @@ class _AccessLogsScreenState extends State<AccessLogsScreen> {
                 Text('ID: ${log['id']}',
                     style: const TextStyle(fontSize: 12, color: Colors.grey)),
                 const SizedBox(height: 4),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                      color: badgeBg, borderRadius: BorderRadius.circular(12)),
-                  child: Text(log['type'],
-                      style: TextStyle(
-                          color: badgeText,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold)),
+                Row(
+                  children: [
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                          color: badgeBg, borderRadius: BorderRadius.circular(12)),
+                      child: Text(log['type'],
+                          style: TextStyle(
+                              color: badgeText,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                      child: Text(
+                          source,
+                          style: const TextStyle(
+                              color: Colors.blue,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold)),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(log['time'],
                     style: const TextStyle(fontWeight: FontWeight.bold)),
-                const Text('Main Gate',
-                    style: TextStyle(fontSize: 10, color: Colors.grey)),
+                const SizedBox(height: 4),
+                Text(location,
+                    style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
               ],
             ),
           ),

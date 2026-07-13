@@ -26,6 +26,11 @@ const accessLogSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     default: null
+  },
+  source: {
+    type: String,
+    enum: ['Security Guard', 'Campus QR Code'],
+    default: 'Security Guard'
   }
 }, { timestamps: true });
 

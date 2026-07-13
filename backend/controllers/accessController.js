@@ -63,7 +63,7 @@ exports.scanQRCode = async (req, res) => {
       if (io) {
         io.to('role:security').to('role:admin').emit('security:alert', {
           title: 'Blacklist Alert',
-          message: `⚠️ ALERT: ${user.fullName} is BLACKLISTED. Reason: ${blacklisted.reason}`,
+          message: `${user.fullName} (${user.studentId}) this student is in blacklist`,
           severity: 'banned',
           user: { name: user.fullName, studentId: user.studentId }
         });
@@ -72,7 +72,7 @@ exports.scanQRCode = async (req, res) => {
         await createNotification({
           recipientRole: 'security',
           title: 'Security Alert: Blacklist',
-          message: `${user.fullName} attempted entry. Reason: ${blacklisted.reason}`,
+          message: `${user.fullName} (${user.studentId}) this student is in blacklist`,
           type: 'SECURITY_ALERT',
           module: 'Security'
         });
@@ -273,6 +273,7 @@ exports.getLogs = async (req, res) => {
     await checkAndGenerateDailyNoExitReports();
 
     let query = {};
+    const andClauses = [];
 
     // 1. Date filter — only apply when a specific date is provided.
     //    Build UTC midnight boundaries so the filter works regardless of server timezone.
@@ -281,26 +282,39 @@ exports.getLogs = async (req, res) => {
       const start = new Date(`${req.query.date}T00:00:00.000Z`);
       const end   = new Date(`${req.query.date}T23:59:59.999Z`);
       // Match on entryTime OR createdAt so we never miss a record
-      query.$or = [
-        { entryTime: { $gte: start, $lte: end } },
-        { createdAt: { $gte: start, $lte: end } }
-      ];
+      andClauses.push({
+        $or: [
+          { entryTime: { $gte: start, $lte: end } },
+          { createdAt: { $gte: start, $lte: end } }
+        ]
+      });
     }
 
-    // 2. Campus-scoping: staff see only logs scanned by security guards assigned to the same campus.
-    //    Superadmin and admin see ALL logs.
+    // 2. Campus-scoping: staff see logs either:
+    //    a) scanned by a security guard assigned to the same campus (Security Guard flow), or
+    //    b) campus field matches their campus directly (Campus QR Code flow, scannedBy is null)
     if (req.user.role === 'staff') {
       if (req.user.campus) {
         const guards = await User.find({ role: 'security', campus: req.user.campus, isDeleted: false }).select('_id');
         const guardIds = guards.map(g => g._id);
-        query.scannedBy = { $in: guardIds };
+        andClauses.push({
+          $or: [
+            { scannedBy: { $in: guardIds } },
+            { campus: req.user.campus, scannedBy: null },
+          ]
+        });
       } else {
-        query.scannedBy = { $in: [] };
+        query._id = { $in: [] }; // No campus assigned → see nothing
       }
+    }
+
+    if (andClauses.length > 0) {
+      query.$and = andClauses;
     }
 
     const logs = await AccessLog.find(query)
       .populate('userId', 'fullName name email role studentId photoUrl')
+      .populate('campus', 'name')
       .sort({ createdAt: -1 });
 
     // Map to a flat object the frontend expects
@@ -311,7 +325,9 @@ exports.getLogs = async (req, res) => {
         personId: u ? (u.studentId || u._id.toString()) : '',
         entryTime: log.entryTime,
         exitTime: log.exitTime,
-        status: log.status,
+        status: log.status === 'IN' ? 'Inside' : 'Outside',
+        source: log.source || 'Security Guard',
+        campus: log.campus ? log.campus.name : 'Main Gate',
         student: u
           ? {
               name: u.fullName || u.name || 'Unknown',

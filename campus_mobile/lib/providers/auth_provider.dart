@@ -45,9 +45,11 @@ class AuthProvider extends ChangeNotifier {
     if (userData != null) {
       _user = jsonDecode(userData);
       if (_token != null) {
+        // Populate in-memory token cache so API requests don't need disk reads
+        ApiService.setToken(_token!);
         _socketService.connect(_token!);
         _listenForShiftUpdates();
-        // Fetch latest profile fields (such as shift times) immediately on start
+        // Fetch latest profile in background — don't await; UI shows cached data immediately
         fetchLatestProfile();
       }
     }
@@ -103,6 +105,10 @@ class AuthProvider extends ChangeNotifier {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(AppConstants.tokenKey, _token!);
         await prefs.setString(AppConstants.userKey, jsonEncode(_user));
+
+        // Populate in-memory token cache immediately so subsequent requests
+        // don't need a SharedPreferences disk read.
+        ApiService.setToken(_token!);
         
         // Connect Socket and start listening for server-pushed updates
         _socketService.connect(_token!);
@@ -129,6 +135,9 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(AppConstants.tokenKey);
     await prefs.remove(AppConstants.userKey);
+
+    // Invalidate the in-memory token cache
+    ApiService.clearToken();
 
     // Remove shift update listener before disconnecting socket
     _socketService.off('user:shiftUpdated');

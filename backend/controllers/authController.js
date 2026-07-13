@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Role = require('../models/Role');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { logAction } = require('../utils/auditLogger');
 const asyncHandler = require('../middleware/asyncHandler');
 const path = require('path');
@@ -123,8 +124,14 @@ exports.loginUser = asyncHandler(async (req, res) => {
   }
 
   // 3. Prevent Students, Security Guards, or Cleaners from logging in to the web app
-  // Check if the user trying to log in has an unauthorized role for this application
-  if (user && !['admin', 'staff', 'superadmin'].includes(user.role)) {
+  // Check if the user trying to log in has an unauthorized role for this application.
+  // Flutter/Mobile clients can log in with any role, but Web application blocks Student, Security, and Cleaner.
+  const userAgent = req.headers['user-agent'] || '';
+  const isMobileClient = userAgent.toLowerCase().includes('dart') || 
+                         userAgent.toLowerCase().includes('flutter') || 
+                         req.headers['x-client-platform'] === 'mobile';
+                         
+  if (!isMobileClient && user && !['admin', 'staff', 'superadmin'].includes(user.role)) {
     return res.status(403).json({
       success: false,
       message: "You are not an Administrator or Staff member. Please log in using an Administrator or Staff account."
@@ -136,22 +143,21 @@ exports.loginUser = asyncHandler(async (req, res) => {
   }
 
   // Check if password matches
-  const bcrypt = require('bcryptjs');
   const isMatch = await bcrypt.compare(cleanPassword, user.password);
 
   if (!isMatch) {
     return res.status(401).json({ success: false, message: 'Invalid username or password' });
   }
 
-  // Log audit action
-  await logAction({
+  // Log audit action — fire-and-forget so it doesn't delay the login response
+  logAction({
     userId: user._id,
     action: 'LOGIN',
     targetId: user._id,
     targetType: 'User',
     details: `User logged in: ${user.username || user.fullName} (${user.role})`,
     req
-  });
+  }).catch(() => {}); // Silently ignore audit write failures
 
   return sendSuccess(res, 'Login successful', {
     token: generateToken(user._id),

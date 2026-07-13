@@ -13,10 +13,17 @@ export const AuthProvider = ({ children }) => {
     const initializeAuth = async () => {
       if (token) {
         try {
-          // Token is presumably valid, fetch full user profile to verify and get roles
-          const { getUserProfile } = await import('../services/api');
-          const profile = await getUserProfile();
-          setUser(profile);
+          // Use locally cached user data first to avoid a round-trip on every page refresh
+          const cachedUser = localStorage.getItem('user');
+          if (cachedUser) {
+            setUser(JSON.parse(cachedUser));
+          } else {
+            // No cached user — fetch from API (first login after clear, or fresh browser)
+            const { getUserProfile } = await import('../services/api');
+            const profile = await getUserProfile();
+            setUser(profile);
+            localStorage.setItem('user', JSON.stringify(profile));
+          }
         } catch (e) {
           console.error("Auth init failed:", e);
           logout();
@@ -30,6 +37,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = (userData, userToken) => {
     localStorage.setItem('token', userToken);
+    localStorage.setItem('user', JSON.stringify(userData)); // cache user for fast page-refresh
     setToken(userToken);
     setUser(userData);
   };
@@ -42,6 +50,7 @@ export const AuthProvider = ({ children }) => {
       console.error('Failed to log logout action on server:', e);
     }
     localStorage.removeItem('token');
+    localStorage.removeItem('user'); // clear cached user data
     setToken(null);
     setUser(null);
     navigate('/login');
