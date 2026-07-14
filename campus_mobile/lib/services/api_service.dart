@@ -30,9 +30,6 @@ class ApiService {
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 15),
       sendTimeout: const Duration(seconds: 10),
-      headers: {
-        'Accept-Encoding': 'gzip, deflate', // enable compression
-      },
     ));
 
     // Trust Let's Encrypt / Custom SSL on older Android devices for our Render host

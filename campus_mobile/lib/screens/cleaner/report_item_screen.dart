@@ -25,39 +25,37 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
   final _descController = TextEditingController();
   final _locController = TextEditingController();
 
-  String _reportType = 'Found'; 
+  String _reportType = 'Found';
   String? _selectedCategory;
   XFile? _imageFile;
   Uint8List? _webImage;
   bool _isLoading = false;
+  bool _categoriesLoading = true;
 
   final ApiService _apiService = ApiService();
   final ImagePicker _picker = ImagePicker();
   static const _themeColor = Color(0xFF0D47A1);
 
-  List<Map<String, dynamic>> _categories = [
-    {
-      'value': 'Other',
-      'label': 'Other',
-      'icon': Icons.category_rounded,
-    }
-  ];
+  // Start empty — never pre-seed 'Other' to avoid dropdown value mismatches
+  List<Map<String, dynamic>> _categories = [];
 
   final SocketService _socketService = SocketService();
+  // Unique key so our off() call only removes this widget's listener
+  late final String _socketListenerKey;
 
   @override
   void initState() {
     super.initState();
-    _selectedCategory = 'Other';
+    _socketListenerKey = 'category:updated:report_item_${hashCode}';
     _fetchCategories();
-    _socketService.on('category:updated', (_) {
+    _socketService.on(_socketListenerKey, (_) {
       if (mounted) _fetchCategories();
     });
   }
 
   @override
   void dispose() {
-    _socketService.off('category:updated');
+    _socketService.off(_socketListenerKey);
     _titleController.dispose();
     _descController.dispose();
     _locController.dispose();
@@ -67,37 +65,56 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
   Future<void> _fetchCategories() async {
     try {
       final response = await _apiService.get('/categories/lost-found');
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data is List
             ? response.data
             : (response.data['data'] ?? []);
-        setState(() {
-          _categories = data
-              .map((e) => {
-                    'value': e is Map ? (e['name']?.toString() ?? '') : '',
-                    'label': e is Map ? (e['name']?.toString() ?? '') : '',
-                    'icon': Icons.category_rounded,
-                  })
-              .where((e) => (e['value'] as String).isNotEmpty)
-              .toList();
 
-          final hasOther = _categories.any((c) => (c['value'] as String).toLowerCase() == 'other' || (c['value'] as String).toLowerCase() == 'others');
-          if (!hasOther) {
-            _categories.add({
-              'value': 'Other',
-              'label': 'Other',
-              'icon': Icons.category_rounded,
-            });
-          }
-          if (_selectedCategory == null || !_categories.any((c) => c['value'] == _selectedCategory)) {
-            if (_categories.isNotEmpty) {
-              _selectedCategory = _categories.first['value'] as String;
-            }
-          }
+        // Build list from server data
+        final List<Map<String, dynamic>> fetched = data
+            .map((e) => <String, dynamic>{
+                  'value': e is Map ? (e['name']?.toString() ?? '') : '',
+                  'label': e is Map ? (e['name']?.toString() ?? '') : '',
+                  'icon': Icons.category_rounded,
+                })
+            .where((e) => (e['value'] as String).isNotEmpty)
+            .toList();
+
+        // Ensure 'Other' exists as a fallback
+        final hasOther = fetched.any(
+          (c) => (c['value'] as String).toLowerCase() == 'other' ||
+                  (c['value'] as String).toLowerCase() == 'others');
+        if (!hasOther) {
+          fetched.add({'value': 'Other', 'label': 'Other', 'icon': Icons.category_rounded});
+        }
+
+        // Deduplicate by lowercase value — prevents the dropdown assertion crash
+        final seen = <String>{};
+        final deduped = fetched.where(
+          (c) => seen.add((c['value'] as String).toLowerCase())
+        ).toList();
+
+        // Find a valid selection: keep current if still valid, else pick first
+        String? newSelection;
+        if (_selectedCategory != null) {
+          final match = deduped.firstWhere(
+            (c) => (c['value'] as String).toLowerCase() == _selectedCategory!.toLowerCase(),
+            orElse: () => <String, dynamic>{},
+          );
+          newSelection = match.isNotEmpty ? match['value'] as String : null;
+        }
+        newSelection ??= deduped.isNotEmpty ? deduped.first['value'] as String : null;
+
+        setState(() {
+          _categories = deduped;
+          _selectedCategory = newSelection;
+          _categoriesLoading = false;
         });
       }
     } catch (e) {
       debugPrint('Error fetching categories: $e');
+      if (mounted) setState(() => _categoriesLoading = false);
     }
   }
 
@@ -439,13 +456,39 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
   }
 
   Widget _categoryDropdown() {
+    if (_categoriesLoading || _categories.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+        child: Row(children: [
+          SizedBox(width: 12),
+          SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+          SizedBox(width: 12),
+          Text('Loading categories...', style: TextStyle(color: Colors.grey)),
+        ]),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: DropdownButtonFormField<String>(
         value: _selectedCategory,
-        decoration: InputDecoration(labelText: 'Category', prefixIcon: Icon(Icons.category_rounded, color: _themeColor, size: 20), border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14)),
-        items: _categories.map((c) => DropdownMenuItem<String>(value: c['value'] as String, child: Row(children: [Icon(c['icon'] as IconData, size: 18, color: Colors.grey.shade600), const SizedBox(width: 8), Text(c['label'] as String)]))).toList(),
+        decoration: InputDecoration(
+          labelText: 'Category',
+          prefixIcon: Icon(Icons.category_rounded, color: _themeColor, size: 20),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        ),
+        items: _categories
+            .map((c) => DropdownMenuItem<String>(
+                  value: c['value'] as String,
+                  child: Row(children: [
+                    Icon(c['icon'] as IconData, size: 18, color: Colors.grey.shade600),
+                    const SizedBox(width: 8),
+                    Text(c['label'] as String),
+                  ]),
+                ))
+            .toList(),
         onChanged: (v) => setState(() => _selectedCategory = v),
+        validator: (v) => (v == null || v.isEmpty) ? 'Please select a category' : null,
       ),
     );
   }
