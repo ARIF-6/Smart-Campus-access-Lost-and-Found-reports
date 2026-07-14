@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
+import 'dart:async';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -16,25 +17,51 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _scaleAnim;
   late Animation<double> _slideAnim;
 
+  String _statusText = 'Connecting to server...';
+  bool _serverReady = false;
+
+  /// Ping the backend until it responds. Render cold starts can take up to 60s.
+  /// We retry up to 15 times with short intervals and show the user live status.
   Future<void> _warmupBackend() async {
-    try {
-      await ApiService().get('/ping');
-    } catch (_) {
-      // Ignore warmup errors silently
+    final api = ApiService();
+    for (int i = 0; i < 15; i++) {
+      if (!mounted) return;
+      try {
+        final res = await api.get('/ping');
+        if (res.statusCode == 200) {
+          if (mounted) setState(() {
+            _serverReady = true;
+            _statusText = 'Connected! Loading...';
+          });
+          // Small delay so user can see the success message
+          await Future.delayed(const Duration(milliseconds: 500));
+          if (mounted) Navigator.of(context).pushReplacementNamed('/login');
+          return;
+        }
+      } catch (_) {
+        // Server not up yet, update the status message
+      }
+      if (!mounted) return;
+      if (i == 0) {
+        setState(() => _statusText = 'please wait a moment...');
+      } else if (i == 5) {
+        setState(() => _statusText = 'please be patient ...');
+      } else if (i == 10) {
+        setState(() => _statusText = 'This is taking longer than usual...');
+      }
+      await Future.delayed(const Duration(seconds: 4));
     }
+    // After all retries, navigate anyway and let the login screen show the error
+    if (mounted) Navigator.of(context).pushReplacementNamed('/login');
   }
 
   @override
   void initState() {
     super.initState();
 
-    // Trigger non-blocking backend warmup (cold start mitigation)
-    // /api/ping is a zero-auth, zero-DB endpoint that wakes the Render instance.
-    _warmupBackend();
-
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1600),
+      duration: const Duration(milliseconds: 1200),
     );
 
     _fadeAnim = Tween<double>(begin: 0, end: 1).animate(
@@ -49,10 +76,8 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    // Reduced from 3s to 1.5s — halves the visible wait time on every app open
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) Navigator.of(context).pushReplacementNamed('/login');
-    });
+    // Start backend warmup — navigates to login only when server is ready
+    _warmupBackend();
   }
 
 
@@ -150,11 +175,29 @@ class _SplashScreenState extends State<SplashScreen>
                                 letterSpacing: 0.3,
                               ),
                             ),
-                            const SizedBox(height: 60),
+                            const SizedBox(height: 50),
                             // Subtle loading dots
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: List.generate(3, (i) => _loadingDot(i)),
+                            ),
+                            const SizedBox(height: 20),
+                            // Live server status message
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 400),
+                              child: Text(
+                                _statusText,
+                                key: ValueKey(_statusText),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w400,
+                                  color: _serverReady
+                                      ? Colors.greenAccent.withValues(alpha: 0.9)
+                                      : Colors.white.withValues(alpha: 0.6),
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
                             ),
                           ],
                         ),

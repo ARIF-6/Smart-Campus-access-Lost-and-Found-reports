@@ -27,9 +27,9 @@ class ApiService {
   ApiService() {
     _dio = Dio(BaseOptions(
       baseUrl: AppConstants.baseUrl,
-      connectTimeout: const Duration(seconds: 20),  // reduced from 30s
-      receiveTimeout: const Duration(seconds: 45),  // reduced from 60s
-      sendTimeout: const Duration(seconds: 20),     // reduced from 30s
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 15),
+      sendTimeout: const Duration(seconds: 10),
       headers: {
         'Accept-Encoding': 'gzip, deflate', // enable compression
       },
