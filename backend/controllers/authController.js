@@ -107,7 +107,7 @@ exports.loginUser = asyncHandler(async (req, res) => {
   let staffUser = null;
   if (identifier && !studentUser) {
     const tempUser = await User.findOne({
-      role: { $in: ['admin', 'staff', 'security', 'cleaner', 'superadmin'] },
+      role: { $in: ['admin', 'staff', 'security', 'clean', 'cleaner', 'superadmin'] },
       isDeleted: false,
       username: identifier
     }).select('+password').lean();
