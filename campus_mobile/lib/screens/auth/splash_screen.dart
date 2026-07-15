@@ -17,42 +17,30 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _scaleAnim;
   late Animation<double> _slideAnim;
 
-  String _statusText = 'Connecting to server...';
+  String _statusText = 'Initializing services...';
   bool _serverReady = false;
 
-  /// Ping the backend until it responds. Render cold starts can take up to 60s.
-  /// We retry up to 15 times with short intervals and show the user live status.
-  Future<void> _warmupBackend() async {
-    final api = ApiService();
-    for (int i = 0; i < 15; i++) {
-      if (!mounted) return;
-      try {
-        final res = await api.get('/ping');
-        if (res.statusCode == 200) {
-          if (mounted) setState(() {
-            _serverReady = true;
-            _statusText = 'Connected! Loading...';
-          });
-          // Small delay so user can see the success message
-          await Future.delayed(const Duration(milliseconds: 500));
-          if (mounted) Navigator.of(context).pushReplacementNamed('/login');
-          return;
-        }
-      } catch (_) {
-        // Server not up yet, update the status message
+  /// Start backend warmup asynchronously in the background.
+  /// Wakes up the Render server early so it is ready by the time the user logs in.
+  void _warmupBackendInBackground() {
+    ApiService().get('/ping').then((_) {
+      if (mounted) {
+        setState(() {
+          _serverReady = true;
+          _statusText = 'Connected!';
+        });
       }
-      if (!mounted) return;
-      if (i == 0) {
-        setState(() => _statusText = 'please wait a moment...');
-      } else if (i == 5) {
-        setState(() => _statusText = 'please be patient ...');
-      } else if (i == 10) {
-        setState(() => _statusText = 'This is taking longer than usual...');
-      }
-      await Future.delayed(const Duration(seconds: 4));
+    }).catchError((_) {
+      // Ignored: we just want to wake up the server
+    });
+  }
+
+  /// Snappy splash duration timer to show the login screen quickly.
+  Future<void> _startStartupTimer() async {
+    await Future.delayed(const Duration(milliseconds: 1500));
+    if (mounted) {
+      Navigator.of(context).pushReplacementNamed('/login');
     }
-    // After all retries, navigate anyway and let the login screen show the error
-    if (mounted) Navigator.of(context).pushReplacementNamed('/login');
   }
 
   @override
@@ -76,8 +64,9 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    // Start backend warmup — navigates to login only when server is ready
-    _warmupBackend();
+    // Start background warmup and navigation timer
+    _warmupBackendInBackground();
+    _startStartupTimer();
   }
 
 
@@ -102,6 +91,17 @@ class _SplashScreenState extends State<SplashScreen>
         ),
         child: Stack(
           children: [
+            // Background university image with low opacity
+            Positioned.fill(
+              child: Opacity(
+                opacity: 0.12,
+                child: Image.asset(
+                  'assets/images/university.jpeg',
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+
             // Decorative circles (like the banking app background bubbles)
             Positioned(
               top: -80, right: -80,
@@ -149,9 +149,12 @@ class _SplashScreenState extends State<SplashScreen>
                                   ),
                                 ],
                               ),
-                              child: Image.asset(
-                                'assets/images/webandapplogo.png',
-                                fit: BoxFit.contain,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(18),
+                                child: Image.asset(
+                                  'assets/images/logo.jpg',
+                                  fit: BoxFit.contain,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 36),

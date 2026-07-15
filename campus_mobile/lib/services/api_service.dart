@@ -1,14 +1,17 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants.dart';
 
-/// Singleton-style API service with in-memory token caching.
-/// The token is loaded from SharedPreferences once and then stored in memory,
-/// eliminating repeated async disk reads on every HTTP request.
+/// Singleton API service with in-memory token caching.
+/// Sharing a single Dio instance across the application enables socket reuse (Keep-Alive).
 class ApiService {
-  late Dio _dio;
+  static final ApiService _instance = ApiService._internal();
+  factory ApiService() => _instance;
+
+  late final Dio _dio;
 
   // ── In-memory token cache ─────────────────────────────────────────────────
   static String? _cachedToken;
@@ -24,28 +27,32 @@ class ApiService {
     _cachedToken = null;
   }
 
-  ApiService() {
+  ApiService._internal() {
     _dio = Dio(BaseOptions(
       baseUrl: AppConstants.baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 15),
-      sendTimeout: const Duration(seconds: 10),
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 20),
+      sendTimeout: const Duration(seconds: 15),
     ));
 
-    // Trust Let's Encrypt / Custom SSL on older Android devices for our Render host
-    try {
-      (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-        final client = HttpClient();
-        client.badCertificateCallback =
-            (X509Certificate cert, String host, int port) {
-          if (host == 'smart-campus-access-lost-and-found-dbgg.onrender.com') {
-            return true;
-          }
-          return false;
+    // Trust Let's Encrypt / Custom SSL on older Android devices for our Render host.
+    // We guard with !kIsWeb because IOHttpClientAdapter is not supported on web.
+    if (!kIsWeb) {
+      try {
+        final hostName = Uri.parse(AppConstants.baseUrl).host;
+        (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+          final client = HttpClient();
+          client.badCertificateCallback =
+              (X509Certificate cert, String host, int port) {
+            if (host == hostName || host == 'smart-campus-access-lost-and-found-dbgg.onrender.com') {
+              return true;
+            }
+            return false;
+          };
+          return client;
         };
-        return client;
-      };
-    } catch (_) {}
+      } catch (_) {}
+    }
 
     _dio.interceptors.add(_RetryInterceptor(dio: _dio));
 

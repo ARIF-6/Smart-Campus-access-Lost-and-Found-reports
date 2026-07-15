@@ -26,8 +26,8 @@ class ErrorHandler {
         // Server accepted the request but is slow to send back data
         return 'Server is responding slowly. Please try again in a moment.';
       case DioExceptionType.connectionError:
-        // Device cannot reach the server at all — likely no internet
-        return 'Cannot reach the server. Please check your internet connection and try again.';
+        // Device cannot reach the server at all — likely no internet or server is offline
+        return 'Cannot reach the server. Please check your connection or try again later.';
       case DioExceptionType.badCertificate:
         return 'A security error occurred. Please contact support.';
       case DioExceptionType.cancel:
@@ -43,7 +43,7 @@ class ErrorHandler {
   // ── HTTP response branch ────────────────────────────────────────────────────
   static String _fromResponse(Response? response) {
     if (response == null) {
-      return 'Cannot reach the server. Please check your internet connection and try again.';
+      return 'Cannot reach the server. Please check your connection or try again later.';
     }
 
     final status = response.statusCode ?? 0;
@@ -103,7 +103,7 @@ class ErrorHandler {
         s.contains('unreachable') ||
         s.contains('errno = 104') ||
         s.contains('broken pipe')) {
-      return 'Cannot reach the server. Please check your internet connection and try again.';
+      return 'Cannot reach the server. Please check your connection or try again later.';
     }
     if (s.contains('timeout') || s.contains('connection')) {
       return 'The server is taking too long to respond. Please wait a moment and try again.';

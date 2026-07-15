@@ -99,6 +99,23 @@ class _LoginScreenState extends State<LoginScreen>
               ),
               child: Stack(
                 children: [
+                  // Background university image with low opacity
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft:  Radius.circular(40),
+                        bottomRight: Radius.circular(40),
+                      ),
+                      child: Opacity(
+                        opacity: 0.12,
+                        child: Image.asset(
+                          'assets/images/university.jpeg',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  ),
+
                   // Background circles
                   Positioned(top: -50, right: -50,
                     child: _circle(200, Colors.white.withValues(alpha: 0.05))),
@@ -111,9 +128,11 @@ class _LoginScreenState extends State<LoginScreen>
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Logo
+                          // Logo image instead of icon
                           Container(
-                            padding: const EdgeInsets.all(20),
+                            width: 90,
+                            height: 90,
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(24),
@@ -125,10 +144,12 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                               ],
                             ),
-                            child: const Icon(
-                              Icons.school_rounded,
-                              size: 52,
-                              color: AppConstants.primaryNavy,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(14),
+                              child: Image.asset(
+                                'assets/images/logo.jpg',
+                                fit: BoxFit.contain,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 20),

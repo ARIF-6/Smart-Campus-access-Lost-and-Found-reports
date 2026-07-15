@@ -1,0 +1,13 @@
+# Netlify Configuration File for Campus Access Monorepo
+
+[build]
+  # Build from the frontend folder
+  base = "frontend"
+  command = "npm install && npm run build"
+  publish = "dist"
+
+# SPA routing redirect: routes all traffic to index.html so React Router handles the pages
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
