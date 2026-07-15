@@ -66,7 +66,7 @@ const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
   'http://localhost:4173', // Vite preview
-];
+].map(o => o.replace(/\/$/, '')); // strip any accidental trailing slashes
 
 app.use(cors({
   origin: (origin, callback) => {

@@ -17,6 +17,7 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
   String? _errorMessage;
+  bool _isConnectionError = false;
 
   bool get isAuthenticated => _token != null && !JwtDecoder.isExpired(_token!);
   String? get role => _user?['role'];
@@ -37,6 +38,7 @@ class AuthProvider extends ChangeNotifier {
     return null;
   }
   String? get errorMessage => _errorMessage;
+  bool get isConnectionError => _isConnectionError;
 
   Future<void> checkAuthStatus() async {
     final prefs = await SharedPreferences.getInstance();
@@ -106,23 +108,26 @@ class AuthProvider extends ChangeNotifier {
         await prefs.setString(AppConstants.tokenKey, _token!);
         await prefs.setString(AppConstants.userKey, jsonEncode(_user));
 
-        // Populate in-memory token cache immediately so subsequent requests
-        // don't need a SharedPreferences disk read.
         ApiService.setToken(_token!);
         
-        // Connect Socket and start listening for server-pushed updates
         _socketService.connect(_token!);
         _listenForShiftUpdates();
 
+        _isConnectionError = false;
         _isLoading = false;
         notifyListeners();
         return true;
       }
     } catch (e) {
-      // ... existing error handling ...
       if (e is DioException) {
+        // Detect connection-level failures (Render cold start, no network)
+        _isConnectionError = e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.sendTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.connectionError;
         _errorMessage = ErrorHandler.getFriendlyMessage(e);
       } else {
+        _isConnectionError = false;
         _errorMessage = 'An unexpected error occurred';
       }
     }

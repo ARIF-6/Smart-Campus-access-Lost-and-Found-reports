@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -19,6 +20,13 @@ class _LoginScreenState extends State<LoginScreen>
   bool _isLoading           = false;
   bool _obscurePassword     = true;
 
+  // ── Render cold-start auto-retry ─────────────────────────────────────────
+  bool  _isServerWarmingUp  = false;
+  int   _retryCountdown     = 0;
+  Timer? _retryTimer;
+  String? _savedEmail;
+  String? _savedPassword;
+
   late AnimationController _animController;
   late Animation<double>   _fadeAnim;
   late Animation<Offset>   _slideAnim;
@@ -38,6 +46,7 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   void dispose() {
+    _retryTimer?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     _animController.dispose();
@@ -46,30 +55,67 @@ class _LoginScreenState extends State<LoginScreen>
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _isLoading = true);
+
+    // Cancel any pending auto-retry before starting a fresh attempt
+    _retryTimer?.cancel();
+    setState(() {
+      _isLoading = true;
+      _isServerWarmingUp = false;
+    });
+
+    // Save credentials for auto-retry
+    _savedEmail    = _emailController.text.trim();
+    _savedPassword = _passwordController.text;
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final success = await authProvider.login(
-      _emailController.text.trim(),
-      _passwordController.text,
-    );
+    final success = await authProvider.login(_savedEmail!, _savedPassword!);
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      if (success) {
-        Navigator.of(context).pushReplacementNamed('/');
-      } else if (authProvider.errorMessage != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(authProvider.errorMessage!),
-            backgroundColor: AppConstants.errorColor,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
-      }
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (success) {
+      Navigator.of(context).pushReplacementNamed('/');
+      return;
     }
+
+    // ── Detect Render cold-start (connection/timeout errors) ─────────────
+    final isConnectionProblem = authProvider.isConnectionError;
+    if (isConnectionProblem) {
+      // Start a 20-second auto-retry countdown
+      _startAutoRetry(authProvider);
+    } else if (authProvider.errorMessage != null) {
+      // Real auth error (wrong credentials, 401, etc.) — show snackbar
+      setState(() => _isServerWarmingUp = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.errorMessage!),
+          backgroundColor: AppConstants.errorColor,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    }
+  }
+
+  /// Start a 20-second countdown then auto-retry login.
+  void _startAutoRetry(AuthProvider authProvider) {
+    if (!mounted) return;
+    setState(() {
+      _isServerWarmingUp = true;
+      _retryCountdown    = 20;
+    });
+
+    _retryTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) { timer.cancel(); return; }
+      setState(() => _retryCountdown--);
+      if (_retryCountdown <= 0) {
+        timer.cancel();
+        if (mounted && _savedEmail != null && _savedPassword != null) {
+          _login(); // auto-retry
+        }
+      }
+    });
   }
 
   @override
@@ -178,6 +224,55 @@ class _LoginScreenState extends State<LoginScreen>
                 ],
               ),
             ),
+
+            // ── Render Warm-up Banner ─────────────────────────────────
+            if (_isServerWarmingUp)
+              Container(
+                margin: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF8E1),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFFBC02D), width: 1),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 18, height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFFF59E0B),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Server is starting up... Retrying in ${_retryCountdown}s',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF92400E),
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        _retryTimer?.cancel();
+                        _login();
+                      },
+                      child: const Text(
+                        'Retry now',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFF59E0B),
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
             // ── Form Card ─────────────────────────────────────────────
             FadeTransition(
