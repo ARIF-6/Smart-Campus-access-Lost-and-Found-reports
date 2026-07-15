@@ -60,6 +60,11 @@ class ApiService {
       onRequest: (options, handler) async {
         options.headers['x-client-platform'] = 'mobile';
 
+        // Normalize path resolution: remove leading slash to prevent Dio from stripping '/api/'
+        if (options.path.startsWith('/')) {
+          options.path = options.path.substring(1);
+        }
+
         // Use in-memory cached token first; fall back to SharedPreferences only
         // on the first request or after a restart (cache miss).
         String? token = _cachedToken;

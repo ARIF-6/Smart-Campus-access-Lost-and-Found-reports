@@ -24,18 +24,18 @@ class AppConstants {
   // API URL
   static String get baseUrl {
     if (kReleaseMode || !useLocalBackend) {
-      return '$_kProdBackendUrl/api';
+      return '$_kProdBackendUrl/api/';
     }
     if (kIsWeb) {
-      return 'http://localhost:5000/api';
+      return 'http://localhost:5000/api/';
     }
     try {
       if (Platform.isAndroid) {
         // 10.0.2.2 maps to the host machine's localhost from an Android emulator.
-        return 'http://10.0.2.2:5000/api';
+        return 'http://10.0.2.2:5000/api/';
       }
     } catch (_) {}
-    return 'http://localhost:5000/api';
+    return 'http://localhost:5000/api/';
   }
 
   static String get serverUrl {

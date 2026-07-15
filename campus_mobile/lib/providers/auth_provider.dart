@@ -19,7 +19,14 @@ class AuthProvider extends ChangeNotifier {
   String? _errorMessage;
   bool _isConnectionError = false;
 
-  bool get isAuthenticated => _token != null && !JwtDecoder.isExpired(_token!);
+  bool get isAuthenticated {
+    if (_token == null) return false;
+    try {
+      return !JwtDecoder.isExpired(_token!);
+    } catch (_) {
+      return false;
+    }
+  }
   String? get role => _user?['role'];
   Map<String, dynamic>? get user => _user;
     String? get classId {
