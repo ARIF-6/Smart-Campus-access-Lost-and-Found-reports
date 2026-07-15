@@ -30,9 +30,9 @@ class ApiService {
   ApiService._internal() {
     _dio = Dio(BaseOptions(
       baseUrl: AppConstants.baseUrl,
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 20),
-      sendTimeout: const Duration(seconds: 15),
+      connectTimeout: const Duration(seconds: 30),  // Heroku cold-start can take 30-60s
+      receiveTimeout: const Duration(seconds: 60),  // Must exceed Heroku cold-start time
+      sendTimeout: const Duration(seconds: 30),
     ));
 
     // Trust Let's Encrypt / Custom SSL on older Android devices for our Render host.
@@ -44,7 +44,7 @@ class ApiService {
           final client = HttpClient();
           client.badCertificateCallback =
               (X509Certificate cert, String host, int port) {
-            if (host == hostName || host == 'smart-campus-access-lost-and-found-dbgg.onrender.com') {
+            if (host == hostName || host == 'smart-campus-access-1cc4e15f5ba0.herokuapp.com') {
               return true;
             }
             return false;

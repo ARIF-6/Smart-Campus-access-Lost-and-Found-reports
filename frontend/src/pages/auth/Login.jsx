@@ -49,9 +49,17 @@ const Login = () => {
         setFieldErrors(mappedErrors);
         setError("Invalid login details.");
       } else {
-        const message = err.response && err.response.data && err.response.data.message
-          ? err.response.data.message
-          : 'Failed to connect to server. Please try again later.';
+        let message;
+        if (err.code === 'ECONNABORTED' || err.message?.includes('timeout') || err.userMessage) {
+          // Heroku dyno is cold-starting (can take 30-60s). Prompt user to retry.
+          message = 'Server is starting up. Please wait a moment and try again.';
+        } else if (err.response?.data?.message) {
+          message = err.response.data.message;
+        } else if (!err.response) {
+          message = 'Unable to reach the server. Please check your internet connection.';
+        } else {
+          message = 'Failed to connect to server. Please try again later.';
+        }
 
         setError(message);
 

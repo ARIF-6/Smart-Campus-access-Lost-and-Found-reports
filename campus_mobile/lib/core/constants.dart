@@ -14,7 +14,7 @@ class AppConstants {
   // ⚠️  DO NOT use 192.168.x.x, 127.0.0.1, or 10.0.2.2 here — these are
   //     private/local addresses that only work on your development machine.
   // ─────────────────────────────────────────────────────────────────────────
-  static const String _kProdBackendUrl = 'https://smart-campus-access-lost-and-found-dbgg.onrender.com';
+  static const String _kProdBackendUrl = 'https://smart-campus-access-1cc4e15f5ba0.herokuapp.com';
   //                                      ↑ REPLACE THIS with your public backend URL
 
   // Set this to true if you are running the backend server locally on your machine.

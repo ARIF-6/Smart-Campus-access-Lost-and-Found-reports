@@ -581,11 +581,10 @@ const UniversityManagement = () => {
                     <td className="px-6 py-4 text-gray-900 font-bold">{c.name}</td>
                     <td className="px-6 py-4">
                       {c.qrExpiresAt ? (
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border ${
-                          new Date() < new Date(c.qrExpiresAt)
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border ${new Date() < new Date(c.qrExpiresAt)
                             ? 'bg-green-50 text-green-700 border-green-200'
                             : 'bg-red-50 text-red-600 border-red-200'
-                        }`}>
+                          }`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${new Date() < new Date(c.qrExpiresAt) ? 'bg-green-500' : 'bg-red-500'}`} />
                           {new Date() < new Date(c.qrExpiresAt) ? 'QR Active' : 'QR Expired'}
                         </span>
