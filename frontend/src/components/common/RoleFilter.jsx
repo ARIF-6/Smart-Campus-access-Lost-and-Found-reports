@@ -12,7 +12,7 @@ const RoleFilter = ({ selectedRole, setSelectedRole }) => {
         <option value="admin">Admins</option>
         <option value="student">Students</option>
         <option value="security">Security</option>
-        <option value="cleaner">Cleaners</option>
+        <option value="clean">Cleaners</option>
       </select>
     </div>
   );

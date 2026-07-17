@@ -727,30 +727,14 @@ exports.getCampusQRPDF = async (req, res) => {
       : 'N/A';
 
     doc.fillColor('#374151').fontSize(11).font('Helvetica-Bold')
-       .text('QR Code Token:', 60, detailsY);
-    doc.fillColor('#6B7280').font('Courier').fontSize(9)
-       .text(campus.qrCode, 60, detailsY + 16, { width: doc.page.width - 120 });
-
-    doc.fillColor('#374151').fontSize(11).font('Helvetica-Bold')
-       .text('Generated:', 60, detailsY + 42);
+       .text('Generated:', 60, detailsY);
     doc.fillColor('#6B7280').font('Helvetica').fontSize(10)
-       .text(formattedGen, 155, detailsY + 42);
+       .text(formattedGen, 155, detailsY);
 
     doc.fillColor('#374151').fontSize(11).font('Helvetica-Bold')
-       .text('Expires:', 60, detailsY + 62);
+       .text('Expires:', 60, detailsY + 20);
     doc.fillColor('#EF4444').font('Helvetica-Bold').fontSize(10)
-       .text(formattedExp, 155, detailsY + 62);
-
-    // ── Instruction ────────────────────────────────────────────────────
-    doc.roundedRect(60, detailsY + 94, doc.page.width - 120, 52, 8)
-       .fill('#F0F9FF');
-    doc.fillColor('#1B3A6B').fontSize(10).font('Helvetica-Bold')
-       .text('📲 Scan Instructions', 72, detailsY + 104);
-    doc.fillColor('#374151').fontSize(9).font('Helvetica')
-       .text(
-         'Students must open the Smart Campus mobile app, tap "Scan", point the camera at this QR code, then enter their Student ID to record campus entry or exit.',
-         72, detailsY + 118, { width: doc.page.width - 144 }
-       );
+       .text(formattedExp, 155, detailsY + 20);
 
     // ── Footer ─────────────────────────────────────────────────────────
     doc.rect(0, doc.page.height - 48, doc.page.width, 48).fill('#F3F4F6');

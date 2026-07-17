@@ -51,6 +51,8 @@ const campusEnvironmentRoutes = require("./modules/campusEnvironment/routes/camp
 const classIssueRoutes = require("./modules/classIssues/routes/classIssueRoutes");
 const hostRoutes = require("./routes/hostRoutes");
 const campusAttendanceRoutes = require("./routes/campusAttendanceRoutes");
+const ownershipReportRoutes = require("./routes/ownershipReportRoutes");
+const ownershipDisputeRoutes = require("./routes/ownershipDisputeRoutes");
 const app = express();
 
 // Connect to database
@@ -168,6 +170,8 @@ app.use("/api/campus-environment", campusEnvironmentRoutes);
 app.use("/api/class-issues", classIssueRoutes);
 app.use("/api/hosts", hostRoutes);
 app.use("/api/campus-attendance", campusAttendanceRoutes);
+app.use("/api/ownership-reports", ownershipReportRoutes);
+app.use("/api/ownership-disputes", ownershipDisputeRoutes);
 
 // Lightweight ping endpoint — used for cold-start warmup. No auth, no DB.
 app.get("/api/ping", (req, res) => {

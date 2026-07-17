@@ -1157,6 +1157,7 @@ class _StudentHomeTabState extends State<StudentHomeTab>
   }
 }
 
+
 // ── Data classes ──────────────────────────────────────────────────────
 class _Feature {
   final IconData icon;

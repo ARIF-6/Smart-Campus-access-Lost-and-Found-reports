@@ -44,8 +44,18 @@ const foundItemSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["pending","approved","rejected","claimed","returned","stored"],
+    enum: ["pending","in review","approved","rejected","claimed","returned","under_ownership_review"],
     default: 'pending'
+  },
+  currentReturnedStudent: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  activeDispute: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'OwnershipDispute',
+    default: null
   },
   storageLocation: {
     type: String,
@@ -60,6 +70,21 @@ const foundItemSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  comments: [{
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    comment: {
+      type: String,
+      required: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   isDeleted: {
     type: Boolean,
     default: false

@@ -34,6 +34,7 @@ const notificationSchema = new mongoose.Schema({
       'CLASS_ISSUE_CREATED',
       'CLASS_ISSUE_UPDATED',
       'SECURITY_ALERT',
+      'OWNERSHIP_DISPUTE',
       'GENERAL'
     ],
     required: true

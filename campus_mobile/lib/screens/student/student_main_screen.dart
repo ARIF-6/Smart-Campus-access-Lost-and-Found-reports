@@ -42,24 +42,35 @@ class StudentMainScreenState extends State<StudentMainScreen> {
         // Also refresh list via provider
         Provider.of<NotificationProvider>(context, listen: false).fetchNotifications();
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(data['title'] ?? 'New Notification',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(data['message'] ?? ''),
-              ],
-            ),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            margin: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-            backgroundColor: _navyPrimary,
-            duration: const Duration(seconds: 4),
-          ),
+        _showTopAlertNotification(
+          data['title'] ?? 'New Notification',
+          data['message'] ?? '',
         );
+      }
+    });
+  }
+
+  void _showTopAlertNotification(String title, String message) {
+    late OverlayEntry overlayEntry;
+    
+    overlayEntry = OverlayEntry(
+      builder: (context) => _TopNotificationWidget(
+        title: title,
+        message: message,
+        onDismiss: () {
+          if (overlayEntry.mounted) {
+            overlayEntry.remove();
+          }
+        },
+      ),
+    );
+
+    Overlay.of(context).insert(overlayEntry);
+
+    // Auto dismiss after 4 seconds
+    Future.delayed(const Duration(seconds: 4), () {
+      if (overlayEntry.mounted) {
+        overlayEntry.remove();
       }
     });
   }
@@ -275,6 +286,145 @@ class StudentMainScreenState extends State<StudentMainScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TopNotificationWidget extends StatefulWidget {
+  final String title;
+  final String message;
+  final VoidCallback onDismiss;
+
+  const _TopNotificationWidget({
+    required this.title,
+    required this.message,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_TopNotificationWidget> createState() => _TopNotificationWidgetState();
+}
+
+class _TopNotificationWidgetState extends State<_TopNotificationWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _slideAnimation;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+
+    _slideAnimation = Tween<double>(begin: -100, end: 0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
+    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
+    );
+
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _dismiss() {
+    _controller.reverse().then((_) => widget.onDismiss());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
+    
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Positioned(
+          top: topPadding + 16 + _slideAnimation.value,
+          left: 16,
+          right: 16,
+          child: Opacity(
+            opacity: _fadeAnimation.value,
+            child: Material(
+              color: Colors.transparent,
+              child: GestureDetector(
+                onTap: _dismiss,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1B3A6B),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.18),
+                        blurRadius: 16,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.notifications_active_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.title,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                height: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              widget.message,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.85),
+                                fontSize: 12,
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white60, size: 20),
+                        onPressed: _dismiss,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

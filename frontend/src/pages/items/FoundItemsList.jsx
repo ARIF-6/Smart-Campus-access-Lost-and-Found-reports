@@ -5,6 +5,7 @@ import { getFoundItems, deleteFoundItem, markItemReturned } from '../../services
 import { fetchLostFoundCategories } from '../../services/categoryService';
 import ReportFoundItemModal from '../../components/modals/ReportFoundItemModal';
 import EditFoundItemModal from '../../components/modals/EditFoundItemModal';
+import AdminCommentsModal from '../../components/modals/AdminCommentsModal';
 import SearchBar from '../../components/common/SearchBar';
 import Pagination from '../../components/common/Pagination';
 import Filter from '../../components/common/Filter';
@@ -16,6 +17,7 @@ const FoundItemsList = () => {
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [commentItem, setCommentItem] = useState(null);
   const [dynamicCategories, setDynamicCategories] = useState([]);
 
   // Pagination & Filtering State
@@ -54,7 +56,7 @@ const FoundItemsList = () => {
 
   const handleMarkReturned = async (id, itemStatus) => {
     if (itemStatus === 'pending') {
-      alert('This item cannot be returned until the claim request has been accepted.');
+      alert('This item cannot be returned while its status is Pending.');
       return;
     }
     try {
@@ -79,9 +81,8 @@ const FoundItemsList = () => {
   const statusOptions = [
     { value: 'all', label: 'All Status' },
     { value: 'pending', label: 'Pending' },
-    { value: 'approved', label: 'Approved' },
-    { value: 'rejected', label: 'Rejected' },
-    { value: 'claimed', label: 'Claimed' }
+    { value: 'in review', label: 'In Review' },
+    { value: 'returned', label: 'Returned' }
   ];
 
   const categoryOptions = [
@@ -92,8 +93,12 @@ const FoundItemsList = () => {
     switch (status?.toLowerCase()) {
       case 'pending':
         return <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-[10px] font-black uppercase tracking-widest border border-yellow-200">Pending</span>;
+      case 'in review':
+        return <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-200">In Review</span>;
+      case 'returned':
+        return <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-[10px] font-black uppercase tracking-widest border border-purple-200">Returned</span>;
       case 'approved':
-        return <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-200">Approved</span>;
+        return <span className="px-3 py-1 bg-teal-100 text-teal-800 rounded-full text-[10px] font-black uppercase tracking-widest border border-teal-200">Approved</span>;
       case 'rejected':
         return <span className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-[10px] font-black uppercase tracking-widest border border-red-200">Rejected</span>;
       case 'claimed':
@@ -221,13 +226,24 @@ const FoundItemsList = () => {
                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                           </Link>
                           
+                          {/* Comment Icon Button */}
+                          <button onClick={() => setCommentItem(item)} className="p-2 text-slate-400 hover:bg-slate-50 hover:text-indigo-600 rounded-xl transition-all" title="View & Add Comments">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                          </button>
+
                           {/* Always allow Editing for Full CRUD */}
                           <button onClick={() => setEditingItem(item)} className="p-2 text-blue-400 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-all" title="Edit Item Info">
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                           </button>
 
-                          {item.status === 'approved' && (
-                            <button onClick={() => handleMarkReturned(item._id, item.status)} className="p-2 text-emerald-400 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl transition-all" title="Mark as Returned">
+                          {item.status !== 'returned' && (
+                            <button 
+                              onClick={() => handleMarkReturned(item._id, item.status)} 
+                              className={`p-2 rounded-xl transition-all ${item.status === 'pending' ? 'text-gray-300 cursor-not-allowed hover:bg-transparent' : 'text-emerald-400 hover:bg-emerald-50 hover:text-emerald-600'}`} 
+                              title={item.status === 'pending' ? 'This item cannot be returned while its status is Pending.' : 'Mark as Returned'}
+                            >
                               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                             </button>
                           )}
@@ -260,6 +276,13 @@ const FoundItemsList = () => {
         onClose={() => setEditingItem(null)} 
         onSuccess={fetchItems}
         item={editingItem}
+      />
+
+      <AdminCommentsModal
+        isOpen={!!commentItem}
+        onClose={() => setCommentItem(null)}
+        itemId={commentItem?._id}
+        itemTitle={commentItem?.title}
       />
     </AdminLayout>
   );

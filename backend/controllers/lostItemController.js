@@ -167,25 +167,27 @@ exports.deleteLostItem = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, message: 'Only authorized personnel (admin/staff/security) can delete reports' });
   }
 
-  // Permanently delete the lost item from the database
-  await LostItem.findByIdAndDelete(req.params.id);
+  // Soft delete the lost item in the database
+  item.isDeleted = true;
+  item.deletedAt = new Date();
+  await item.save();
 
   try {
     const { emitGlobalEvent } = require('../socket/events/notificationEvents');
     emitGlobalEvent('lostItem:deleted', { _id: req.params.id });
   } catch (_) {}
 
-  // Log audit for permanent deletion
+  // Log audit for soft deletion
   await logAction({
     userId: req.user.id,
-    action: 'PERMANENT_DELETE',
+    action: 'DELETE',
     targetId: item._id,
     targetType: 'LostItem',
-    details: `Permanently deleted lost item: ${item.title}`,
+    details: `Soft deleted lost item: ${item.title}`,
     req
   });
 
-  return res.status(200).json({ success: true, message: 'Lost item permanently deleted' });
+  return res.status(200).json({ success: true, message: 'Lost item moved to trash' });
 });
 
 // @desc    Restore soft deleted lost item

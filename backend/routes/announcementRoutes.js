@@ -5,7 +5,8 @@ const {
   getAnnouncements, 
   deleteAnnouncement,
   restoreAnnouncement,
-  permanentDeleteAnnouncement
+  permanentDeleteAnnouncement,
+  getStudentList
 } = require('../controllers/announcementController');
 const { protect } = require('../middleware/authMiddleware');
 const { adminOnly, adminOrStaff } = require('../middleware/roleMiddleware');
@@ -21,9 +22,11 @@ router.route('/')
   .post(adminOrStaff, [
     body('title', 'Title is required').notEmpty().trim().escape(),
     body('message', 'Message is required').notEmpty().trim().escape(),
-    body('targetRoles', 'Target Roles are required').notEmpty(),
     validate
   ], createAnnouncement);
+
+// Student list for specific-student picker (must be before /:id)
+router.get('/students', adminOrStaff, getStudentList);
 
 router.route('/:id')
   .delete(adminOrStaff, deleteAnnouncement);

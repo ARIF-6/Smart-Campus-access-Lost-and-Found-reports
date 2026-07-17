@@ -39,9 +39,9 @@ const FoundItemDetails = () => {
   }, [id]);
 
   const handleMarkReturned = async () => {
-    // Guard: cannot return while a claim is still pending
+    // Guard: cannot return while status is pending
     if (item.status === 'pending') {
-      toast.error('This item cannot be returned until the claim request has been accepted.');
+      toast.error('This item cannot be returned while its status is Pending.');
       return;
     }
     try {
@@ -163,6 +163,135 @@ const FoundItemDetails = () => {
               </div>
             </div>
 
+            {/* RENDER FOR RETURNED ITEMS */}
+            {item.status === 'returned' && item.currentReturnedStudent && (
+              <div className="mb-8 p-6 bg-green-50/50 rounded-2xl border border-green-200/60 shadow-sm animate-in fade-in duration-200">
+                <h3 className="text-sm font-black text-green-800 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  Latest Returned Owner (Handed Over)
+                </h3>
+                
+                <div className="flex flex-col sm:flex-row items-center gap-6">
+                  <div className="w-20 h-20 rounded-2xl border-2 border-green-200 shadow overflow-hidden bg-green-50 shrink-0">
+                    {item.currentReturnedStudent.photoUrl ? (
+                      <img
+                        src={getImageUrl(item.currentReturnedStudent.photoUrl)}
+                        alt={item.currentReturnedStudent.fullName}
+                        className="w-full h-full object-cover"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-green-600 font-black text-2xl">
+                        {item.currentReturnedStudent.fullName.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-xs">
+                    <div>
+                      <span className="block text-[10px] font-bold text-green-500 uppercase tracking-wider">Full Name</span>
+                      <span className="text-sm font-bold text-slate-800">{item.currentReturnedStudent.fullName}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-bold text-green-500 uppercase tracking-wider">Student ID</span>
+                      <span className="text-sm font-mono font-bold text-slate-855">{item.currentReturnedStudent.studentId || '—'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-bold text-green-500 uppercase tracking-wider">Faculty / Dept</span>
+                      <span className="text-slate-700 font-semibold">
+                        {item.currentReturnedStudent.faculty?.name || item.currentReturnedStudent.faculty || '—'} / {item.currentReturnedStudent.department?.name || item.currentReturnedStudent.department || '—'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-bold text-green-500 uppercase tracking-wider">Class / Handover Time</span>
+                      <span className="text-slate-700 font-semibold">
+                        Class: {item.currentReturnedStudent.class?.name || item.currentReturnedStudent.class || '—'} 
+                        {item.returnedAt && ` (Handover: ${new Date(item.returnedAt).toLocaleString()})`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* RENDER FOR ITEMS UNDER OWNERSHIP REVIEW */}
+            {item.status === 'under_ownership_review' && (
+              <div className="mb-8 p-6 bg-red-50/20 rounded-2xl border border-red-100/80 shadow-sm animate-in fade-in duration-200">
+                <h3 className="text-sm font-black text-red-800 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-red-650" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                  Ownership Dispute Verification — Classify Participants
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* PREVIOUS RETURNED STUDENT */}
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <span className="inline-block text-[9px] font-black uppercase tracking-wider text-slate-500 bg-slate-100 px-2 py-0.5 rounded mb-3">
+                      Previous Returned Student
+                    </span>
+                    {item.currentReturnedStudent ? (
+                      <div className="flex gap-4">
+                        <div className="w-14 h-14 rounded-xl border border-slate-200 overflow-hidden bg-slate-50 shrink-0">
+                          {item.currentReturnedStudent.photoUrl ? (
+                            <img
+                              src={getImageUrl(item.currentReturnedStudent.photoUrl)}
+                              alt={item.currentReturnedStudent.fullName}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-lg">
+                              {item.currentReturnedStudent.fullName.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div className="space-y-0.5 text-xs text-slate-600">
+                          <p className="text-sm font-bold text-slate-800">{item.currentReturnedStudent.fullName}</p>
+                          <p className="font-mono">ID: {item.currentReturnedStudent.studentId || '—'}</p>
+                          <p>Faculty: {item.currentReturnedStudent.faculty?.name || item.currentReturnedStudent.faculty || '—'}</p>
+                          <p>Dept/Class: {item.currentReturnedStudent.department?.name || item.currentReturnedStudent.department || '—'} ({item.currentReturnedStudent.class?.name || item.currentReturnedStudent.class || '—'})</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">No previous owner recorded.</p>
+                    )}
+                  </div>
+
+                  {/* CURRENT CLAIMANT / REPORTER */}
+                  <div className="bg-white p-4 rounded-xl border border-indigo-150 shadow-sm">
+                    <span className="inline-block text-[9px] font-black uppercase tracking-wider text-indigo-750 bg-indigo-50 px-2 py-0.5 rounded mb-3">
+                      Current Ownership Claimant (Reporter)
+                    </span>
+                    {item.activeDispute?.newClaimant ? (
+                      <div className="flex gap-4">
+                        <div className="w-14 h-14 rounded-xl border border-indigo-200 overflow-hidden bg-indigo-50 shrink-0">
+                          {item.activeDispute.newClaimant.photoUrl ? (
+                            <img
+                              src={getImageUrl(item.activeDispute.newClaimant.photoUrl)}
+                              alt={item.activeDispute.newClaimant.fullName}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-indigo-400 font-bold text-lg">
+                              {item.activeDispute.newClaimant.fullName.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div className="space-y-0.5 text-xs text-slate-600">
+                          <p className="text-sm font-bold text-slate-800">{item.activeDispute.newClaimant.fullName}</p>
+                          <p className="font-mono">ID: {item.activeDispute.newClaimant.studentId || '—'}</p>
+                          <p>Faculty: {item.activeDispute.newClaimant.faculty?.name || item.activeDispute.newClaimant.faculty || '—'}</p>
+                          <p>Dept/Class: {item.activeDispute.newClaimant.department?.name || item.activeDispute.newClaimant.department || '—'} ({item.activeDispute.newClaimant.class?.name || item.activeDispute.newClaimant.class || '—'})</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">No claimant information found.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
              <div className="pt-6 border-t border-gray-200 flex flex-wrap gap-4">
                    {item.status !== 'returned' && (
                      <>
@@ -173,28 +302,15 @@ const FoundItemDetails = () => {
                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                          Edit Details
                        </button>
-                       {item.status === 'pending' ? (
-                         <div className="group relative">
-                           <button 
-                             disabled
-                             className="px-6 py-2.5 bg-gray-200 text-gray-400 rounded-lg shadow-sm font-semibold cursor-not-allowed flex items-center gap-2"
-                           >
-                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                             Flag as Returned
-                           </button>
-                           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10 w-64 bg-gray-800 text-white text-xs rounded-lg px-3 py-2 text-center shadow-lg">
-                             Cannot return while claim is still Pending. Approve the claim first.
-                           </div>
-                         </div>
-                       ) : (
-                         <button 
-                           onClick={handleMarkReturned}
-                           className="px-6 py-2.5 bg-orange-500 text-white rounded-lg shadow-sm font-semibold hover:bg-orange-600 transition-colors flex items-center gap-2"
+                        {item.status === 'approved' && (
+                          <button 
+                            onClick={handleMarkReturned}
+                            className="px-6 py-2.5 bg-orange-500 text-white rounded-lg shadow-sm font-semibold hover:bg-orange-600 transition-colors flex items-center gap-2"
                           >
-                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                           Flag as Returned
-                         </button>
-                       )}
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                            Flag as Returned
+                          </button>
+                        )}
                      </>
                    )}
                <button 

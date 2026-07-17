@@ -1,67 +1,99 @@
 const Announcement = require('../models/Announcement');
+const User = require('../models/User');
 const { logAction } = require('../utils/auditLogger');
 const { getIO } = require('../utils/socket');
 const APIFeatures = require('../utils/apiFeatures');
 
 // @desc    Create a new announcement
 // @route   POST /api/announcements
-// @access  Private/Admin
+// @access  Private/Admin or Staff
 exports.createAnnouncement = async (req, res) => {
   try {
-    const { title, message, targetRoles } = req.body;
+    const { title, message, targetRoles, recipientType, recipientUserId } = req.body;
 
     if (!title || !message) {
       return res.status(400).json({ message: 'Title and message are required' });
     }
 
+    const { createNotification } = require('./notificationController');
+
+    // ── Specific-student branch ──────────────────────────────────────────────
+    if (recipientType === 'specific_student') {
+      if (!recipientUserId) {
+        return res.status(400).json({ message: 'recipientUserId is required for specific_student announcements' });
+      }
+
+      const recipient = await User.findOne({ _id: recipientUserId, role: 'student', isDeleted: { $ne: true } });
+      if (!recipient) {
+        return res.status(400).json({ message: 'The selected student could not be found or is no longer active.' });
+      }
+
+      const announcement = await Announcement.create({
+        title,
+        message,
+        targetRoles: ['student'],
+        recipientType: 'specific_student',
+        recipientUserId: recipient._id,
+        createdBy: req.user.id
+      });
+
+      // Notify only the specific student
+      await createNotification({
+        title: `Announcement: ${title}`,
+        message,
+        type: 'GENERAL',
+        userId: recipient._id,
+        recipientRole: null,
+        module: 'General',
+        relatedId: announcement._id
+      });
+
+      // Real-time: emit only to that user's socket room
+      const io = getIO();
+      if (io) {
+        io.to(`user:${recipient._id}`).emit('new_announcement', {
+          _id: announcement._id,
+          title: announcement.title,
+          message: announcement.message,
+          targetRoles: announcement.targetRoles,
+          recipientType: 'specific_student',
+          createdAt: announcement.createdAt
+        });
+      }
+
+      await logAction({
+        userId: req.user.id,
+        action: 'CREATE_ANNOUNCEMENT',
+        targetId: announcement._id,
+        targetType: 'Other',
+        details: `Created personal announcement for student ${recipient.studentId || recipient._id}: ${title}`,
+        req
+      });
+
+      return res.status(201).json(announcement);
+    }
+
+    // ── Broadcast / legacy branch ────────────────────────────────────────────
+    const finalRecipientType = recipientType === 'all_students' ? 'all_students' : null;
     const announcement = await Announcement.create({
       title,
       message,
       targetRoles: targetRoles || ['all'],
+      recipientType: finalRecipientType,
+      recipientUserId: null,
       createdBy: req.user.id
     });
 
-    // Create notifications for the target roles
-    const { createNotification } = require('./notificationController');
     const roles = targetRoles && targetRoles.length > 0 ? targetRoles : ['all'];
-    
     for (let role of roles) {
-      // Map 'clean' to 'clean' or 'cleaner' to be compatible with both
       if (role === 'clean') {
-        // Create notification for 'clean'
-        await createNotification({
-          title: `Announcement: ${title}`,
-          message: message,
-          type: 'GENERAL',
-          recipientRole: 'clean',
-          userId: null,
-          module: 'General',
-          relatedId: announcement._id
-        });
-        // Also create for 'cleaner' just in case
-        await createNotification({
-          title: `Announcement: ${title}`,
-          message: message,
-          type: 'GENERAL',
-          recipientRole: 'cleaner',
-          userId: null,
-          module: 'General',
-          relatedId: announcement._id
-        });
+        await createNotification({ title: `Announcement: ${title}`, message, type: 'GENERAL', recipientRole: 'clean',   userId: null, module: 'General', relatedId: announcement._id });
+        await createNotification({ title: `Announcement: ${title}`, message, type: 'GENERAL', recipientRole: 'cleaner', userId: null, module: 'General', relatedId: announcement._id });
       } else {
-        await createNotification({
-          title: `Announcement: ${title}`,
-          message: message,
-          type: 'GENERAL',
-          recipientRole: role,
-          userId: null,
-          module: 'General',
-          relatedId: announcement._id
-        });
+        await createNotification({ title: `Announcement: ${title}`, message, type: 'GENERAL', recipientRole: role, userId: null, module: 'General', relatedId: announcement._id });
       }
     }
 
-    // Log the action
     await logAction({
       userId: req.user.id,
       action: 'CREATE_ANNOUNCEMENT',
@@ -71,7 +103,6 @@ exports.createAnnouncement = async (req, res) => {
       req
     });
 
-    // Emit socket event
     const io = getIO();
     if (io) {
       io.emit('new_announcement', {
@@ -102,10 +133,15 @@ exports.getAnnouncements = async (req, res) => {
     };
 
     if (userRole !== 'admin' && userRole !== 'staff') {
-      queryConditions.$or = [
+      // Students see: role-broadcast announcements AND personal announcements addressed to them
+      const orClauses = [
         { targetRoles: 'all' },
         { targetRoles: userRole }
       ];
+      if (userRole === 'student') {
+        orClauses.push({ recipientType: 'specific_student', recipientUserId: req.user.id });
+      }
+      queryConditions.$or = orClauses;
     }
 
     const baseQuery = Announcement.find(queryConditions);
@@ -227,6 +263,38 @@ exports.getTrashedAnnouncements = async (req, res) => {
   try {
     const announcements = await Announcement.find({ isDeleted: true }).sort({ deletedAt: -1 });
     res.status(200).json(announcements);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Get all students (for specific-student picker)
+// @route   GET /api/announcements/students
+// @access  Private/Admin or Staff
+exports.getStudentList = async (req, res) => {
+  try {
+    const search = (req.query.search || '').trim();
+    const filter = {
+      role: 'student',
+      isDeleted: { $ne: true },
+      isActive: { $ne: false }
+    };
+    if (search) {
+      filter.$or = [
+        { studentId: { $regex: search, $options: 'i' } },
+        { fullName:  { $regex: search, $options: 'i' } }
+      ];
+    }
+    const students = await User
+      .find(filter)
+      .select('_id fullName studentId photoUrl faculty department class')
+      .populate('faculty',    'name')
+      .populate('department', 'name')
+      .populate('class',      'name')
+      .sort({ fullName: 1 })
+      .limit(100)
+      .lean();
+    res.status(200).json({ success: true, data: students });
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }

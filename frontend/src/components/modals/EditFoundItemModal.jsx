@@ -175,18 +175,13 @@ const EditFoundItemModal = ({ isOpen, onClose, onSuccess, item }) => {
                   onChange={handleChange}
                   className={`w-full px-4 py-2 border rounded-xl outline-none text-sm focus:ring-2 transition-all appearance-none cursor-pointer ${
                     formData.status === 'pending' ? 'border-yellow-200 text-yellow-700 bg-yellow-50 focus:ring-yellow-100' :
-                    formData.status === 'approved' ? 'border-blue-200 text-blue-700 bg-blue-50 focus:ring-blue-100' :
-                    formData.status === 'claimed' ? 'border-green-200 text-green-700 bg-green-50 focus:ring-green-100' :
+                    formData.status === 'in review' ? 'border-blue-200 text-blue-700 bg-blue-50 focus:ring-blue-100' :
                     formData.status === 'returned' ? 'border-purple-200 text-purple-700 bg-purple-50 focus:ring-purple-100' :
                     'border-gray-200 text-gray-700 bg-gray-50 focus:border-blue-500 focus:ring-blue-100'
                   }`}
                 >
                   <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="claimed">Claimed</option>
-                  <option value="returned">Returned</option>
-                  <option value="stored">Stored in Safe</option>
+                  <option value="in review">In Review</option>
                 </select>
               </div>
 

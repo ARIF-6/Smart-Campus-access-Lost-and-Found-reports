@@ -1285,10 +1285,6 @@ const UniversityManagement = () => {
                   {/* QR Details */}
                   <div className="w-full space-y-3 mb-6 bg-gray-50/50 p-4 rounded-xl border border-gray-200">
                     <div className="flex justify-between text-xs font-medium">
-                      <span className="text-gray-400">QR Code Token:</span>
-                      <span className="font-mono text-gray-800 break-all select-all font-bold">{selectedCampusQR.qrCode}</span>
-                    </div>
-                    <div className="flex justify-between text-xs font-medium">
                       <span className="text-gray-400">Generated At:</span>
                       <span className="text-gray-700 font-bold">{new Date(selectedCampusQR.qrGeneratedAt).toLocaleString()}</span>
                     </div>

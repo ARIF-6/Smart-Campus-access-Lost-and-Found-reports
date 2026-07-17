@@ -11,7 +11,9 @@ const {
   markItemReturned,
   linkLostItem,
   restoreFoundItem,
-  permanentDeleteFoundItem
+  permanentDeleteFoundItem,
+  addFoundItemComment,
+  getFoundItemComments
 } = require('../controllers/foundItemController');
 
 const { protect } = require('../middleware/authMiddleware');
@@ -63,5 +65,9 @@ router.route('/:id/returned')
 
 router.route('/:id/link-lost')
   .patch(protect, allowRoles('admin', 'security', 'staff', 'clean'), linkLostItem);
+
+router.route('/:id/comments')
+  .get(protect, allowRoles('admin', 'staff', 'security', 'clean'), getFoundItemComments)
+  .post(protect, allowRoles('admin', 'staff', 'security', 'clean'), addFoundItemComment);
 
 module.exports = router;

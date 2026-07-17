@@ -1,4 +1,5 @@
 import '../core/constants.dart';
+import 'found_item.dart';
 
 class ItemModel {
   final String id;
@@ -11,6 +12,7 @@ class ItemModel {
   final String status;
   final DateTime createdAt;
   final String? itemSource;
+  final ReturnedStudent? currentReturnedStudent;
 
   ItemModel({
     required this.id,
@@ -23,6 +25,7 @@ class ItemModel {
     required this.status,
     required this.createdAt,
     this.itemSource,
+    this.currentReturnedStudent,
   });
 
   factory ItemModel.fromJson(Map<String, dynamic> json) {
@@ -39,6 +42,9 @@ class ItemModel {
           ? DateTime.parse(json['createdAt']) 
           : DateTime.now(),
       itemSource: json['itemSource'],
+      currentReturnedStudent: json['currentReturnedStudent'] is Map
+          ? ReturnedStudent.fromJson(json['currentReturnedStudent'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -60,6 +66,7 @@ class ItemModel {
       'image': image,
       'status': status,
       'createdAt': createdAt.toIso8601String(),
+      'currentReturnedStudent': currentReturnedStudent?.toJson(),
     };
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants.dart';
 import '../../models/item_model.dart';
+import '../../models/found_item.dart';
 
 class ItemViewScreen extends StatelessWidget {
   final ItemModel item;
@@ -73,6 +74,11 @@ class ItemViewScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if ((item.status.toLowerCase() == 'returned' || item.status.toLowerCase() == 'under_ownership_review') &&
+                      item.currentReturnedStudent != null) ...[
+                    const SizedBox(height: 24),
+                    _buildReturnedOwnerCard(item.currentReturnedStudent!),
+                  ],
                   const SizedBox(height: 24),
                   const Text(
                     'Description',
@@ -127,6 +133,94 @@ class ItemViewScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildReturnedOwnerCard(ReturnedStudent student) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEFF6FF),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.handshake_outlined, size: 18, color: Color(0xFF2563EB)),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'LATEST RETURNED OWNER',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF1E293B),
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _buildInfoRow('Full Name', student.fullName),
+          const Divider(height: 16, color: Color(0xFFF1F5F9)),
+          _buildInfoRow('Student ID', student.studentId),
+          if (student.faculty != null && student.faculty!.isNotEmpty) ...[
+            const Divider(height: 16, color: Color(0xFFF1F5F9)),
+            _buildInfoRow('Faculty', student.faculty!),
+          ],
+          if (student.department != null && student.department!.isNotEmpty) ...[
+            const Divider(height: 16, color: Color(0xFFF1F5F9)),
+            _buildInfoRow('Department', student.department!),
+          ],
+          if (student.classField != null && student.classField!.isNotEmpty) ...[
+            const Divider(height: 16, color: Color(0xFFF1F5F9)),
+            _buildInfoRow('Class', student.classField!),
+          ],
+          if (student.returnedAt != null) ...[
+            const Divider(height: 16, color: Color(0xFFF1F5F9)),
+            _buildInfoRow('Handover Date', '${student.returnedAt!.day}/${student.returnedAt!.month}/${student.returnedAt!.year} ${student.returnedAt!.hour.toString().padLeft(2, '0')}:${student.returnedAt!.minute.toString().padLeft(2, '0')}'),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 100,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: AppConstants.textSecondary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppConstants.textPrimary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTypeBadge(bool isLost) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -149,6 +243,7 @@ class ItemViewScreen extends StatelessWidget {
     Color color = Colors.grey;
     if (status.toLowerCase() == 'approved') color = AppConstants.successColor;
     if (status.toLowerCase() == 'pending') color = AppConstants.accentColor;
+    if (status.toLowerCase() == 'under_ownership_review') color = const Color(0xFFF59E0B);
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

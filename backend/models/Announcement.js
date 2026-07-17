@@ -34,6 +34,17 @@ const announcementSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
+  },
+  // New: student targeting
+  recipientType: {
+    type: String,
+    enum: ['all_students', 'specific_student', null],
+    default: null
+  },
+  recipientUserId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
   }
 });
 

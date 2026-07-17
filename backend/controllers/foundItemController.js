@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const FoundItem = require('../models/FoundItem');
 const Claim = require('../models/Claim');
+const OwnershipHistory = require('../models/OwnershipHistory');
 const { findMatchesForFoundItem } = require('../services/matchService');
 const { logAction } = require('../utils/auditLogger');
 const APIFeatures = require('../utils/apiFeatures');
@@ -125,7 +126,13 @@ exports.getAllFoundItems = asyncHandler(async (req, res) => {
     .sort()
     .pagination();
 
-  const items = await features.query.populate('createdBy', 'name fullName email').lean();
+  const items = await features.query
+    .populate('createdBy', 'name fullName email')
+    .populate({
+      path: 'currentReturnedStudent',
+      select: 'fullName studentId faculty department class returnedAt'
+    })
+    .lean();
   const total = await FoundItem.countDocuments({ isDeleted: { $ne: true }, ...features.filterCriteria });
 
   // Check claim status for authenticated user (exclude rejected claims so UI shows correct state)
@@ -177,6 +184,33 @@ exports.getFoundItemById = asyncHandler(async (req, res) => {
   const item = await FoundItem.findById(req.params.id)
     .populate('createdBy', 'name fullName email role')
     .populate('possibleMatch')
+    .populate({
+      path: 'currentReturnedStudent',
+      select: 'fullName studentId faculty department class photoUrl',
+      populate: [
+        { path: 'faculty', select: 'name' },
+        { path: 'department', select: 'name' },
+        { path: 'class', select: 'name' }
+      ]
+    })
+    .populate({
+      path: 'activeDispute',
+      populate: [
+        {
+          path: 'newClaimant',
+          select: 'fullName studentId faculty department class photoUrl',
+          populate: [
+            { path: 'faculty', select: 'name' },
+            { path: 'department', select: 'name' },
+            { path: 'class', select: 'name' }
+          ]
+        },
+        {
+          path: 'ownershipReport',
+          select: 'reason comments status'
+        }
+      ]
+    })
     .lean();
 
   if (!item) {
@@ -203,7 +237,10 @@ exports.updateFoundItem = asyncHandler(async (req, res) => {
   item.description = description || item.description;
   item.category = category || item.category;
   if (locationFound) item.location = locationFound;
-  item.status = status || item.status;
+  // Prevent manually setting status to 'returned' — use the dedicated /returned endpoint
+  if (status && status !== 'returned') {
+    item.status = status;
+  }
   item.storageLocation = storageLocation !== undefined ? storageLocation : item.storageLocation;
   item.priority = priority || item.priority;
   item.notes = notes !== undefined ? notes : item.notes;
@@ -241,47 +278,33 @@ exports.updateFoundItem = asyncHandler(async (req, res) => {
 // @route   DELETE /api/found-items/:id
 // @access  Private (Admin only)
 exports.deleteFoundItem = asyncHandler(async (req, res) => {
-  // Permanently delete the found item from the database
+  // Soft delete the found item in the database
   const item = await FoundItem.findById(req.params.id);
 
   if (!item) {
     return res.status(404).json({ success: false, message: 'Item not found' });
   }
 
-  // If the item has an image stored on Cloudinary, delete it
-  if (item.image && item.image.includes('cloudinary')) {
-    try {
-      const cloudinary = require('../config/cloudinary');
-      const urlParts = item.image.split('/');
-      const filename = urlParts[urlParts.length - 1];
-      const publicId = filename.split('.')[0];
-      const folderPath = urlParts.slice(urlParts.indexOf('upload') + 2, urlParts.length - 1).join('/');
-      const fullPublicId = folderPath ? `${folderPath}/${publicId}` : publicId;
-      await cloudinary.uploader.destroy(fullPublicId);
-    } catch (err) {
-      console.error('Failed to delete image from Cloudinary:', err);
-    }
-  }
-
-  // Remove the document permanently
-  await FoundItem.findByIdAndDelete(req.params.id);
+  item.isDeleted = true;
+  item.deletedAt = new Date();
+  await item.save();
 
   try {
     const { emitGlobalEvent } = require('../socket/events/notificationEvents');
     emitGlobalEvent('foundItem:deleted', { _id: req.params.id });
   } catch (_) {}
 
-  // Log audit of permanent delete
+  // Log audit of soft delete
   await logAction({
     userId: req.user.id,
-    action: 'PERMANENT_DELETE',
+    action: 'DELETE',
     targetId: item._id,
     targetType: 'FoundItem',
-    details: `Permanently deleted found item: ${item.title}`,
+    details: `Soft deleted found item: ${item.title}`,
     req
   });
 
-  return sendSuccess(res, 'Item permanently deleted');
+  return sendSuccess(res, 'Item moved to trash');
 });
 
 // @desc    Mark item as returned
@@ -292,6 +315,13 @@ exports.markItemReturned = asyncHandler(async (req, res) => {
 
   if (!item) {
     return res.status(404).json({ success: false, message: 'Item not found' });
+  }
+
+  if (item.status === 'pending') {
+    return res.status(400).json({
+      success: false,
+      message: 'This item cannot be returned while its status is Pending.'
+    });
   }
 
   // Prevent double-return
@@ -308,15 +338,40 @@ exports.markItemReturned = asyncHandler(async (req, res) => {
     });
   }
 
+  // Find the approved claim for this item to resolve who received it
+  const claim = await Claim.findOne({ item: item._id, status: 'approved' });
+  if (!claim) {
+    return res.status(400).json({
+      success: false,
+      message: 'This item cannot be returned before an ownership claim has been approved.'
+    });
+  }
+
   item.status = 'returned';
   item.returnedAt = new Date();
   item.returnedBy = req.user.id;
+  item.currentReturnedStudent = claim.user;
 
   const updatedItem = await item.save();
+
+  // Create OwnershipHistory record
+  try {
+    await OwnershipHistory.create({
+      foundItem: item._id,
+      eventType: 'item_returned',
+      originalFinder: item.createdBy,
+      returnedStudent: claim ? claim.user : null,
+      previousStatus: 'approved',
+      newStatus: 'returned',
+      decision: 'Initial return handover',
+      reason: 'Handed over by admin'
+    });
+  } catch (err) {
+    console.error('Failed to create ownership history for return:', err);
+  }
   
   // Notify the claimant if there's an approved claim
   try {
-    const claim = await Claim.findOne({ item: item._id, status: 'approved' });
     if (claim) {
       await createNotification({
         userId: claim.user,
@@ -456,6 +511,55 @@ exports.getTrashedFoundItems = asyncHandler(async (req, res) => {
     .lean();
     
   return sendSuccess(res, 'Trashed items fetched successfully', items);
+});
+
+// @desc    Add comment to found item
+// @route   POST /api/found-items/:id/comments
+// @access  Private (Admin/Staff/Security/Cleaner)
+exports.addFoundItemComment = asyncHandler(async (req, res) => {
+  const { comment } = req.body;
+  if (!comment || comment.trim() === '') {
+    return res.status(400).json({ success: false, message: 'Comment cannot be empty' });
+  }
+
+  const item = await FoundItem.findById(req.params.id);
+  if (!item) {
+    return res.status(404).json({ success: false, message: 'Item not found' });
+  }
+
+  item.comments.push({
+    user: req.user.id,
+    comment: comment.trim()
+  });
+
+  await item.save();
+
+  const updatedItem = await FoundItem.findById(item._id)
+    .populate({
+      path: 'comments.user',
+      select: 'fullName role'
+    })
+    .lean();
+
+  return sendSuccess(res, 'Comment added successfully', updatedItem.comments);
+});
+
+// @desc    Get comments of found item
+// @route   GET /api/found-items/:id/comments
+// @access  Private (Admin/Staff/Security/Cleaner)
+exports.getFoundItemComments = asyncHandler(async (req, res) => {
+  const item = await FoundItem.findById(req.params.id)
+    .populate({
+      path: 'comments.user',
+      select: 'fullName role'
+    })
+    .lean();
+
+  if (!item) {
+    return res.status(404).json({ success: false, message: 'Item not found' });
+  }
+
+  return sendSuccess(res, 'Comments fetched successfully', item.comments || []);
 });
 
 

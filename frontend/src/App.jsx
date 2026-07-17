@@ -26,6 +26,7 @@ import {
   AdminProfile
 } from './pages/admin';
 import CategoryManagement from './pages/CategoryManagement';
+import OwnershipReportsList from './pages/admin/OwnershipReportsList';
 // Campus Environment Pages
 import CampusEnvironmentPage from './pages/campus-environment/CampusEnvironmentPage';
 import CampusEnvironmentAnalytics from './pages/campus-environment/CampusEnvironmentAnalytics';
@@ -121,6 +122,10 @@ function App() {
         <Route
           path="/admin/matches"
           element={<ProtectedRoute allowedRoles={['admin', 'staff']}><AdminMatches /></ProtectedRoute>}
+        />
+        <Route
+          path="/admin/ownership-reports"
+          element={<ProtectedRoute allowedRoles={['admin', 'staff']}><OwnershipReportsList /></ProtectedRoute>}
         />
         <Route
           path="/admin/reports"

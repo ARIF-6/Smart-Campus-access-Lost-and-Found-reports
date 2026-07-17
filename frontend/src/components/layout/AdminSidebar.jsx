@@ -155,6 +155,7 @@ const AdminSidebar = ({ isOpen = false, onClose = () => {} }) => {
         { label: 'Lost Items',          path: '/admin/lost-items',        icon: iconPath.lostItems },
         { label: 'Found Items',         path: '/admin/found-items',       icon: iconPath.foundItems },
         { label: 'Claims',              path: '/admin/claims',            icon: iconPath.claims },
+        { label: 'Ownership Claims',    path: '/admin/ownership-reports', icon: iconPath.claims },
       ]
     },
     {

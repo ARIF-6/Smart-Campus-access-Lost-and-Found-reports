@@ -11,50 +11,12 @@ const testGetClassStudents = async () => {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('DB Connected!');
     
-    // Find a class
-    const cls = await ClassModel.findOne();
-    if (!cls) {
-      console.log('No class found in DB');
-      return;
-    }
-    console.log('Found Class:', cls.name, 'with ID:', cls._id);
-
-    const classId = cls._id;
-    const classDetail = await ClassModel.findById(classId)
-      .populate('classLeader', 'fullName email studentId')
-      .populate({
-        path: 'departmentId',
-        select: 'name facultyId',
-        populate: { path: 'facultyId', select: 'name' }
-      })
-      .lean();
-    if (!classDetail) {
-      console.log('Class detail not found');
-      return;
-    }
-    console.log('Class Detail fetched successfully');
-
-    const assignedHall = await Hall.findOne({ class: classId })
-      .select('name campus capacity class')
-      .populate('campus', 'name')
-      .lean();
-    console.log('Assigned Hall:', assignedHall);
-
-    const students = await User.find({
-      role: 'student',
-      isDeleted: { $ne: true },
-      $or: [
-        { class: classId },
-        { department: classDetail.name }
-      ]
-    })
-      .select('fullName email studentId phone isClassLeader isActive photoUrl class')
-      .populate('class', 'name academicYear')
-      .lean();
-    console.log('Found Students:', students.length);
+    const students = await User.find({ role: 'student' }).select('fullName studentId isDeleted isActive').limit(20).lean();
+    console.log('Total students in DB matching role student:', students.length);
+    console.log('Students:', students);
 
   } catch (err) {
-    console.error('Error testing getClassStudents:', err);
+    console.error('Error testing:', err);
   } finally {
     await mongoose.disconnect();
   }

@@ -7,6 +7,7 @@ import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
 import '../../models/found_item.dart';
 import 'claim_request_screen.dart';
+import 'report_ownership_screen.dart';
 
 class FoundItemsScreen extends StatefulWidget {
   const FoundItemsScreen({super.key});
@@ -88,9 +89,14 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                         Provider.of<AuthProvider>(context, listen: false)
                             .user?['_id'];
                     final bool isOwner = item.foundBy == currentUserId;
+                    final bool isUnderReview = item.status.toLowerCase() == 'under_ownership_review';
                     final bool isReturned = ['returned', 'claimed', 'approved']
                         .contains(item.status);
                     final bool isRejected = item.isRejectedByUser;
+                    
+                    final DateTime returnedTime = item.returnedAt ?? item.updatedAt ?? DateTime.now();
+                    final bool canReportOwnership = item.status.toLowerCase() == 'returned' &&
+                        DateTime.now().difference(returnedTime).inHours < 24;
 
                     // ── Tap handler ────────────────────────────────────
                     void handleTap() {
@@ -103,6 +109,28 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                             behavior: SnackBarBehavior.floating,
                           ),
                         );
+                        return;
+                      }
+                      if (isUnderReview) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('This item is currently under ownership review. No further reports are allowed.'),
+                            backgroundColor: Color(0xFFF59E0B),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
+                      if (canReportOwnership) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => ReportOwnershipScreen(item: item)),
+                        ).then((value) {
+                          if (value == true) {
+                            _fetchItems();
+                          }
+                        });
                         return;
                       }
                       if (isReturned) {
@@ -164,6 +192,10 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                         badgeColor = Colors.teal;
                         badgeLabel = 'Approved';
                         break;
+                      case 'under_ownership_review':
+                        badgeColor = const Color(0xFFF59E0B);
+                        badgeLabel = 'Under Review';
+                        break;
                       default:
                         if (isOwner) {
                           badgeColor = Colors.blue;
@@ -183,6 +215,32 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                         icon: Icons.person_outline,
                         text: 'Your Item',
                         color: Colors.blue,
+                      );
+                    } else if (canReportOwnership) {
+                      actionWidget = SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: handleTap,
+                          icon: const Icon(Icons.shield_outlined, size: 16),
+                          label: const Text(
+                            'Report Ownership',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.purple,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                        ),
+                      );
+                    } else if (isUnderReview) {
+                      actionWidget = _infoLabel(
+                        icon: Icons.gavel_rounded,
+                        text: 'Ownership Under Review',
+                        color: const Color(0xFFF59E0B),
                       );
                     } else if (isReturned) {
                       actionWidget = _infoLabel(

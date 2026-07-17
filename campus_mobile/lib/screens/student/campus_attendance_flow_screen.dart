@@ -208,8 +208,6 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // Progress tracker bar
-            _buildProgressBar(),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
@@ -221,71 +219,6 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildProgressBar() {
-    int activeIndex = 0;
-    if (_currentStep == _FlowStep.idEntry) activeIndex = 1;
-    if (_currentStep == _FlowStep.confirm) activeIndex = 2;
-    if (_currentStep == _FlowStep.success) activeIndex = 3;
-
-    final steps = ['Scan QR', 'Enter ID', 'Verify', 'Access'];
-
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: List.generate(steps.length, (index) {
-          final isActive = index <= activeIndex;
-          final isCurrent = index == activeIndex;
-          return Row(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: isCurrent
-                      ? const Color(0xFF2563EB)
-                      : isActive
-                          ? const Color(0xFF1B3A6B)
-                          : Colors.grey.shade200,
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    '${index + 1}',
-                    style: TextStyle(
-                      color: isActive ? Colors.white : Colors.grey.shade500,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                steps[index],
-                style: TextStyle(
-                  color: isCurrent
-                      ? const Color(0xFF2563EB)
-                      : isActive
-                          ? const Color(0xFF0D1B38)
-                          : Colors.grey.shade400,
-                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
-              if (index < steps.length - 1)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Icon(Icons.chevron_right_rounded, size: 16, color: Colors.grey.shade400),
-                ),
-            ],
-          );
-        }),
       ),
     );
   }

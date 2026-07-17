@@ -258,6 +258,60 @@ export const permanentDeleteFoundItem = async (id) => {
   return response.data;
 };
 
+/* Comments Endpoints */
+export const getFoundItemComments = async (id) => {
+  const response = await api.get(`/found-items/${id}/comments`);
+  return response.data;
+};
+
+export const addFoundItemComment = async (id, comment) => {
+  const response = await api.post(`/found-items/${id}/comments`, { comment });
+  return response.data;
+};
+
+/* Ownership Reports Endpoints */
+export const getOwnershipReports = async () => {
+  const response = await api.get('/ownership-reports');
+  return response.data;
+};
+
+export const getOwnershipReportById = async (id) => {
+  const response = await api.get(`/ownership-reports/${id}`);
+  return response.data;
+};
+
+export const resolveOwnershipReport = async (id, data) => {
+  const response = await api.patch(`/ownership-reports/${id}/resolve`, data);
+  return response.data;
+};
+
+export const addOwnershipReportComment = async (id, comment) => {
+  const response = await api.post(`/ownership-reports/${id}/comments`, { comment });
+  return response.data;
+};
+
+/* Ownership Disputes Endpoints */
+export const getOwnershipDisputes = async () => {
+  const response = await api.get('/ownership-disputes');
+  return response.data;
+};
+
+export const getOwnershipDisputeById = async (id) => {
+  const response = await api.get(`/ownership-disputes/${id}`);
+  return response.data;
+};
+
+export const resolveOwnershipDispute = async (id, data) => {
+  const response = await api.post(`/ownership-disputes/${id}/resolve`, data);
+  return response.data;
+};
+
+export const getItemOwnershipHistory = async (itemId) => {
+  const response = await api.get(`/ownership-disputes/history/${itemId}`);
+  return response.data;
+};
+
+
 /* Claims Endpoints */
 export const createClaim = async (formData) => {
   const response = await api.post('/claims', formData, {
@@ -418,6 +472,12 @@ export const permanentDeleteAnnouncement = async (id) => {
   const response = await api.delete(`/announcements/${id}/permanent`);
   return response.data;
 };
+
+export const getStudentList = async (search = '') => {
+  const response = await api.get('/announcements/students', { params: search ? { search } : {} });
+  return response.data;
+};
+
 
 /* Trash Endpoints */
 export const getTrashedUsers = async () => {
