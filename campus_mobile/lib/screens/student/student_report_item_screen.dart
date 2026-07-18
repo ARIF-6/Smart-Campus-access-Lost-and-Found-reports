@@ -111,6 +111,18 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCategory == null) return;
 
+    final bool isLost = _reportType.toLowerCase() == 'lost';
+    if (!isLost && _imageFile == null && _webImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select or capture a photo of the found item.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -465,8 +477,13 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
   Widget _buildPhotoBox(Color accentColor) {
     final bool isEmpty = _imageFile == null;
 
-    // Found Item uses the side-by-side cards layout
-    if (_reportType == 'Found' && isEmpty) {
+    if (isEmpty) {
+      final bool isLost = _reportType == 'Lost';
+      final Color cardColor = isLost ? const Color(0xFFF1F5F9) : const Color(0xFFE8E8E8);
+      final Color iconBgColor = isLost ? const Color(0xFFE2E8F0) : const Color(0xFFFFD2D2);
+      final Color iconColor = isLost ? const Color(0xFF475569) : const Color(0xFFE53935);
+      final String labelSuffix = isLost ? ' (optional)' : '';
+
       return Row(
         children: [
           Expanded(
@@ -475,7 +492,7 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
               child: Container(
                 height: 140,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8E8E8),
+                  color: cardColor,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Column(
@@ -485,19 +502,19 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
                       width: 56,
                       height: 56,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFD2D2),
+                        color: iconBgColor,
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.photo_library_rounded,
-                        color: Color(0xFFE53935),
+                        color: iconColor,
                         size: 28,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'upload photo',
-                      style: TextStyle(
+                    Text(
+                      'upload photo$labelSuffix',
+                      style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF4B5563),
@@ -515,7 +532,7 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
               child: Container(
                 height: 140,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8E8E8),
+                  color: cardColor,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Column(
@@ -525,19 +542,19 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
                       width: 56,
                       height: 56,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFD2D2),
+                        color: iconBgColor,
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.camera_alt_rounded,
-                        color: Color(0xFFE53935),
+                        color: iconColor,
                         size: 28,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'take photo',
-                      style: TextStyle(
+                    Text(
+                      'take photo$labelSuffix',
+                      style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF4B5563),
@@ -552,88 +569,61 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
       );
     }
 
-    // Otherwise show selected preview or the original Lost item upload container
+    // Otherwise show selected preview
     return Container(
       width: double.infinity,
       height: 160,
       decoration: BoxDecoration(
-        color: isEmpty ? Colors.red.shade50 : Colors.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isEmpty ? Colors.red.shade300 : accentColor.withValues(alpha: 0.2),
-          width: isEmpty ? 2.0 : 1.5,
+          color: accentColor.withValues(alpha: 0.2),
+          width: 1.5,
         ),
       ),
-      child: _imageFile != null
-          ? ClipRRect(
-              borderRadius: BorderRadius.circular(18),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  kIsWeb
-                      ? Image.memory(_webImage!, fit: BoxFit.cover)
-                      : Image.file(File(_imageFile!.path), fit: BoxFit.cover),
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.black.withValues(alpha: 0.1), Colors.black.withValues(alpha: 0.4)],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _imageFile = null;
-                          _webImage = null;
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(
-                          color: Colors.black54,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
-                      ),
-                    ),
-                  ),
-                  const Center(
-                    child: Icon(Icons.camera_alt_rounded, color: Colors.white, size: 32),
-                  ),
-                ],
-              ),
-            )
-          : GestureDetector(
-              onTap: () => _pickImage(ImageSource.gallery),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade100,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.add_a_photo_rounded, color: Colors.red.shade400, size: 32),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Attach a Photo (Required)',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.red),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'A photo is mandatory to submit a report',
-                    style: TextStyle(color: Colors.red.shade300, fontSize: 12),
-                  ),
-                ],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            kIsWeb
+                ? Image.memory(_webImage!, fit: BoxFit.cover)
+                : Image.file(File(_imageFile!.path), fit: BoxFit.cover),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.black.withValues(alpha: 0.1), Colors.black.withValues(alpha: 0.4)],
+                ),
               ),
             ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _imageFile = null;
+                    _webImage = null;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+                ),
+              ),
+            ),
+            const Center(
+              child: Icon(Icons.camera_alt_rounded, color: Colors.white, size: 32),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

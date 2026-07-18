@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -31,6 +32,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
   Uint8List? _webImage;
   bool _isLoading = false;
   bool _categoriesLoading = true;
+  bool _showCustomTitleField = true;
 
   final ApiService _apiService = ApiService();
   final ImagePicker _picker = ImagePicker();
@@ -110,6 +112,9 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
           _categories = deduped;
           _selectedCategory = newSelection;
           _categoriesLoading = false;
+          if (newSelection != null) {
+            _showCustomTitleField = newSelection.toLowerCase() == 'other' || newSelection.toLowerCase() == 'others';
+          }
         });
       }
     } catch (e) {
@@ -204,10 +209,14 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
         imageFile = await MultipartFile.fromFile(_imageFile!.path, filename: fileName, contentType: MediaType('image', 'jpeg'));
       }
 
+      final String cat = _selectedCategory!;
+      final bool isOther = cat.toLowerCase() == 'other' || cat.toLowerCase() == 'others';
+      final String title = isOther ? _titleController.text.trim() : cat;
+
       final formData = FormData.fromMap({
-        'title': _titleController.text.trim(),
+        'title': title,
         'description': _descController.text.trim(),
-        'category': _selectedCategory!.toLowerCase(),
+        'category': cat.toLowerCase(),
         'locationFound': _locController.text.trim(),
         'dateFound': DateTime.now().toIso8601String(),
         'status': 'pending',
@@ -268,7 +277,8 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Image Picker - Side-by-side cards or Preview
-                    _webImage != null
+                    // Image Picker - Side-by-side cards or Preview
+                    (_imageFile != null || _webImage != null)
                         ? Container(
                             height: 210,
                             width: double.infinity,
@@ -281,7 +291,12 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                             child: Stack(
                               fit: StackFit.expand,
                               children: [
-                                ClipRRect(borderRadius: BorderRadius.circular(24), child: Image.memory(_webImage!, fit: BoxFit.cover)),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(24),
+                                  child: kIsWeb
+                                      ? Image.memory(_webImage!, fit: BoxFit.cover)
+                                      : Image.file(File(_imageFile!.path), fit: BoxFit.cover),
+                                ),
                                 Positioned(
                                   top: 12,
                                   right: 12,
@@ -393,8 +408,16 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                     // Item Details
                     _sectionTitle('Item Details'),
                     _formCard([
-                      _field(controller: _titleController, label: 'Item Title', hint: 'e.g. Blue Backpack', icon: Icons.label_rounded, validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null),
-                      _divider(),
+                      if (_showCustomTitleField) ...[
+                        _field(
+                          controller: _titleController,
+                          label: 'Item Title',
+                          hint: 'e.g. Blue Backpack',
+                          icon: Icons.label_rounded,
+                          validator: (v) => (_showCustomTitleField && (v == null || v.trim().isEmpty)) ? 'Required' : null,
+                        ),
+                        _divider(),
+                      ],
                       _categoryDropdown(),
                     ]),
                     const SizedBox(height: 20),
@@ -487,7 +510,14 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                   ]),
                 ))
             .toList(),
-        onChanged: (v) => setState(() => _selectedCategory = v),
+        onChanged: (v) {
+          setState(() {
+            _selectedCategory = v;
+            if (v != null) {
+              _showCustomTitleField = v.toLowerCase() == 'other' || v.toLowerCase() == 'others';
+            }
+          });
+        },
         validator: (v) => (v == null || v.isEmpty) ? 'Please select a category' : null,
       ),
     );
