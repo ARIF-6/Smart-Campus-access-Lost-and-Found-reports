@@ -6,6 +6,7 @@ const AccessLog = require('../models/AccessLog');
 const { logAction } = require('../utils/auditLogger');
 const { createNotification } = require('./notificationController');
 const { getIO } = require('../socket');
+const { haversineDistance } = require('../utils/haversine');
 
 // Helper: Get today's date string YYYY-MM-DD (UTC)
 const getTodayDate = () => new Date().toISOString().slice(0, 10);
@@ -211,11 +212,15 @@ exports.verifyStudentId = async (req, res) => {
 /**
  * POST /api/campus-attendance/submit
  * Saves the attendance record (ENTER or EXIT) and creates or updates AccessLog.
- * Body: { userId, studentId, campusId, action: 'ENTER'|'EXIT' }
+ * Body: { userId, studentId, campusId, action: 'ENTER'|'EXIT', latitude, longitude, accuracy }
+ *
+ * GPS GEOFENCING: Backend validates that the student is physically inside the campus.
  */
 exports.submitAttendance = async (req, res) => {
   try {
-    const { userId, studentId, campusId, action } = req.body;
+    const { userId, studentId, campusId, action, latitude, longitude, accuracy } = req.body;
+
+    // ── 1. Required fields ────────────────────────────────────────────────────
     if (!userId || !studentId || !campusId || !action) {
       return res.status(400).json({ success: false, message: 'userId, studentId, campusId, and action are required.' });
     }
@@ -223,13 +228,72 @@ exports.submitAttendance = async (req, res) => {
       return res.status(400).json({ success: false, message: 'action must be ENTER or EXIT.' });
     }
 
-    // 1. Check if the QR campus exists
+    // ── 2. GPS coordinate validation ─────────────────────────────────────────
+    const studentLat = parseFloat(latitude);
+    const studentLon = parseFloat(longitude);
+    const gpsAccuracy = parseFloat(accuracy);
+
+    if (latitude == null || longitude == null || isNaN(studentLat) || isNaN(studentLon)) {
+      console.log('[GPS] REJECTED — missing or invalid coordinates:', { latitude, longitude });
+      return res.status(400).json({
+        success: false,
+        message: 'GPS coordinates are required. Please ensure location services are enabled.',
+      });
+    }
+
+    if (studentLat < -90 || studentLat > 90 || studentLon < -180 || studentLon > 180) {
+      console.log('[GPS] REJECTED — coordinates out of valid range:', { studentLat, studentLon });
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid GPS coordinates. Please try again.',
+      });
+    }
+
+    if (!isNaN(gpsAccuracy) && gpsAccuracy > 100) {
+      console.log('[GPS] WARNING — GPS accuracy is low:', gpsAccuracy, 'm');
+    }
+
+    // ── 3. Load campus and validate GPS geofencing ───────────────────────────
     const campus = await Campus.findById(campusId).lean();
     if (!campus) {
       return res.status(404).json({ success: false, message: 'Campus not found.' });
     }
 
-    // 2. Validate Student ID using case-insensitive check
+    // Ensure the campus has coordinates configured
+    if (campus.latitude == null || campus.longitude == null) {
+      console.log('[GPS] REJECTED — Campus has no coordinates configured:', campus.name);
+      return res.status(400).json({
+        success: false,
+        message: 'This campus does not have GPS coordinates configured. Please contact the administrator.',
+      });
+    }
+
+    const campusRadius = campus.radius || 120; // Default 120 meters
+    const distanceMeters = haversineDistance(studentLat, studentLon, campus.latitude, campus.longitude);
+
+    // ── DEBUG LOGGING (remove in production) ────────────────────────────────
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('[GPS Geofence Debug]');
+    console.log('  Student Lat    :', studentLat);
+    console.log('  Student Lon    :', studentLon);
+    console.log('  Campus Lat     :', campus.latitude);
+    console.log('  Campus Lon     :', campus.longitude);
+    console.log('  Campus Name    :', campus.name);
+    console.log('  Campus Radius  :', campusRadius, 'm');
+    console.log('  Distance       :', distanceMeters.toFixed(2), 'm');
+    console.log('  GPS Accuracy   :', isNaN(gpsAccuracy) ? 'N/A' : gpsAccuracy + 'm');
+    console.log('  Result         :', distanceMeters <= campusRadius ? '✅ ALLOWED' : '❌ REJECTED (outside campus)');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+    // ── Enforce geofencing boundary ───────────────────────────────────────────
+    if (distanceMeters > campusRadius) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are out of campus.',
+      });
+    }
+
+    // ── 4. Validate Student ID ────────────────────────────────────────────────
     const studentIdClean = studentId.trim();
     const student = await User.findOne({
       studentId: { $regex: new RegExp('^' + studentIdClean.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') },
@@ -320,6 +384,10 @@ exports.submitAttendance = async (req, res) => {
         entryTime: now,
         status: 'IN',
         date: today,
+        latitude: studentLat,
+        longitude: studentLon,
+        accuracy: gpsAccuracy || null,
+        distance: Math.round(distanceMeters),
       });
 
       // Synchronize by creating a new AccessLog record
@@ -329,7 +397,11 @@ exports.submitAttendance = async (req, res) => {
         status: 'IN',
         campus: campusId,
         scannedBy: null, // scanned by student self via QR Code
-        source: 'Campus QR Code'
+        source: 'Campus QR Code',
+        latitude: studentLat,
+        longitude: studentLon,
+        accuracy: gpsAccuracy || null,
+        distance: Math.round(distanceMeters),
       });
 
       logAction({
@@ -366,7 +438,16 @@ exports.submitAttendance = async (req, res) => {
       // Create CampusExit record (find existing IN record for today or fallback)
       const existingAttendance = await CampusAttendance.findOneAndUpdate(
         { userId: student._id, campusId, date: today, status: 'IN' },
-        { $set: { exitTime: now, status: 'OUT' } },
+        { 
+          $set: { 
+            exitTime: now, 
+            status: 'OUT',
+            latitude: studentLat,
+            longitude: studentLon,
+            accuracy: gpsAccuracy || null,
+            distance: Math.round(distanceMeters),
+          } 
+        },
         { sort: { createdAt: -1 }, new: true }
       );
 
@@ -378,6 +459,10 @@ exports.submitAttendance = async (req, res) => {
           exitTime: now,
           status: 'OUT',
           date: today,
+          latitude: studentLat,
+          longitude: studentLon,
+          accuracy: gpsAccuracy || null,
+          distance: Math.round(distanceMeters),
         });
       }
 
@@ -385,6 +470,10 @@ exports.submitAttendance = async (req, res) => {
       if (lastLog && lastLog.status === 'IN') {
         lastLog.exitTime = now;
         lastLog.status = 'OUT';
+        lastLog.latitude = studentLat;
+        lastLog.longitude = studentLon;
+        lastLog.accuracy = gpsAccuracy || null;
+        lastLog.distance = Math.round(distanceMeters);
         await lastLog.save();
       } else {
         await AccessLog.create({
@@ -393,7 +482,11 @@ exports.submitAttendance = async (req, res) => {
           status: 'OUT',
           campus: campusId,
           scannedBy: null,
-          source: 'Campus QR Code'
+          source: 'Campus QR Code',
+          latitude: studentLat,
+          longitude: studentLon,
+          accuracy: gpsAccuracy || null,
+          distance: Math.round(distanceMeters),
         });
       }
 

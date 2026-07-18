@@ -421,7 +421,7 @@ exports.getCampuses = async (req, res) => {
 
 exports.createCampus = async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, locationLink, latitude, longitude, radius } = req.body;
     if (!name) {
       return res.status(400).json({ success: false, message: 'Campus Name is required' });
     }
@@ -430,7 +430,13 @@ exports.createCampus = async (req, res) => {
     if (existing) {
       return res.status(400).json({ success: false, message: 'Campus name already exists' });
     }
-    let newCampus = await Campus.create({ name });
+    let newCampus = await Campus.create({
+      name,
+      locationLink: locationLink || '',
+      latitude: latitude != null ? Number(latitude) : null,
+      longitude: longitude != null ? Number(longitude) : null,
+      radius: radius != null ? Number(radius) : 120,
+    });
     newCampus = await ensureValidCampusQR(newCampus);
     
     try {
@@ -447,9 +453,14 @@ exports.createCampus = async (req, res) => {
 exports.updateCampus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name } = req.body;
+    const { name, locationLink, latitude, longitude, radius } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Campus Name is required' });
-    let campus = await Campus.findByIdAndUpdate(id, { name }, { new: true, runValidators: true });
+    const updateData = { name };
+    if (locationLink !== undefined) updateData.locationLink = locationLink;
+    if (latitude != null) updateData.latitude = Number(latitude);
+    if (longitude != null) updateData.longitude = Number(longitude);
+    if (radius != null) updateData.radius = Number(radius);
+    let campus = await Campus.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
     if (!campus) return res.status(404).json({ success: false, message: 'Campus not found' });
     campus = await ensureValidCampusQR(campus);
     

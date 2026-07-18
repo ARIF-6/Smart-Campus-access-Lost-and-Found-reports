@@ -57,7 +57,7 @@ const UniversityManagement = () => {
   const [isActionLoading, setIsActionLoading] = useState(false);
 
   // Form Input States (Create)
-  const [campusForm, setCampusForm] = useState({ name: '' });
+  const [campusForm, setCampusForm] = useState({ name: '', locationLink: '', latitude: '', longitude: '', radius: '120' });
   const [facultyForm, setFacultyForm] = useState({ name: '', description: '' });
   const [deptForm, setDeptForm] = useState({ name: '', description: '', facultyId: '' });
   const [classForm, setClassForm] = useState({ name: '', departmentId: '', academicYear: '', campusId: '', hallId: '' });
@@ -119,12 +119,21 @@ const UniversityManagement = () => {
   const handleCampusSubmit = async (e) => {
     e.preventDefault();
     if (!campusForm.name.trim()) return toast.error('Campus Name is required');
+    if (campusForm.locationLink && !/^https?:\/\//i.test(campusForm.locationLink.trim())) {
+      return toast.error('Location Link must be a valid URL (starting with http:// or https://)');
+    }
 
     setIsActionLoading(true);
     try {
-      await createCampus(campusForm);
+      await createCampus({
+        name: campusForm.name.trim(),
+        locationLink: campusForm.locationLink.trim(),
+        latitude: campusForm.latitude !== '' ? Number(campusForm.latitude) : null,
+        longitude: campusForm.longitude !== '' ? Number(campusForm.longitude) : null,
+        radius: campusForm.radius !== '' ? Number(campusForm.radius) : 120,
+      });
       toast.success('Campus registered successfully');
-      setCampusForm({ name: '' });
+      setCampusForm({ name: '', locationLink: '', latitude: '', longitude: '', radius: '120' });
       setIsCreateOpen(false);
       await fetchData();
     } catch (error) {
@@ -220,7 +229,7 @@ const UniversityManagement = () => {
   // Edit Handlers
   const openEdit = (item, type) => {
     setEditItem({ ...item, _type: type });
-    if (type === 'campuses') setEditForm({ name: item.name });
+    if (type === 'campuses') setEditForm({ name: item.name, locationLink: item.locationLink || '', latitude: item.latitude ?? '', longitude: item.longitude ?? '', radius: item.radius ?? 120 });
     else if (type === 'faculties') setEditForm({ name: item.name, description: item.description || '' });
     else if (type === 'departments') setEditForm({ name: item.name, description: item.description || '', facultyId: item.facultyId || item.faculty?._id || '' });
     else if (type === 'classes') setEditForm({ name: item.name, departmentId: item.departmentId || item.department?._id || '', academicYear: item.academicYear || '', campusId: item.hall?.campusId || '', hallId: item.hall?._id || '' });
@@ -527,6 +536,9 @@ const UniversityManagement = () => {
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">#</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Campus Name</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Coordinates</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Radius</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">QR Status</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Date Registered</th>
                     <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
@@ -579,6 +591,26 @@ const UniversityManagement = () => {
                   <tr key={c._id} className="hover:bg-indigo-50/30 transition-colors cursor-pointer">
                     <td className="px-6 py-4 text-gray-500 font-bold w-16">{index + 1}</td>
                     <td className="px-6 py-4 text-gray-900 font-bold">{c.name}</td>
+                    <td className="px-6 py-4">
+                      {c.locationLink ? (
+                        <a href={c.locationLink} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 text-xs font-semibold transition-colors">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          View Map
+                        </a>
+                      ) : <span className="text-gray-300 italic text-xs">—</span>}
+                    </td>
+                    <td className="px-6 py-4 text-xs text-gray-500 font-mono">
+                      {c.latitude != null && c.longitude != null
+                        ? <span className="text-gray-700">{Number(c.latitude).toFixed(6)}, {Number(c.longitude).toFixed(6)}</span>
+                        : <span className="text-gray-300 italic">Not set</span>}
+                    </td>
+                    <td className="px-6 py-4 text-xs text-gray-600 font-semibold">
+                      {c.radius != null ? `${c.radius} m` : <span className="text-gray-300 italic">—</span>}
+                    </td>
                     <td className="px-6 py-4">
                       {c.qrExpiresAt ? (
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border ${new Date() < new Date(c.qrExpiresAt)
@@ -732,16 +764,61 @@ const UniversityManagement = () => {
               </div>
 
               {activeTab === 'campuses' && (
-                <form onSubmit={handleCampusSubmit} className="space-y-5">
+                <form onSubmit={handleCampusSubmit} className="space-y-4">
                   <div>
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Campus Name *</label>
                     <input
                       type="text"
                       placeholder="e.g., Main Campus"
                       value={campusForm.name}
-                      onChange={(e) => setCampusForm({ name: e.target.value })}
+                      onChange={(e) => setCampusForm({ ...campusForm, name: e.target.value })}
                       className="block w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all font-semibold text-gray-700"
                       required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Location Link (Google Maps URL)</label>
+                    <input
+                      type="url"
+                      placeholder="https://maps.app.goo.gl/..."
+                      value={campusForm.locationLink}
+                      onChange={(e) => setCampusForm({ ...campusForm, locationLink: e.target.value })}
+                      className="block w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all font-semibold text-gray-700"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Latitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="e.g., 2.047300"
+                        value={campusForm.latitude}
+                        onChange={(e) => setCampusForm({ ...campusForm, latitude: e.target.value })}
+                        className="block w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all font-semibold text-gray-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Longitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="e.g., 45.344800"
+                        value={campusForm.longitude}
+                        onChange={(e) => setCampusForm({ ...campusForm, longitude: e.target.value })}
+                        className="block w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all font-semibold text-gray-700"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Allowed Radius (meters)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="e.g., 120"
+                      value={campusForm.radius}
+                      onChange={(e) => setCampusForm({ ...campusForm, radius: e.target.value })}
+                      className="block w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all font-semibold text-gray-700"
                     />
                   </div>
                   <div className="flex gap-3 pt-3">
@@ -969,10 +1046,30 @@ const UniversityManagement = () => {
 
               <form onSubmit={handleEditSubmit} className="space-y-4">
                 {editItem._type === 'campuses' && (
-                  <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Campus Name *</label>
-                    <input type="text" value={editForm.name || ''} onChange={e => setEditForm({ ...editForm, name: e.target.value })} className="block w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all font-semibold text-gray-700" required />
-                  </div>
+                  <>
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Campus Name *</label>
+                      <input type="text" value={editForm.name || ''} onChange={e => setEditForm({ ...editForm, name: e.target.value })} className="block w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all font-semibold text-gray-700" required />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Location Link (Google Maps URL)</label>
+                      <input type="url" placeholder="https://maps.app.goo.gl/..." value={editForm.locationLink || ''} onChange={e => setEditForm({ ...editForm, locationLink: e.target.value })} className="block w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all font-semibold text-gray-700" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Latitude</label>
+                        <input type="number" step="any" placeholder="e.g., 2.047300" value={editForm.latitude ?? ''} onChange={e => setEditForm({ ...editForm, latitude: e.target.value })} className="block w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all font-semibold text-gray-700" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Longitude</label>
+                        <input type="number" step="any" placeholder="e.g., 45.344800" value={editForm.longitude ?? ''} onChange={e => setEditForm({ ...editForm, longitude: e.target.value })} className="block w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all font-semibold text-gray-700" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Allowed Radius (meters)</label>
+                      <input type="number" min="1" placeholder="e.g., 120" value={editForm.radius ?? 120} onChange={e => setEditForm({ ...editForm, radius: e.target.value })} className="block w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all font-semibold text-gray-700" />
+                    </div>
+                  </>
                 )}
 
                 {editItem._type === 'faculties' && (

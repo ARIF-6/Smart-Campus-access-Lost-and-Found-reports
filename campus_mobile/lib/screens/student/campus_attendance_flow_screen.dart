@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:dio/dio.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
 
@@ -32,11 +33,130 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
   String? _studentPhotoUrl;
   String? _nextAction; // 'ENTER' or 'EXIT'
 
+  // GPS coordinates
+  double? _latitude;
+  double? _longitude;
+  double? _accuracy;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkLocationPermissionAndGetGPS();
+    });
+  }
+
   @override
   void dispose() {
     _scannerController.dispose();
     _idController.dispose();
     super.dispose();
+  }
+
+  Future<bool> _checkLocationPermissionAndGetGPS() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Location services are disabled. Please enable GPS.';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location services are disabled. Please enable GPS.'), backgroundColor: Colors.orange),
+        );
+      }
+      return false;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'Location permission is required to scan the campus QR Code.';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission is required to scan the campus QR Code.'), backgroundColor: Colors.red),
+          );
+        }
+        return false;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Location permission is required to scan the campus QR Code.';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location permission is permanently denied. Please enable it in system settings.'), backgroundColor: Colors.red),
+        );
+      }
+      return false;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
+      );
+
+      if (position.accuracy > 30) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('GPS accuracy is poor (${position.accuracy.toStringAsFixed(1)}m). Waiting for a more accurate location...'),
+              backgroundColor: Colors.amber,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        await Future.delayed(const Duration(seconds: 3));
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 15),
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _latitude = position.latitude;
+          _longitude = position.longitude;
+          _accuracy = position.accuracy;
+          if (position.accuracy > 30) {
+            _errorMessage = 'GPS accuracy is poor (${position.accuracy.toStringAsFixed(1)}m). Please wait for a better GPS lock.';
+          } else {
+            _errorMessage = null;
+          }
+        });
+      }
+      return true;
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to obtain GPS location. Please try again.';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to obtain GPS location: $e'), backgroundColor: Colors.red),
+        );
+      }
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _resetFlow() {
@@ -51,12 +171,22 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
       _nextAction = null;
       _idController.clear();
       _scannerController.start();
+      _latitude = null;
+      _longitude = null;
+      _accuracy = null;
     });
+    _checkLocationPermissionAndGetGPS();
   }
 
   // Step 2: Validate scanned QR code token
   Future<void> _handleQrDetected(String qrToken) async {
     if (_isLoading) return;
+
+    if (_latitude == null || _longitude == null) {
+      final hasGps = await _checkLocationPermissionAndGetGPS();
+      if (!hasGps) return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -164,6 +294,10 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
         'studentId': _idController.text.trim(),
         'campusId': _campusId,
         'action': _nextAction,
+        'latitude': _latitude,
+        'longitude': _longitude,
+        'accuracy': _accuracy,
+        'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
       });
 
       // Success on either 200 (exit) or 201 (entry)

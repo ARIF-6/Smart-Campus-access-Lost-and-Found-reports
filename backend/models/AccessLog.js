@@ -31,7 +31,12 @@ const accessLogSchema = new mongoose.Schema({
     type: String,
     enum: ['Security Guard', 'Campus QR Code'],
     default: 'Security Guard'
-  }
+  },
+  // GPS Geofence details for auditing
+  latitude: { type: Number },
+  longitude: { type: Number },
+  accuracy: { type: Number },
+  distance: { type: Number }
 }, { timestamps: true });
 
 module.exports = mongoose.model('AccessLog', accessLogSchema);

@@ -7,6 +7,7 @@ const hpp = require("hpp");
 const rateLimit = require("express-rate-limit");
 const http = require('http');
 require("dotenv").config();
+// Nodemon trigger restart to reload env variables
 
 // Fix SRV DNS resolution issues on some local routers/DNS servers
 try {

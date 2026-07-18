@@ -29,7 +29,12 @@ const campusAttendanceSchema = new mongoose.Schema({
   date: {
     type: String, // Format: YYYY-MM-DD
     required: true
-  }
+  },
+  // GPS Geofence details for auditing
+  latitude: { type: Number },
+  longitude: { type: Number },
+  accuracy: { type: Number },
+  distance: { type: Number }
 }, { timestamps: true });
 
 // Prevent duplicate attendance entry logs for a user on the same campus on the same day
