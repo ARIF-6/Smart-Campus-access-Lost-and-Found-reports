@@ -374,6 +374,19 @@ exports.submitAttendance = async (req, res) => {
       }
 
       const today = getTodayDate();
+      // Check if student already has an entry record today
+      const existingEntry = await CampusAttendance.findOne({
+        userId: student._id,
+        date: today,
+        entryTime: { $ne: null }
+      });
+      if (existingEntry) {
+        return res.status(400).json({
+          success: false,
+          message: 'You have already completed your daily entry.',
+        });
+      }
+      
       const now = new Date();
 
       // Create CampusAttendance record
@@ -433,6 +446,19 @@ exports.submitAttendance = async (req, res) => {
       }
 
       const today = getTodayDate();
+      // Check if student already has an exit record today
+      const existingExit = await CampusAttendance.findOne({
+        userId: student._id,
+        date: today,
+        exitTime: { $ne: null }
+      });
+      if (existingExit) {
+        return res.status(400).json({
+          success: false,
+          message: 'You have already completed your daily exit.',
+        });
+      }
+
       const now = new Date();
 
       // Create CampusExit record (find existing IN record for today or fallback)

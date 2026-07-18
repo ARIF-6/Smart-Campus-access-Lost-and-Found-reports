@@ -105,7 +105,7 @@ class _SecurityReportsScreenState extends State<SecurityReportsScreen> with Sing
           physics: const NeverScrollableScrollPhysics(),
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 1.4,
+          childAspectRatio: 1.25,
           children: [
             _statCard('Entries', '${data['entries'] ?? 0}', Icons.login, Colors.green),
             _statCard('Exits', '${data['exits'] ?? 0}', Icons.logout, AppConstants.statusInvalid),
@@ -159,24 +159,33 @@ class _SecurityReportsScreenState extends State<SecurityReportsScreen> with Sing
 
   Widget _statCard(String label, String val, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.shade100),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, color: color, size: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, color: color, size: 18),
+            ),
+          ]),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(val, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
+              const SizedBox(height: 2),
+              Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600)),
+            ],
           ),
-        ]),
-        const Spacer(),
-        Text(val, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color)),
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-      ]),
+        ],
+      ),
     );
   }
 

@@ -90,13 +90,13 @@ const OwnershipDisputeDetailsModal = ({ isOpen, onClose, disputeId, onSuccess })
         className="bg-white w-full max-w-[800px] rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[90vh] animate-in zoom-in-95 slide-in-from-bottom-4 duration-300"
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-red-800 to-red-950 px-6 py-6 text-white flex justify-between items-center shrink-0">
+        <div className="bg-[#07073c] px-6 py-6 text-white flex justify-between items-center shrink-0">
           <div>
             <div className="flex items-center gap-2">
               <span className="px-2 py-0.5 bg-red-600 text-[9px] font-black uppercase tracking-widest rounded">Ownership Dispute</span>
               <h2 className="text-xl font-bold">Investigation & Resolution</h2>
             </div>
-            <p className="text-red-200 text-xs mt-0.5">
+            <p className="text-slate-300 text-xs mt-0.5">
               Review claim timelines, claimant profiles, and make a final verification decision.
             </p>
           </div>
@@ -284,38 +284,7 @@ const OwnershipDisputeDetailsModal = ({ isOpen, onClose, disputeId, onSuccess })
               )}
             </div>
 
-            {/* Ownership Verification Audit Timeline */}
-            <div>
-              <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-3">Permanent Ownership History Log</h4>
-              {history.length === 0 ? (
-                <p className="text-xs text-slate-400 italic">No history records logged yet.</p>
-              ) : (
-                <div className="space-y-2 font-mono text-[11px]">
-                  {history.map((h, i) => (
-                    <div key={h._id || i} className="p-3 bg-slate-900 text-slate-300 rounded-lg border border-slate-850">
-                      <div className="flex justify-between text-slate-500 mb-1.5">
-                        <span>EVENT: {h.eventType.toUpperCase()}</span>
-                        <span>{new Date(h.createdAt).toLocaleString()}</span>
-                      </div>
-                      <div>
-                        {h.eventType === 'item_returned' && (
-                          <span>Item marked returned to student <span className="text-green-400 font-bold">{h.returnedStudent?.fullName || 'N/A'}</span>.</span>
-                        )}
-                        {h.eventType === 'dispute_created' && (
-                          <span>Dispute raised by claimant <span className="text-amber-400 font-bold">{h.claimant?.fullName || 'N/A'}</span>. Reason: "{h.reason}"</span>
-                        )}
-                        {h.eventType === 'dispute_resolved_original' && (
-                          <span>Dispute resolved. Original recipient <span className="text-green-400 font-bold">{h.returnedStudent?.fullName || 'N/A'}</span> confirmed as rightful owner by admin. Reason: "{h.reason}"</span>
-                        )}
-                        {h.eventType === 'dispute_resolved_transfer' && (
-                          <span>Dispute resolved. Ownership transferred to claimant <span className="text-purple-400 font-bold">{h.returnedStudent?.fullName || 'N/A'}</span> by admin. Reason: "{h.reason}"</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+
 
             {/* Resolution Input Form */}
             {dispute.status === 'pending' && (

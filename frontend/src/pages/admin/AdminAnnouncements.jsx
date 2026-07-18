@@ -8,6 +8,7 @@ import {
   getStudentList
 } from '../../services/api';
 import { toast } from 'react-hot-toast';
+import { getImageUrl } from '../../utils/imageUtils';
 
 /* ─────────────────────────────────────────────────────────────────────────
    Sub-component: Student Picker
@@ -79,7 +80,7 @@ const StudentPicker = ({ onSelect, selected }) => {
                   {/* Avatar */}
                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden text-sm font-bold text-indigo-600">
                     {s.photoUrl
-                      ? <img src={s.photoUrl} alt={s.fullName} className="w-full h-full object-cover" />
+                      ? <img src={getImageUrl(s.photoUrl)} alt={s.fullName} className="w-full h-full object-cover" onError={(e) => { e.target.style.display='none'; }} />
                       : (s.fullName?.[0] || '?').toUpperCase()}
                   </div>
                   {/* Info */}

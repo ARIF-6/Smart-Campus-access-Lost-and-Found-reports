@@ -1,0 +1,1 @@
+{"watch":["."],"ignore":["uploads/**","node_modules/**","*.log","*.md"],"ext":"js,json","delay":"500"}

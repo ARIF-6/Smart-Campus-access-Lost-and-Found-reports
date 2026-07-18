@@ -284,7 +284,7 @@ const SystemReports = () => {
       case 'foundItems':
         return filtered.map(r => ({ Title: r.title, Category: r.category, Status: r.status, Location: r.location, Date: fmtDate(r.createdAt) }));
       case 'claims':
-        return filtered.map(r => ({ Item: r.foundItemId?.title || '—', User: r.userId?.fullName || '—', Email: r.userId?.email || '—', Status: r.status, Date: fmtDate(r.createdAt) }));
+        return filtered.map(r => ({ Item: r.foundItemId?.title || '—', Student: r.userId?.fullName || r.userId?.name || '—', Email: r.userId?.email || '—', Status: r.status, Date: fmtDate(r.createdAt) }));
       case 'userAdmins':
         return filtered.map(r => ({ Name: r.fullName || r.name || '—', Username: r.username || '—', Role: r.role, Joined: fmtDate(r.createdAt) }));
       case 'userStaff':
@@ -348,7 +348,7 @@ const SystemReports = () => {
             rows={filtered.map((r, i) => [
               <span className="text-xs text-gray-300 font-mono" key="idx">{i + 1}</span>,
               <span className="font-bold text-gray-800" key="item">{r.foundItemId?.title || '—'}</span>,
-              <span className="text-gray-700" key="user">{r.userId?.fullName || '—'}</span>,
+              <span className="text-gray-700" key="user">{r.userId?.fullName || r.userId?.name || '—'}</span>,
               <span className="text-gray-400 text-xs" key="email">{r.userId?.email || '—'}</span>,
               <StatusBadge value={r.status} />,
               <span className="text-gray-400 text-xs" key="date">{fmtDate(r.createdAt)}</span>,

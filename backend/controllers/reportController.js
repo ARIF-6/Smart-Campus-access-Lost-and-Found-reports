@@ -294,10 +294,10 @@ exports.getAllSystemReports = async (req, res) => {
           .limit(500)
           .lean(),
 
-        ClaimRequest.find({ ...dateFilter })
+        ClaimRequest.find({ isDeleted: { $ne: true }, ...dateFilter })
           .populate('foundItemId', 'title')
-          .populate('userId', 'name email')
-          .select('status createdAt')
+          .populate('userId', 'fullName name email')
+          .select('foundItemId userId status message createdAt')
           .sort({ createdAt: -1 })
           .limit(500)
           .lean(),

@@ -220,15 +220,18 @@ exports.addToBlacklist = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'This id is not exist' });
   }
 
-  // Validate Student ID against User database
+  // Validate Student ID or Name against User database
   const student = await User.findOne({
     role: 'student',
     isDeleted: { $ne: true },
-    studentId: { $regex: new RegExp('^' + resolvedStudentId.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') }
+    $or: [
+      { studentId: { $regex: new RegExp('^' + resolvedStudentId.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') } },
+      { fullName: { $regex: new RegExp('^' + resolvedStudentId.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') } }
+    ]
   });
 
   if (!student) {
-    return res.status(400).json({ success: false, message: 'This id is not exist' });
+    return res.status(400).json({ success: false, message: 'Student ID or Name is incorrect.' });
   }
 
   const studentName = student.fullName || student.name || name || 'Unknown';
