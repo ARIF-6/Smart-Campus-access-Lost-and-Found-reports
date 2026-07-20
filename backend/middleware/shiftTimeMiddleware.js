@@ -1,5 +1,3 @@
-const Shift = require('../models/Shift');
-
 /**
  * Middleware that checks whether the authenticated security guard is performing an action
  * within the allowed time window of their assigned shift.
@@ -8,12 +6,12 @@ const Shift = require('../models/Shift');
  *  1. Uses `req.user.shiftStartTime` and `req.user.shiftEndTime` (admin-set custom times, e.g. "08:00", "16:00")
  *  2. Falls back to legacy logic based on `req.user.assignedShift` ("morning" → 05:00-13:29, "afternoon" → 13:30-18:00)
  *
- * Returns 403 if the guard has no active shift OR the request is outside the allowed window.
- * Admin and superadmin roles bypass this check entirely.
+ * NOTE: Does NOT require a manually-started Shift record. Guards are allowed to scan
+ * anytime within their assigned time window without needing to press "Start Shift" first.
+ * Admin and staff roles bypass this check entirely.
  */
 const checkShiftWindow = async (req, res, next) => {
   try {
-    const guardId = req.user.id;
     const userRole = req.user.role ? req.user.role.toLowerCase() : '';
 
     // Bypass check for admin and staff
@@ -21,23 +19,13 @@ const checkShiftWindow = async (req, res, next) => {
       return next();
     }
 
-    // Require an active shift record
-    let activeShift = await Shift.findOne({ guardId, status: 'active' });
-    if (!activeShift) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not currently on duty. Student entry and exit are only allowed during your assigned shift time."
-      });
-    }
-
-    // Now check if current server time matches the guard's shift start/end times if assigned.
-    // Server runs on UTC (Render). Shift times are stored in Egypt local time, so convert.
+    // Get current Egypt local time (handles UTC offset on cloud servers)
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' }));
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
     // ── Option 1: Use admin-assigned custom start/end times ──────────────────
-    const customStart = req.user.shiftStartTime; // e.g. "08:00"
-    const customEnd   = req.user.shiftEndTime;   // e.g. "16:00"
+    const customStart = req.user.shiftStartTime; // e.g. "09:00"
+    const customEnd   = req.user.shiftEndTime;   // e.g. "11:10"
 
     if (customStart && customEnd) {
       const [startH, startM] = customStart.split(':').map(Number);
@@ -47,7 +35,7 @@ const checkShiftWindow = async (req, res, next) => {
 
       let withinWindow;
       if (startMinutes <= endMinutes) {
-        // Normal window (e.g. 08:00 – 16:00)
+        // Normal window (e.g. 09:00 – 11:10)
         withinWindow = nowMinutes >= startMinutes && nowMinutes <= endMinutes;
       } else {
         // Overnight window (e.g. 22:00 – 06:00)
@@ -58,21 +46,21 @@ const checkShiftWindow = async (req, res, next) => {
 
       return res.status(403).json({
         success: false,
-        message: "You are not currently on duty. Student entry and exit are only allowed during your assigned shift time."
+        message: `You are not currently on duty. Your assigned shift is ${customStart} – ${customEnd}.`
       });
     }
 
     // ── Option 2: Legacy fallback – use assignedShift name ───────────────────
-    let isMorningShift = false;
-    if (req.user.assignedShift && req.user.assignedShift !== 'none') {
-      isMorningShift = req.user.assignedShift.toLowerCase() === 'morning';
-    } else {
-      // No custom times and no named shift → deny
+    const assignedShift = (req.user.assignedShift || 'none').toLowerCase();
+
+    if (assignedShift === 'none' || assignedShift === '') {
       return res.status(403).json({
         success: false,
-        message: "You are not currently on duty. Student entry and exit are only allowed during your assigned shift time."
+        message: "No shift has been assigned to you. Please contact an administrator."
       });
     }
+
+    const isMorningShift = assignedShift === 'morning';
 
     const startWindow = new Date(now);
     const endWindow   = new Date(now);
@@ -88,10 +76,12 @@ const checkShiftWindow = async (req, res, next) => {
       return next();
     }
 
+    const windowLabel = isMorningShift ? '05:00 – 13:29' : '13:30 – 18:00';
     return res.status(403).json({
       success: false,
-      message: "You are not currently on duty. Student entry and exit are only allowed during your assigned shift time."
+      message: `You are not currently on duty. Your ${assignedShift} shift window is ${windowLabel}.`
     });
+
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, message: 'Server error' });

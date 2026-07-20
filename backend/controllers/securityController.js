@@ -398,67 +398,9 @@ exports.startShift = asyncHandler(async (req, res) => {
     });
   }
 
-  // ── Enforce shift-window check before allowing start ────────────────────
-  const userRole = req.user.role ? req.user.role.toLowerCase() : '';
-
-  // Admins / staff can start any time
-  if (!['admin', 'staff'].includes(userRole)) {
-    const now        = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' }));
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-
-    const customStart = req.user.shiftStartTime; // e.g. "08:00"
-    const customEnd   = req.user.shiftEndTime;   // e.g. "16:00"
-
-    if (customStart && customEnd) {
-      // Use admin-assigned custom window
-      const [startH, startM] = customStart.split(':').map(Number);
-      const [endH, endM]     = customEnd.split(':').map(Number);
-      const startMinutes = startH * 60 + startM;
-      const endMinutes   = endH * 60 + endM;
-
-      let withinWindow;
-      if (startMinutes <= endMinutes) {
-        withinWindow = nowMinutes >= startMinutes && nowMinutes <= endMinutes;
-      } else {
-        // Overnight window (e.g. 22:00 – 06:00)
-        withinWindow = nowMinutes >= startMinutes || nowMinutes <= endMinutes;
-      }
-
-      if (!withinWindow) {
-        return res.status(403).json({
-          success: false,
-          message: `You cannot start your shift yet. Your shift window is ${customStart} – ${customEnd}.`
-        });
-      }
-    } else if (req.user.assignedShift && req.user.assignedShift !== 'none') {
-      // Fall back to named shift (morning / afternoon)
-      const isMorning = req.user.assignedShift.toLowerCase() === 'morning';
-      const startWindow = new Date(now);
-      const endWindow   = new Date(now);
-      if (isMorning) {
-        startWindow.setHours(5, 0, 0, 0);
-        endWindow.setHours(13, 29, 59, 999);
-      } else {
-        startWindow.setHours(13, 30, 0, 0);
-        endWindow.setHours(18, 0, 0, 0);
-      }
-
-      if (now < startWindow || now > endWindow) {
-        const label = isMorning ? '05:00 – 13:29' : '13:30 – 18:00';
-        return res.status(403).json({
-          success: false,
-          message: `You cannot start your shift yet. Your shift window is ${label}.`
-        });
-      }
-    } else {
-      return res.status(403).json({
-        success: false,
-        message: 'No shift assigned. Contact an admin to assign your shift schedule before starting.'
-      });
-    }
-  }
-  // ────────────────────────────────────────────────────────────────────────
-
+  // Guards can start their shift tracking record at any time.
+  // Access control (QR scanning) is already enforced by shiftTimeMiddleware
+  // based on the time window — no need to re-gate here.
   const shift = await Shift.create({
     guardId: req.user.id,
     shiftStart: new Date()
