@@ -146,19 +146,36 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
     }
 
     // ── Native (Android / iOS) ──────────────────────────────────────
-    // Request permission, but fall back to direct picker call if request is denied/restricted
-    // because some Android versions or manufacturers do not report storage status correctly
-    // or handle photo access permissions differently.
-    final Permission permission =
-        source == ImageSource.camera ? Permission.camera : PermissionHelper.photosPermission;
-
-    PermissionStatus status = await permission.status;
-    if (status.isDenied || status.isRestricted) {
-      status = await permission.request();
+    // For ImageSource.gallery on Android 13+, the photo picker is handled by the OS
+    // and does not require active storage permission prompts.
+    // For older Android versions or the camera, we check/request permissions gracefully.
+    try {
+      if (Platform.isAndroid) {
+        final major = PermissionHelper.getAndroidMajorVersion();
+        
+        if (source == ImageSource.camera) {
+          // Camera permission is always required
+          final status = await Permission.camera.request();
+          if (!status.isGranted && !status.isLimited) {
+            debugPrint('Camera permission not granted explicitly.');
+          }
+        } else {
+          // Gallery: Only request storage permission on Android 12 and older (API <= 32 / major <= 12)
+          if (major > 0 && major <= 12) {
+            await Permission.storage.request();
+          }
+        }
+      } else {
+        // iOS or other platforms
+        final Permission permission =
+            source == ImageSource.camera ? Permission.camera : Permission.photos;
+        await permission.request();
+      }
+    } catch (e) {
+      debugPrint('Permission request error (ignored to allow fallback picker): $e');
     }
 
-    // Always attempt to pick the image even if status is not explicitly granted,
-    // allowing the system photo picker fallback to execute or ask itself.
+    // Invoke image picker directly so the Android/iOS system activity can launch
     try {
       final XFile? picked = await _picker.pickImage(
         source: source,
@@ -179,7 +196,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
       final label = source == ImageSource.camera ? 'Camera' : 'Photos';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Could not open $label picker. Please grant permission in Settings.'),
+          content: Text('Could not open $label picker. Please check your system settings.'),
           backgroundColor: AppConstants.errorColor,
           action: SnackBarAction(
             label: 'Settings',
