@@ -146,37 +146,27 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
     }
 
     // ── Native (Android / iOS) ──────────────────────────────────────
-    // For ImageSource.gallery on Android 13+, the photo picker is handled by the OS
-    // and does not require active storage permission prompts.
-    // For older Android versions or the camera, we check/request permissions gracefully.
-    try {
-      if (Platform.isAndroid) {
-        final major = PermissionHelper.getAndroidMajorVersion();
-        
-        if (source == ImageSource.camera) {
-          // Camera permission is always required
-          final status = await Permission.camera.request();
-          if (!status.isGranted && !status.isLimited) {
-            debugPrint('Camera permission not granted explicitly.');
-          }
-        } else {
-          // Gallery: Only request storage permission on Android 12 and older (API <= 32 / major <= 12)
-          if (major > 0 && major <= 12) {
-            await Permission.storage.request();
-          }
-        }
-      } else {
-        // iOS or other platforms
-        final Permission permission =
-            source == ImageSource.camera ? Permission.camera : Permission.photos;
-        await permission.request();
-      }
-    } catch (e) {
-      debugPrint('Permission request error (ignored to allow fallback picker): $e');
+    // Determine the correct permission for this device/OS version.
+    // Calling permission.request() triggers the OS system dialog just like the
+    // camera permission dialog — the user sees "Allow / Deny" before anything opens.
+    late final Permission permission;
+    if (source == ImageSource.camera) {
+      permission = Permission.camera;
+    } else if (Platform.isAndroid) {
+      final major = PermissionHelper.getAndroidMajorVersion();
+      // Android 13+ (API 33+): READ_MEDIA_IMAGES → Permission.photos
+      // Android 12 and below: READ_EXTERNAL_STORAGE → Permission.storage
+      permission = (major >= 13) ? Permission.photos : Permission.storage;
+    } else {
+      permission = Permission.photos; // iOS
     }
 
-    // Invoke image picker directly so the Android/iOS system activity can launch
-    try {
+    // request() shows the system permission dialog on the first call.
+    // On subsequent calls it returns the cached status without a dialog.
+    final PermissionStatus status = await permission.request();
+
+    if (status.isGranted || status.isLimited) {
+      // ✅ Permission granted — open the picker
       final XFile? picked = await _picker.pickImage(
         source: source,
         maxWidth: 1200,
@@ -191,18 +181,31 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
           });
         }
       }
-    } catch (e) {
+    } else if (status.isPermanentlyDenied) {
+      // ❌ User selected "Never ask again" — guide them to Settings
       if (!mounted) return;
       final label = source == ImageSource.camera ? 'Camera' : 'Photos';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Could not open $label picker. Please check your system settings.'),
+          content: Text(
+              '$label access was permanently denied. Please enable it in App Settings.'),
           backgroundColor: AppConstants.errorColor,
           action: SnackBarAction(
-            label: 'Settings',
+            label: 'Open Settings',
             textColor: Colors.white,
             onPressed: openAppSettings,
           ),
+        ),
+      );
+    } else {
+      // ⚠️ User tapped "Don't allow" this time — they can try again
+      if (!mounted) return;
+      final label = source == ImageSource.camera ? 'Camera' : 'Photos';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$label access is required to upload a photo. Please allow it when prompted.'),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
