@@ -1,6 +1,6 @@
 const LostItem = require('../models/LostItem');
 const FoundItem = require('../models/FoundItem');
-const ClaimRequest = require('../models/ClaimRequest');
+const Claim = require('../models/Claim');
 const User = require('../models/User');
 const Incident = require('../models/Incident');
 const Visitor = require('../models/Visitor');
@@ -41,7 +41,7 @@ const buildClaimFilters = (query) => {
   const filters = buildFilters(query);
 
   if (filters.status) {
-    filters.status = filters.status.toUpperCase();
+    filters.status = filters.status.toLowerCase();
   }
 
   return filters;
@@ -158,16 +158,16 @@ exports.exportLostItems = async (req, res) => {
 exports.exportClaims = async (req, res) => {
   try {
     const filters = buildClaimFilters(req.query);
-    const claims = await ClaimRequest.find(filters)
-      .populate('foundItemId', 'title')
-      .populate('userId', 'name email')
+    const claims = await Claim.find(filters)
+      .populate('item', 'title')
+      .populate('user', 'fullName name email')
       .sort({ createdAt: -1 });
 
     const reportData = claims.map(claim => ({
-      item: claim.foundItemId?.title || 'Unknown',
-      user: claim.userId?.name || 'Unknown',
-      userEmail: claim.userId?.email || '-',
-      status: claim.status,
+      item: claim.item?.title || 'Unknown',
+      user: claim.user?.fullName || claim.user?.name || 'Unknown',
+      userEmail: claim.user?.email || '-',
+      status: claim.status?.toUpperCase(),
       createdAt: claim.createdAt.toLocaleString()
     }));
 
@@ -280,7 +280,7 @@ exports.getAllSystemReports = async (req, res) => {
       guardIds = guards.map(g => g._id);
     }
 
-    const [lostItems, foundItems, claims, users, incidents, visitors, accessLogs, auditLogs, noExitReports] =
+    const [lostItems, foundItems, rawClaims, users, incidents, visitors, accessLogs, auditLogs, noExitReports] =
       await Promise.all([
         LostItem.find({ isDeleted: false, ...dateFilter })
           .select('title category status locationLost createdAt')
@@ -294,10 +294,10 @@ exports.getAllSystemReports = async (req, res) => {
           .limit(500)
           .lean(),
 
-        ClaimRequest.find({ isDeleted: { $ne: true }, ...dateFilter })
-          .populate('foundItemId', 'title')
-          .populate('userId', 'fullName name email')
-          .select('foundItemId userId status message createdAt')
+        Claim.find({ isDeleted: false, ...dateFilter })
+          .populate('item', 'title')
+          .populate('user', 'fullName name email')
+          .select('item itemModel user status message createdAt')
           .sort({ createdAt: -1 })
           .limit(500)
           .lean(),
@@ -374,6 +374,15 @@ exports.getAllSystemReports = async (req, res) => {
         }
       });
     }
+
+    const claims = rawClaims.map(c => ({
+      _id: c._id,
+      foundItemId: c.item,
+      userId: c.user,
+      status: c.status?.toUpperCase(),
+      message: c.message,
+      createdAt: c.createdAt
+    }));
 
     // Resolve halls for users
     const classIds = users.filter(u => u.class?._id || u.class).map(u => u.class?._id || u.class);

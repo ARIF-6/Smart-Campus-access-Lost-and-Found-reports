@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { useAuth } from './context/AuthContext';
 
 // Auth Pages
 import { Login, Register } from './pages/auth';
@@ -70,6 +71,7 @@ const DashboardPlaceholder = ({ role }) => (
 );
 
 function App() {
+  const { user } = useAuth();
   return (
     <>
       <Routes>
@@ -157,7 +159,7 @@ function App() {
         />
         <Route
           path="/admin/university"
-          element={<ProtectedRoute allowedRoles={['admin', 'staff']}><AdminLayout title="University Management"><UniversityManagement /></AdminLayout></ProtectedRoute>}
+          element={<ProtectedRoute allowedRoles={['admin', 'staff']}><AdminLayout title={user?.role === 'staff' ? 'University' : 'University Management'}><UniversityManagement /></AdminLayout></ProtectedRoute>}
         />
         <Route
           path="/admin/categories"

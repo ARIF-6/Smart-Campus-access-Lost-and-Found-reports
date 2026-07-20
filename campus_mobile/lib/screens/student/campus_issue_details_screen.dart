@@ -93,8 +93,9 @@ class _CampusIssueDetailsScreenState extends State<CampusIssueDetailsScreen> {
   Future<void> _supportIssue() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final currentUser = authProvider.user;
-    final isOwner = currentUser != null && _reporterData != null &&
-        (currentUser['studentId'] == _reporterData!['studentId'] || currentUser['email'] == _reporterData!['email']);
+    final reporterId = _reporterData?['id']?.toString();
+    final isOwner = currentUser != null && reporterId != null &&
+        (currentUser['_id'] == reporterId || currentUser['id'] == reporterId);
     final isPending = (_complaintData?['status']?.toString() ?? 'pending').toLowerCase() == 'pending';
     
     if (isOwner || !isPending) {
@@ -352,8 +353,9 @@ class _CampusIssueDetailsScreenState extends State<CampusIssueDetailsScreen> {
                 child: () {
                   final authProvider = Provider.of<AuthProvider>(context, listen: false);
                   final currentUser = authProvider.user;
-                  final isOwner = currentUser != null && _reporterData != null &&
-                      (currentUser['studentId'] == _reporterData!['studentId'] || currentUser['email'] == _reporterData!['email']);
+                  final reporterId = _reporterData?['id']?.toString();
+                  final isOwner = currentUser != null && reporterId != null &&
+                      (currentUser['_id'] == reporterId || currentUser['id'] == reporterId);
                   final isPending = (issue.status).toLowerCase() == 'pending';
                   final canSupport = !isOwner && isPending;
 

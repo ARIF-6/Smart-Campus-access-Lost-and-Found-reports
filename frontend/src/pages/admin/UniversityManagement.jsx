@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAutoRefreshSignal } from '../../context/AutoRefreshContext';
+import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import {
   getFaculties,
@@ -30,7 +31,9 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 
 const UniversityManagement = () => {
-  const [activeTab, setActiveTab] = useState('campuses'); // campuses, faculties, departments, halls, classes
+  const { user: currentUser } = useAuth();
+  const isStaff = currentUser?.role === 'staff';
+  const [activeTab, setActiveTab] = useState(isStaff ? 'halls' : 'campuses'); // campuses, faculties, departments, halls, classes
   const [searchQuery, setSearchQuery] = useState('');
   const [hallCampusFilter, setHallCampusFilter] = useState('');
 
@@ -401,48 +404,56 @@ const UniversityManagement = () => {
           <p className="text-sm text-gray-500 mt-1 font-medium">{getSectionDescription()}</p>
         </div>
         <div className="flex gap-3 flex-wrap">
-          <button
-            onClick={() => setIsCreateOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 shadow-sm shadow-indigo-200"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
-            </svg>
-            {getRegisterButtonLabel()}
-          </button>
+          {!isStaff && (
+            <button
+              onClick={() => setIsCreateOpen(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 shadow-sm shadow-indigo-200"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+              </svg>
+              {getRegisterButtonLabel()}
+            </button>
+          )}
         </div>
       </div>
 
       {/* Tabs Menu Section in exact requested sequence: Campuses -> Faculties -> Departments -> Halls -> Classes */}
       <div className="border-b border-gray-200 mb-6">
         <nav className="flex space-x-8" aria-label="Tabs">
-          <button
-            onClick={() => { setActiveTab('campuses'); setSearchQuery(''); setHallCampusFilter(''); }}
-            className={`pb-4 px-1 border-b-2 font-bold text-sm transition-all duration-200 ${activeTab === 'campuses'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-          >
-            1. Campus Registration
-          </button>
-          <button
-            onClick={() => { setActiveTab('faculties'); setSearchQuery(''); setHallCampusFilter(''); }}
-            className={`pb-4 px-1 border-b-2 font-bold text-sm transition-all duration-200 ${activeTab === 'faculties'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-          >
-            2. Faculty Management
-          </button>
-          <button
-            onClick={() => { setActiveTab('departments'); setSearchQuery(''); setHallCampusFilter(''); }}
-            className={`pb-4 px-1 border-b-2 font-bold text-sm transition-all duration-200 ${activeTab === 'departments'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-          >
-            3. Department Registration
-          </button>
+          {!isStaff && (
+            <button
+              onClick={() => { setActiveTab('campuses'); setSearchQuery(''); setHallCampusFilter(''); }}
+              className={`pb-4 px-1 border-b-2 font-bold text-sm transition-all duration-200 ${activeTab === 'campuses'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+            >
+              1. Campus Registration
+            </button>
+          )}
+          {!isStaff && (
+            <button
+              onClick={() => { setActiveTab('faculties'); setSearchQuery(''); setHallCampusFilter(''); }}
+              className={`pb-4 px-1 border-b-2 font-bold text-sm transition-all duration-200 ${activeTab === 'faculties'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+            >
+              2. Faculty Management
+            </button>
+          )}
+          {!isStaff && (
+            <button
+              onClick={() => { setActiveTab('departments'); setSearchQuery(''); setHallCampusFilter(''); }}
+              className={`pb-4 px-1 border-b-2 font-bold text-sm transition-all duration-200 ${activeTab === 'departments'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+            >
+              3. Department Registration
+            </button>
+          )}
           <button
             onClick={() => { setActiveTab('halls'); setSearchQuery(''); }}
             className={`pb-4 px-1 border-b-2 font-bold text-sm transition-all duration-200 ${activeTab === 'halls'
@@ -450,7 +461,7 @@ const UniversityManagement = () => {
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
           >
-            4. Hall Registration
+            {isStaff ? '1.' : '4.'} Hall Registration
           </button>
           <button
             onClick={() => { setActiveTab('classes'); setSearchQuery(''); setHallCampusFilter(''); }}
@@ -459,7 +470,7 @@ const UniversityManagement = () => {
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
           >
-            5. Class Registration
+            {isStaff ? '2.' : '5.'} Class Registration
           </button>
         </nav>
       </div>
@@ -711,8 +722,13 @@ const UniversityManagement = () => {
                     <td className="px-6 py-4 text-xs text-gray-400">{new Date(h.createdAt || Date.now()).toLocaleDateString()}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => openEdit(h, 'halls')} className="p-1.5 bg-indigo-50/50 border border-indigo-100/50 hover:border-indigo-205 text-indigo-600 hover:text-indigo-800 rounded-lg transition-all" title="Edit"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
-                        <button onClick={() => openDelete(h, 'halls')} className="p-1.5 bg-red-50/50 border border-red-100/50 hover:border-red-200 text-red-500 hover:text-red-700 rounded-lg transition-all" title="Delete"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                        {!isStaff && (
+                          <button onClick={() => openEdit(h, 'halls')} className="p-1.5 bg-indigo-50/50 border border-indigo-100/50 hover:border-indigo-205 text-indigo-600 hover:text-indigo-800 rounded-lg transition-all" title="Edit"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
+                        )}
+                        {!isStaff && (
+                          <button onClick={() => openDelete(h, 'halls')} className="p-1.5 bg-red-50/50 border border-red-100/50 hover:border-red-200 text-red-500 hover:text-red-700 rounded-lg transition-all" title="Delete"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                        )}
+                        {isStaff && <span className="text-xs text-gray-400 italic font-medium">View only</span>}
                       </div>
                     </td>
                   </tr>
@@ -739,7 +755,9 @@ const UniversityManagement = () => {
                       <div className="flex items-center justify-end gap-2">
                         <button onClick={() => handleInspectClass(c)} className="p-1.5 bg-gray-50 border border-gray-100 hover:border-gray-200 text-gray-650 hover:text-gray-900 rounded-lg transition-all" title="Inspect Class / Students"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg></button>
                         <button onClick={() => openEdit(c, 'classes')} className="p-1.5 bg-indigo-50/50 border border-indigo-100/50 hover:border-indigo-205 text-indigo-600 hover:text-indigo-800 rounded-lg transition-all" title="Edit"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
-                        <button onClick={() => openDelete(c, 'classes')} className="p-1.5 bg-red-50/50 border border-red-100/50 hover:border-red-200 text-red-500 hover:text-red-700 rounded-lg transition-all" title="Delete"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                        {!isStaff && (
+                          <button onClick={() => openDelete(c, 'classes')} className="p-1.5 bg-red-50/50 border border-red-100/50 hover:border-red-200 text-red-500 hover:text-red-700 rounded-lg transition-all" title="Delete"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1107,31 +1125,48 @@ const UniversityManagement = () => {
 
                 {editItem._type === 'classes' && (
                   <>
-                    <div>
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Associated Department *</label>
-                      <select value={editForm.departmentId || ''} onChange={e => setEditForm({ ...editForm, departmentId: e.target.value })} className="block w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all font-semibold text-gray-700" required>
-                        <option value="" disabled>Select Department</option>
-                        {departments.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Class Name *</label>
-                      <input type="text" value={editForm.name || ''} onChange={e => setEditForm({ ...editForm, name: e.target.value })} className="block w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all font-semibold text-gray-700" required />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Campus *</label>
-                      <select
-                        value={editForm.campusId || ''}
-                        onChange={(e) => setEditForm({ ...editForm, campusId: e.target.value, hallId: '' })}
-                        className="block w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all font-semibold text-gray-700"
-                        required
-                      >
-                        <option value="" disabled>Select Campus</option>
-                        {campuses.map(camp => (
-                          <option key={camp._id} value={camp._id}>{camp.name}</option>
-                        ))}
-                      </select>
-                    </div>
+                    {!isStaff ? (
+                      <>
+                        <div>
+                          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Associated Department *</label>
+                          <select value={editForm.departmentId || ''} onChange={e => setEditForm({ ...editForm, departmentId: e.target.value })} className="block w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all font-semibold text-gray-700" required>
+                            <option value="" disabled>Select Department</option>
+                            {departments.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Class Name *</label>
+                          <input type="text" value={editForm.name || ''} onChange={e => setEditForm({ ...editForm, name: e.target.value })} className="block w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all font-semibold text-gray-700" required />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Campus *</label>
+                          <select
+                            value={editForm.campusId || ''}
+                            onChange={(e) => setEditForm({ ...editForm, campusId: e.target.value, hallId: '' })}
+                            className="block w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all font-semibold text-gray-700"
+                            required
+                          >
+                            <option value="" disabled>Select Campus</option>
+                            {campuses.map(camp => (
+                              <option key={camp._id} value={camp._id}>{camp.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="bg-indigo-50/50 border border-indigo-100/50 rounded-xl p-3.5 mb-4 text-xs space-y-2">
+                          <p className="font-bold text-indigo-900">Editing Class: <span className="font-black text-indigo-600">{editItem.name}</span></p>
+                          <p className="text-gray-500 font-semibold">You are updating the hall assignment. All other details are managed by administrators.</p>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Campus</label>
+                          <div className="block w-full px-4 py-2.5 text-sm bg-gray-100 border border-gray-200 rounded-xl font-bold text-gray-750 select-none">
+                            {campuses.find(c => String(c._id) === String(currentUser?.campus?._id || currentUser?.campus))?.name || 'Your Assigned Campus'}
+                          </div>
+                        </div>
+                      </>
+                    )}
                     <div>
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Assign Hall *</label>
                       <select
@@ -1143,6 +1178,12 @@ const UniversityManagement = () => {
                         <option value="" disabled>Select Hall</option>
                         {halls
                           .filter(h => {
+                            const staffCampusId = currentUser?.campus?._id || currentUser?.campus;
+                            // If staff, only show halls belonging to the staff's campus
+                            if (isStaff && staffCampusId) {
+                              return String(h.campus?._id || h.campus) === String(staffCampusId);
+                            }
+                            // Otherwise show halls matching selected campus
                             if (editForm.campusId && (h.campus?._id || h.campus) !== editForm.campusId) {
                               return false;
                             }

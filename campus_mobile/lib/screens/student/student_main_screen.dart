@@ -213,39 +213,67 @@ class StudentMainScreenState extends State<StudentMainScreen> {
           child: KeyedSubtree(key: ValueKey(_currentIndex), child: _screens[_currentIndex]),
         ),
 
-        // ── Bottom Navigation Bar (custom premium design) ───────────────
-        bottomNavigationBar: Container(
-          height: 76,
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 22),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 24, offset: const Offset(0, 8)),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _navItem(0, Icons.home_rounded, Icons.home_outlined, 'Home'),
-              _navItem(1, Icons.receipt_long_rounded, Icons.receipt_long_outlined, 'Claims'),
-              // Center FAB / Action Button inside the nav bar itself
-              GestureDetector(
+        // ── Bottom Navigation Bar (curved premium design matching screenshot) ───────────────
+        bottomNavigationBar: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.topCenter,
+          children: [
+            // White bottom navigation bar container
+            Container(
+              height: 76,
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 22),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Expanded(child: _navItem(0, Icons.home_rounded, Icons.home_outlined, 'Home')),
+                  Expanded(child: _navItem(1, Icons.receipt_long_rounded, Icons.receipt_long_outlined, 'Claims')),
+                  // Spacing gap in the middle for the central FAB
+                  const SizedBox(width: 60),
+                  Expanded(child: _navItem(2, Icons.explore_rounded, Icons.explore_outlined, 'Items')),
+                  Expanded(child: _navItem(3, Icons.person_rounded, Icons.person_outline_rounded, 'Profile')),
+                ],
+              ),
+            ),
+            // Floating Action Button (+), rising above the navigation bar
+            Positioned(
+              top: -24,
+              child: GestureDetector(
                 onTap: () => _showActionMenu(context),
                 child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF1F2937), // dark background
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF2563EB).withOpacity(0.35),
+                        blurRadius: 16,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                    border: Border.all(color: Colors.white, width: 4),
                   ),
-                  child: const Icon(Icons.add_rounded, color: Colors.white, size: 24),
+                  child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
                 ),
               ),
-              _navItem(2, Icons.explore_rounded, Icons.explore_outlined, 'Items'),
-              _navItem(3, Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -253,38 +281,30 @@ class StudentMainScreenState extends State<StudentMainScreen> {
 
   Widget _navItem(int index, IconData activeIcon, IconData inactiveIcon, String label) {
     final selected = _currentIndex == index;
+    final color = selected ? const Color(0xFF2563EB) : const Color(0xFF94A3B8);
     return GestureDetector(
       onTap: () => _onTabTapped(index),
       behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF1F2937) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              selected ? activeIcon : inactiveIcon,
-              color: selected ? Colors.white : Colors.grey.shade400,
-              size: 22,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            selected ? activeIcon : inactiveIcon,
+            color: color,
+            size: 24,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              letterSpacing: 0.2,
             ),
-            if (selected) ...[
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ]
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

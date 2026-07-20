@@ -425,9 +425,14 @@ exports.createCampus = async (req, res) => {
     if (!name) {
       return res.status(400).json({ success: false, message: 'Campus Name is required' });
     }
-    // Check duplicate
-    const existing = await Campus.findOne({ name });
-    if (existing) {
+    // Normalize: strip all whitespace and compare case-insensitively
+    // so "Campus 3" and "campus3" are treated as the same name
+    const normalizedNew = name.replace(/\s+/g, '').toLowerCase();
+    const allCampuses = await Campus.find({}, 'name');
+    const duplicate = allCampuses.find(
+      c => c.name.replace(/\s+/g, '').toLowerCase() === normalizedNew
+    );
+    if (duplicate) {
       return res.status(400).json({ success: false, message: 'Campus name already exists' });
     }
     let newCampus = await Campus.create({
@@ -455,6 +460,17 @@ exports.updateCampus = async (req, res) => {
     const { id } = req.params;
     const { name, locationLink, latitude, longitude, radius } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Campus Name is required' });
+
+    // Normalize: strip all whitespace and compare case-insensitively
+    const normalizedNew = name.replace(/\s+/g, '').toLowerCase();
+    const allCampuses = await Campus.find({ _id: { $ne: id } }, 'name');
+    const duplicate = allCampuses.find(
+      c => c.name.replace(/\s+/g, '').toLowerCase() === normalizedNew
+    );
+    if (duplicate) {
+      return res.status(400).json({ success: false, message: 'Campus name already exists' });
+    }
+
     const updateData = { name };
     if (locationLink !== undefined) updateData.locationLink = locationLink;
     if (latitude != null) updateData.latitude = Number(latitude);
@@ -567,8 +583,24 @@ exports.deleteDepartment = async (req, res) => {
 exports.updateClass = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, departmentId, academicYear, hallId } = req.body;
-    if (!name || !hallId) return res.status(400).json({ success: false, message: 'Class Name and Hall ID are required' });
+    let { name, departmentId, academicYear, hallId } = req.body;
+    
+    const ClassModel = require('../models/Class');
+    const existingClass = await ClassModel.findById(id);
+    if (!existingClass) return res.status(404).json({ success: false, message: 'Class not found' });
+
+    // If staff, they can only edit the hallId. Ignore/override other fields.
+    if (req.user && req.user.role === 'staff') {
+      name = existingClass.name;
+      departmentId = existingClass.departmentId;
+      academicYear = existingClass.academicYear;
+      
+      if (!hallId) {
+        return res.status(400).json({ success: false, message: 'Hall ID is required to update class hall assignment.' });
+      }
+    } else {
+      if (!name || !hallId) return res.status(400).json({ success: false, message: 'Class Name and Hall ID are required' });
+    }
     
     const Hall = require('../models/Hall');
     // Check if new hall has space
@@ -576,11 +608,19 @@ exports.updateClass = async (req, res) => {
     if (!newHall) {
       return res.status(404).json({ success: false, message: 'Lecture Hall not found' });
     }
+
+    // Verify staff's campus matches the hall's campus
+    if (req.user && req.user.role === 'staff') {
+      if (!req.user.campus || String(newHall.campus) !== String(req.user.campus)) {
+        return res.status(403).json({ success: false, message: 'You are not authorized to assign this class to a hall in another campus.' });
+      }
+    }
+
     if (newHall.classes && newHall.classes.length >= 3 && !newHall.classes.includes(id)) {
       return res.status(400).json({ success: false, message: 'The selected hall has reached its maximum limit of 3 assigned classes.' });
     }
 
-    const cls = await require('../models/Class').findByIdAndUpdate(id, { name, departmentId, academicYear }, { new: true, runValidators: true });
+    const cls = await ClassModel.findByIdAndUpdate(id, { name, departmentId, academicYear }, { new: true, runValidators: true });
     if (!cls) return res.status(404).json({ success: false, message: 'Class not found' });
     
     // Manage hall assignments

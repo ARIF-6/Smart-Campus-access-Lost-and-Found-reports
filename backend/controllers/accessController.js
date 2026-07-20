@@ -94,9 +94,31 @@ exports.scanQRCode = async (req, res) => {
       photoUrl: user.photoUrl || '',
     };
 
-    // Find latest AccessLog for that user
-    const lastLog = await AccessLog.findOne({ userId: user._id }).sort({ createdAt: -1 });
     const now = new Date();
+
+    // Enforce one entry and one exit per day — work exclusively with today's log
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const todayLog = await AccessLog.findOne({
+      userId: user._id,
+      $or: [
+        { entryTime: { $gte: startOfToday, $lte: endOfToday } },
+        { createdAt: { $gte: startOfToday, $lte: endOfToday } }
+      ]
+    }).sort({ createdAt: -1 });
+
+    // Student already completed their daily cycle (IN → OUT)
+    if (todayLog && todayLog.status === 'OUT') {
+      return res.status(400).json({
+        status: 'Limit Reached',
+        color: 'red',
+        message: `sorry you have reached the limit of entry/exit of this day`,
+        student: studentPayload,
+      });
+    }
 
     if (user.role !== 'student') {
       return res.status(400).json({
@@ -113,7 +135,6 @@ exports.scanQRCode = async (req, res) => {
       const message = `${studentPayload.name} has ${actionLabel} the campus.`;
       await createNotification({ recipientRole: 'admin', title, message, type: 'ACCESS_LOG', relatedId: log._id });
       await createNotification({ recipientRole: 'staff', title, message, type: 'ACCESS_LOG', relatedId: log._id });
-      // Notify the student directly
       await createNotification({
         userId: user._id,
         title,
@@ -123,56 +144,13 @@ exports.scanQRCode = async (req, res) => {
       });
     };
 
-    const finishAccess = async (nextStatus) => {
-      if (nextStatus === 'IN') {
-        if (lastLog?.status === 'IN') {
-          return res.status(200).json({
-            status: 'Already Inside',
-            color: 'green',
-            message: `${studentPayload.name} already has an active campus entry.`,
-            student: studentPayload,
-          });
-        }
-
-        const newLog = await AccessLog.create({
-          userId: user._id,
-          entryTime: now,
-          status: 'IN',
-          campus: req.user?.campus || null,
-          scannedBy: req.user?.id || null
-        });
-        await notifyAccess(newLog, 'IN');
-        await logAction({
-          userId: req.user.id,
-          action: 'SCAN_QR',
-          targetId: user._id,
-          targetType: 'User',
-          details: `Recorded entry for ${user.username || user.fullName} via ${method || 'QR'}`,
-          req,
-        });
-        emitDashboardRefresh('security');
-        emitDashboardRefresh('admin');
-        return res.status(200).json({
-          status: 'Access Granted',
-          color: 'green',
-          message: `Entry recorded for ${studentPayload.name}`,
-          student: studentPayload,
-        });
-      }
-
-      if (!lastLog || lastLog.status !== 'IN') {
-        return res.status(400).json({
-          status: 'No Active Entry',
-          color: 'red',
-          message: `${studentPayload.name} does not have an active entry to exit from.`,
-          student: studentPayload,
-        });
-      }
-
-      lastLog.exitTime = now;
-      lastLog.status = 'OUT';
-      await lastLog.save();
-      await notifyAccess(lastLog, 'OUT');
+    // Student already entered today — record exit
+    if (todayLog && todayLog.status === 'IN') {
+      todayLog.exitTime = now;
+      todayLog.status = 'OUT';
+      todayLog.exitSource = 'Security Guard';
+      await todayLog.save();
+      await notifyAccess(todayLog, 'OUT');
       await logAction({
         userId: req.user.id,
         action: 'SCAN_QR',
@@ -189,65 +167,27 @@ exports.scanQRCode = async (req, res) => {
         message: `Exit recorded for ${studentPayload.name}`,
         student: studentPayload,
       });
-    };
-
-    if (requestedStatus === 'IN' || requestedStatus === 'OUT') {
-      return finishAccess(requestedStatus);
     }
 
-    return finishAccess(lastLog?.status === 'IN' ? 'OUT' : 'IN');
-
-    // No previous log → first entry
-    if (!lastLog) {
-      await AccessLog.create({ userId: user._id, entryTime: now, status: 'IN' });
-      return res.status(200).json({
-        status: 'Access Granted',
-        color: 'green',
-        message: `Entry recorded for ${studentPayload.name}`,
-        student: studentPayload,
-      });
-    }
-
-    // Last status was IN → record exit on same log
-    if (lastLog.status === 'IN') {
-      lastLog.exitTime = now;
-      lastLog.status = 'OUT';
-      await lastLog.save();
-
-      // Notify Admins & Staff
-      const exitMsg = `${studentPayload.name} has exited the campus.`;
-      await createNotification({ recipientRole: 'admin', title: 'Campus Exit', message: exitMsg, type: 'ACCESS_LOG', relatedId: lastLog._id });
-      await createNotification({ recipientRole: 'staff', title: 'Campus Exit', message: exitMsg, type: 'ACCESS_LOG', relatedId: lastLog._id });
-
-      return res.status(200).json({
-        status: 'Exit Recorded',
-        color: 'yellow',
-        message: `Exit recorded for ${studentPayload.name}`,
-        student: studentPayload,
-      });
-    }
-
-    // Last status was OUT → new entry
-    const newLog = await AccessLog.create({ userId: user._id, entryTime: now, status: 'IN' });
-
-    // Notify Admins & Staff
-    const entryMsg = `${studentPayload.name} has entered the campus.`;
-    await createNotification({ recipientRole: 'admin', title: 'Campus Entry', message: entryMsg, type: 'ACCESS_LOG', relatedId: newLog._id });
-    await createNotification({ recipientRole: 'staff', title: 'Campus Entry', message: entryMsg, type: 'ACCESS_LOG', relatedId: newLog._id });
-
+    // No log today — record first entry
+    const newLog = await AccessLog.create({
+      userId: user._id,
+      entryTime: now,
+      status: 'IN',
+      campus: req.user?.campus || null,
+      scannedBy: req.user?.id || null
+    });
+    await notifyAccess(newLog, 'IN');
     await logAction({
       userId: req.user.id,
       action: 'SCAN_QR',
       targetId: user._id,
       targetType: 'User',
-      details: `Scanned QR for user ${user.username || user.fullName} (Entry) via ${method || 'QR'}`,
+      details: `Recorded entry for ${user.username || user.fullName} via ${method || 'QR'}`,
       req,
     });
-
-    // Refresh security dashboards
     emitDashboardRefresh('security');
     emitDashboardRefresh('admin');
-
     return res.status(200).json({
       status: 'Access Granted',
       color: 'green',
@@ -327,6 +267,7 @@ exports.getLogs = async (req, res) => {
         exitTime: log.exitTime,
         status: log.status === 'IN' ? 'Inside' : 'Outside',
         source: log.source || 'Security Guard',
+        exitSource: log.exitSource || null,
         campus: log.campus ? log.campus.name : 'Main Gate',
         student: u
           ? {

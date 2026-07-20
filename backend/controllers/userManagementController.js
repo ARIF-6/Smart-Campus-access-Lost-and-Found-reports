@@ -4,6 +4,7 @@ const Faculty = require('../models/Faculty');
 const Department = require('../models/Department');
 const Class = require('../models/Class');
 const Campus = require('../models/Campus');
+const Hall = require('../models/Hall');
 const { enforceHallCapacityForClass } = require('../utils/hallCapacityHelper');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
@@ -110,9 +111,18 @@ exports.getAllUsers = async (req, res) => {
 
     const query = { isDeleted: { $ne: true } };
 
-    // Staff can only see users they registered; admins/superadmins can see all
+    // Staff can only see students whose class belongs to a hall in their campus
     if (req.user && req.user.role === 'staff') {
-      query.createdBy = req.user.id;
+      if (req.user.campus) {
+        const campusHalls = await Hall.find({ campus: req.user.campus }).select('classes').lean();
+        const classIds = campusHalls.flatMap(h => h.classes || []);
+        query.class = { $in: classIds };
+        // Only show students (not other staff, admins, etc.)
+        if (!query.role) query.role = 'student';
+      } else {
+        // No campus assigned → staff sees nothing
+        query._id = { $in: [] };
+      }
     }
 
     if (role && role !== 'All') {
@@ -175,8 +185,17 @@ exports.getUserById = async (req, res) => {
     const user = await User.findById(req.params.id).select('-password').lean();
     if (!user) return sendError(res, 'User not found', 404);
 
-    if (req.user && req.user.role === 'staff' && String(user.createdBy) !== req.user.id) {
-      return sendError(res, 'Not authorized to view this user', 403);
+    if (req.user && req.user.role === 'staff') {
+      if (req.user.campus) {
+        // Staff can only view students in their campus halls
+        const campusHalls = await Hall.find({ campus: req.user.campus }).select('classes').lean();
+        const classIds = campusHalls.flatMap(h => h.classes || []).map(id => String(id));
+        if (user.role !== 'student' || !classIds.includes(String(user.class))) {
+          return sendError(res, 'Not authorized to view this user', 403);
+        }
+      } else {
+        return sendError(res, 'Not authorized to view this user', 403);
+      }
     }
 
     const [enriched] = await enrichUsers([user]);
@@ -208,10 +227,15 @@ exports.createUser = async (req, res) => {
       return sendError(res, 'Username is required for non-student roles', 400);
     }
 
-    // Check for duplicate studentId
-    if (studentId) {
-      const sidExists = await User.findOne({ studentId: studentId.trim() });
-      if (sidExists) return sendError(res, 'Student ID already in use', 400);
+    // Check for duplicate studentId (case-insensitive)
+    let normalizedStudentId = studentId ? studentId.trim().toUpperCase() : undefined;
+    if (normalizedStudentId) {
+      const sidExists = await User.findOne({
+        studentId: { $regex: new RegExp('^' + normalizedStudentId.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') }
+      });
+      if (sidExists) {
+        return sendError(res, `Student ID "${normalizedStudentId}" already exists. Duplicate Student IDs are not allowed (case-insensitive).`, 400);
+      }
     }
 
     const photoUrl = req.file ? `/uploads/profiles/${req.file.filename}` : '';
@@ -238,7 +262,7 @@ exports.createUser = async (req, res) => {
       if (academicYear && !isValidAcademicYear(academicYear)) {
         return sendError(res, `Academic year '${academicYear}' is invalid. It must span exactly one year (e.g. 24/25 or 2024/2025).`, 400);
       }
-      userData.studentId = studentId;
+      userData.studentId = normalizedStudentId;
       // Parse parentNumber as integer and validate minimum 9 digits
       if (parentNumber !== undefined && parentNumber !== '') {
         const parentNumInt = parseInt(parentNumber, 10);
@@ -319,9 +343,15 @@ exports.updateUser = async (req, res) => {
       const usernameExists = await User.findOne({ username: username.trim(), _id: { $ne: user._id } });
       if (usernameExists) return sendError(res, 'Username already taken', 400);
     }
-    if (studentId && studentId !== user.studentId) {
-      const sidExists = await User.findOne({ studentId: studentId.trim(), _id: { $ne: user._id } });
-      if (sidExists) return sendError(res, 'Student ID already in use', 400);
+    let normalizedStudentId = studentId ? studentId.trim().toUpperCase() : undefined;
+    if (normalizedStudentId) {
+      const sidExists = await User.findOne({
+        studentId: { $regex: new RegExp('^' + normalizedStudentId.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') },
+        _id: { $ne: user._id }
+      });
+      if (sidExists) {
+        return sendError(res, `Student ID "${normalizedStudentId}" already exists. Duplicate Student IDs are not allowed (case-insensitive).`, 400);
+      }
     }
 
     if (fullName) user.fullName = fullName.trim();
@@ -342,7 +372,7 @@ exports.updateUser = async (req, res) => {
     const userRole = user.role;
 
     if (userRole === 'student') {
-      if (studentId !== undefined) user.studentId = studentId ? studentId.trim() : user.studentId;
+      if (studentId !== undefined) user.studentId = studentId ? studentId.trim().toUpperCase() : user.studentId;
       if (parentNumber !== undefined) {
         if (parentNumber === '' || parentNumber === null) {
           user.parentNumber = undefined;
@@ -663,7 +693,7 @@ exports.uploadExcelStudents = async (req, res) => {
       }
 
       const fullName     = norm['fullname']     || '';
-      const studentId    = norm['studentid']    || '';
+      const studentId    = (norm['studentid']    || '').toUpperCase();
       const rawParentNum = norm['parentnumber'] || '';
       const facultyName  = norm['faculty']      || '';
       const deptName     = norm['department']   || '';
@@ -766,9 +796,11 @@ exports.uploadExcelStudents = async (req, res) => {
       }
 
       // ── Duplicate studentId check ───────────────────────────────────────────
-      const exists = await User.findOne({ studentId });
+      const exists = await User.findOne({
+        studentId: { $regex: new RegExp('^' + studentId.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') }
+      });
       if (exists) {
-        errors.push(`Row ${rowNum}: Student ID '${studentId}' already exists.`);
+        errors.push(`Row ${rowNum}: Student ID "${studentId}" already exists. Duplicate Student IDs are not allowed (case-insensitive).`);
         continue;
       }
 

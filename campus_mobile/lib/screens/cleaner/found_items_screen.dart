@@ -4,7 +4,8 @@ import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
 
 class FoundItemsScreen extends StatefulWidget {
-  const FoundItemsScreen({super.key});
+  final String? initialStatus;
+  const FoundItemsScreen({super.key, this.initialStatus});
 
   @override
   State<FoundItemsScreen> createState() => _FoundItemsScreenState();
@@ -15,7 +16,7 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _items = [];
-  String _filterStatus = 'all';
+  late String _filterStatus;
 
   static const _themeColor = Color(0xFF0D47A1);
 
@@ -32,6 +33,7 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
   @override
   void initState() {
     super.initState();
+    _filterStatus = widget.initialStatus ?? 'all';
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _fetchItems();
     });

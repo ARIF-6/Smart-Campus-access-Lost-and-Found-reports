@@ -230,6 +230,20 @@ exports.getMyComplaints = asyncHandler(async (req, res) => {
     .populate('issueType')
     .sort({ createdAt: -1 })
     .lean();
+
+  // Attach hasUserSupported flag for the requesting student
+  const studentId = req.user?.id;
+  if (studentId && complaints.length > 0) {
+    const complaintIds = complaints.map(c => c._id);
+    const userSupports = await CampusEnvironmentSupport.find({
+      complaint: { $in: complaintIds },
+      student: studentId
+    }).select('complaint').lean();
+    const supportedSet = new Set(userSupports.map(s => s.complaint.toString()));
+    complaints.forEach(c => {
+      c.hasUserSupported = supportedSet.has(c._id.toString());
+    });
+  }
   
   return sendSuccess(res, 'Campus complaints fetched successfully', complaints);
 });
@@ -280,6 +294,7 @@ exports.getComplaintById = asyncHandler(async (req, res) => {
     if (hallDoc) hallName = hallDoc.name;
   }
   const reporter = {
+    id: complaint.student?._id || null,
     fullName: complaint.student?.fullName || null,
     studentId: complaint.student?.studentId || null,
     facultyName: facultyName,
@@ -308,27 +323,29 @@ exports.supportComplaint = asyncHandler(async (req, res) => {
   const complaintId = req.params.id;
   const studentId = req.user.id;
 
+  // 1. Fetch complaint first
+  const complaint = await CampusEnvironmentComplaint.findById(complaintId);
+  if (!complaint) {
+    return res.status(404).json({ success: false, message: 'Complaint not found' });
+  }
+
+  // 2. Validation: prevent self-support
+  if (complaint.student && complaint.student.toString() === studentId) {
+    return res.status(400).json({ success: false, message: 'You cannot support your own complaint.' });
+  }
+
+  // 3. Validation: prevent support on resolved complaints
+  if (complaint.status === 'resolved') {
+    return res.status(400).json({ success: false, message: 'This complaint has already been resolved. Support is no longer available.' });
+  }
+
   try {
+    // 4. Create support record (will fail if duplicate)
     await CampusEnvironmentSupport.create({ complaint: complaintId, student: studentId });
     
-    const complaint = await CampusEnvironmentComplaint.findByIdAndUpdate(
-      complaintId,
-      { $inc: { supportCount: 1 } },
-      { new: true }
-    );
-
-    if (!complaint) {
-      return res.status(404).json({ success: false, message: 'Complaint not found' });
-    }
-
-    // Validation: prevent self-support
-    if (complaint.student.toString() === studentId) {
-      return res.status(400).json({ success: false, message: 'You cannot support your own complaint.' });
-    }
-    // Validation: prevent support on resolved complaints
-    if (complaint.status === 'resolved') {
-      return res.status(400).json({ success: false, message: 'This complaint has already been resolved. Support is no longer available.' });
-    }
+    // 5. Increment support count on complaint
+    complaint.supportCount = (complaint.supportCount || 0) + 1;
+    await complaint.save();
 
     try {
       const { getIO } = require('../../../socket');

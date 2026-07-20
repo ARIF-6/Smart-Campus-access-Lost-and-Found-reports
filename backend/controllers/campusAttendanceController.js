@@ -188,8 +188,28 @@ exports.verifyStudentId = async (req, res) => {
     }
 
     // 6. Prevent Duplicate Entry and Exit (check latest AccessLog status)
-    const lastLog = await AccessLog.findOne({ userId: student._id }).sort({ createdAt: -1 }).lean();
-    const currentStatus = lastLog?.status || null; // 'IN' or 'OUT'
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const todayLog = await AccessLog.findOne({
+      userId: student._id,
+      $or: [
+        { entryTime: { $gte: startOfToday, $lte: endOfToday } },
+        { createdAt: { $gte: startOfToday, $lte: endOfToday } }
+      ]
+    }).sort({ createdAt: -1 }).lean();
+
+    if (todayLog && todayLog.status === 'OUT') {
+      return res.status(403).json({
+        success: false,
+        message: 'sorry you have reached the limit of entry/exit of this day',
+        code: 'LIMIT_REACHED',
+      });
+    }
+
+    const currentStatus = todayLog?.status || null; // 'IN' or 'OUT'
     const nextAction = (!currentStatus || currentStatus === 'OUT') ? 'ENTER' : 'EXIT';
 
     return res.status(200).json({
@@ -361,9 +381,28 @@ exports.submitAttendance = async (req, res) => {
       });
     }
 
-    // 6. Prevent Duplicate Entry and Exit (check latest AccessLog status)
-    const lastLog = await AccessLog.findOne({ userId: student._id }).sort({ createdAt: -1 });
-    const currentStatus = lastLog?.status || null;
+    // 6. Prevent Duplicate Entry and Exit (check latest AccessLog status today)
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const todayLog = await AccessLog.findOne({
+      userId: student._id,
+      $or: [
+        { entryTime: { $gte: startOfToday, $lte: endOfToday } },
+        { createdAt: { $gte: startOfToday, $lte: endOfToday } }
+      ]
+    }).sort({ createdAt: -1 });
+
+    if (todayLog && todayLog.status === 'OUT') {
+      return res.status(400).json({
+        success: false,
+        message: 'sorry you have reached the limit of entry/exit of this day',
+      });
+    }
+
+    const currentStatus = todayLog?.status || null;
 
     if (action === 'ENTER') {
       if (currentStatus === 'IN') {
@@ -493,9 +532,11 @@ exports.submitAttendance = async (req, res) => {
       }
 
       // Synchronize by updating latest IN AccessLog record to OUT
+      const lastLog = todayLog; // use the todayLog
       if (lastLog && lastLog.status === 'IN') {
         lastLog.exitTime = now;
         lastLog.status = 'OUT';
+        lastLog.exitSource = 'Campus QR Code';
         lastLog.latitude = studentLat;
         lastLog.longitude = studentLon;
         lastLog.accuracy = gpsAccuracy || null;
@@ -509,6 +550,7 @@ exports.submitAttendance = async (req, res) => {
           campus: campusId,
           scannedBy: null,
           source: 'Campus QR Code',
+          exitSource: 'Campus QR Code',
           latitude: studentLat,
           longitude: studentLon,
           accuracy: gpsAccuracy || null,

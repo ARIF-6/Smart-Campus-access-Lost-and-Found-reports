@@ -48,7 +48,6 @@ const TABS = [
   { id: 'issue',    label: 'Issue Details' },
   { id: 'support',  label: 'Support' },
   { id: 'timeline', label: 'Timeline' },
-  { id: 'manage',   label: 'Manage' },
 ];
 
 /* ═══════════════════════════════════════════════════ modal ══ */
@@ -225,8 +224,6 @@ const ClassIssueDetailsModal = ({ issueId, staffUsers, onClose, onUpdate }) => {
                   <Field label="Department"   value={issue?.student?.departmentName || issue?.departmentName}    />
                   <Field label="Class"        value={issue?.className}              />
                   <Field label="Hall"         value={issue?.hallName || issue?.building} />
-                  <Field label="Email"        value={issue?.student?.email}         />
-                  <Field label="Phone"        value={issue?.student?.phone}         />
                 </div>
               </div>
 
@@ -246,19 +243,9 @@ const ClassIssueDetailsModal = ({ issueId, staffUsers, onClose, onUpdate }) => {
                 </div>
 
                 {/* Quick stats */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-white border border-slate-100 rounded-2xl p-4 text-center shadow-sm">
-                    <div className="text-2xl font-black text-indigo-700">{issue?.supportCount ?? 0}</div>
-                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Supports</div>
-                  </div>
-                  <div className="bg-white border border-slate-100 rounded-2xl p-4 text-center shadow-sm">
-                    <div className="text-2xl font-black text-slate-700">{issue?.tracking?.length ?? 0}</div>
-                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Updates</div>
-                  </div>
-                  <div className="bg-white border border-slate-100 rounded-2xl p-4 text-center shadow-sm">
-                    <div className="text-2xl font-black text-slate-700">{issue?.images?.length ?? 0}</div>
-                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Photos</div>
-                  </div>
+                <div className="bg-white border border-slate-100 rounded-2xl p-4 text-center shadow-sm">
+                  <div className="text-2xl font-black text-indigo-700">{issue?.supportCount ?? 0}</div>
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Supports</div>
                 </div>
 
                 {/* Current status */}
@@ -380,7 +367,6 @@ const ClassIssueDetailsModal = ({ issueId, staffUsers, onClose, onUpdate }) => {
                 </p>
               </div>
 
-              {/* Supporter list */}
               {issue?.supportedBy?.length > 0 ? (
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                   <div className="px-5 py-4 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
@@ -410,21 +396,17 @@ const ClassIssueDetailsModal = ({ issueId, staffUsers, onClose, onUpdate }) => {
                     ))}
                   </div>
                 </div>
-              ) : (
+              ) : (issue?.supportCount ?? 0) > 0 ? (
                 <div className="bg-slate-50 rounded-2xl border border-slate-100 py-12 flex flex-col items-center gap-2">
                   <svg className="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                   <p className="font-bold text-slate-400">
-                    {(issue?.supportCount ?? 0) > 0
-                      ? `${issue.supportCount} supports recorded`
-                      : 'No supports yet'}
+                    {issue.supportCount} supports recorded
                   </p>
                   <p className="text-xs text-slate-300 text-center">
-                    {(issue?.supportCount ?? 0) > 0
-                      ? 'Supporter profiles are not stored with full details'
-                      : 'Students can support this issue via the mobile app'}
+                    Supporter profiles are not stored with full details
                   </p>
                 </div>
-              )}
+              ) : null}
             </div>
           )}
 
@@ -482,152 +464,10 @@ const ClassIssueDetailsModal = ({ issueId, staffUsers, onClose, onUpdate }) => {
             </div>
           )}
 
-          {/* ──────────── MANAGE TAB ──────────── */}
-          {!loading && activeTab === 'manage' && (
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
 
-              {/* Update status */}
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                <div className="px-5 py-4 bg-slate-50/60 border-b border-slate-100">
-                  <div className="text-sm font-black text-slate-700">Update Status</div>
-                  <div className="text-xs text-slate-400 mt-0.5">Change the progress of this issue</div>
-                </div>
-                <div className="p-5 space-y-4">
-
-                  {/* Support threshold indicator */}
-                  {(() => {
-                    const classStudentCount = issue?.classStudentCount || 0;
-                    const required = Math.floor(classStudentCount / 2) + 1;
-                    const current  = issue?.supportCount || 0;
-                    const blocked  = updateData.status === 'resolved' && current < required;
-                    return (
-                      <>
-                        <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                          <span className="text-2xl font-black text-indigo-600">{current}</span>
-                          <div>
-                            <p className="text-xs font-bold text-slate-700">Student Supports</p>
-                            <p className="text-[11px] text-slate-400">
-                              {current >= required
-                                ? `✅ Threshold reached (${required} needed) — issue can be resolved`
-                                : `⚠️ ${required - current} more needed to enable Resolve (class has ${classStudentCount} students)`}
-                            </p>
-                          </div>
-                        </div>
-
-                        {blocked && (
-                          <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm">
-                            <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                            </svg>
-                            <p className="text-amber-800 font-semibold">
-                              The supports does not reach the target
-                            </p>
-                          </div>
-                        )}
-
-                        <div>
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">New Status</label>
-                          <select
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-indigo-400/30 focus:border-indigo-300 outline-none transition-all"
-                            value={updateData.status}
-                            onChange={(e) => setUpdateData({ ...updateData, status: e.target.value })}
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="in_review">In Review</option>
-                            <option value="resolved" disabled={current < required}>
-                              Resolved{current < required ? ` (need ${required} supports)` : ''}
-                            </option>
-                            <option value="rejected">Rejected</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Note (optional)</label>
-                          <textarea
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-indigo-400/30 focus:border-indigo-300 outline-none h-28 resize-none transition-all"
-                            placeholder="Reason for status change..."
-                            value={updateData.note}
-                            onChange={(e) => setUpdateData({ ...updateData, note: e.target.value })}
-                          />
-                        </div>
-                        <button
-                          onClick={handleUpdateStatus}
-                          disabled={updating || blocked}
-                          className={`w-full py-3 rounded-xl font-black text-sm shadow-lg active:scale-[0.98] transition-all ${
-                            blocked
-                              ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                              : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed'
-                          }`}
-                        >
-                          {updating ? 'Saving…' : '✓ Save Status Update'}
-                        </button>
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* Assign staff */}
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                <div className="px-5 py-4 bg-slate-50/60 border-b border-slate-100">
-                  <div className="text-sm font-black text-slate-700">Assign Staff</div>
-                  <div className="text-xs text-slate-400 mt-0.5">
-                    {issue?.assignedTo
-                      ? `Currently assigned: ${issue.assignedTo.fullName}`
-                      : 'No staff assigned yet'}
-                  </div>
-                </div>
-                <div className="p-3 max-h-80 overflow-y-auto space-y-1.5">
-                  {staffUsers.length === 0 ? (
-                    <div className="py-10 text-center text-sm text-slate-400">No staff members found</div>
-                  ) : (
-                    staffUsers.map((user) => {
-                      const isAssigned = issue?.assignedTo?._id === user._id;
-                      return (
-                        <div
-                          key={user._id}
-                          className={`p-3 rounded-xl border flex items-center justify-between gap-3 transition-all ${
-                            isAssigned
-                              ? 'bg-indigo-50 border-indigo-200'
-                              : 'bg-white border-slate-100 hover:border-indigo-100 hover:bg-slate-50'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
-                              isAssigned ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'
-                            }`}>
-                              {user.fullName.charAt(0)}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-sm font-bold text-slate-700 truncate">{user.fullName}</div>
-                              {user.email && <div className="text-xs text-slate-400 truncate">{user.email}</div>}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleAssign(user._id)}
-                            disabled={updating || isAssigned}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-black shrink-0 transition-all ${
-                              isAssigned
-                                ? 'text-indigo-600 cursor-default'
-                                : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-indigo-600 hover:text-white hover:border-transparent'
-                            }`}
-                          >
-                            {isAssigned ? '✓ Assigned' : 'Assign'}
-                          </button>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* ══ Footer ══ */}
-        <div className="shrink-0 px-8 py-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
-          <p className="text-[10px] text-slate-300 font-semibold truncate">
-            {issue?._id ? `Issue ID: ${issue._id}` : ''}
-          </p>
+        <div className="shrink-0 px-8 py-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-end">
           <button
             onClick={onClose}
             className="px-5 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm"

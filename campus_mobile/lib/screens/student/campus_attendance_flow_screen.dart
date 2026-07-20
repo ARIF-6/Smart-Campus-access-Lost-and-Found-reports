@@ -53,53 +53,78 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
     super.dispose();
   }
 
+  // Location permission state — drives the blocking UI overlay
+  bool _locationBlocked = false;
+  String _locationBlockReason = '';
+  bool _isGpsServiceDisabled = false;
+  bool _isPermanentlyDenied = false;
+
   Future<bool> _checkLocationPermissionAndGetGPS() async {
     bool serviceEnabled;
     LocationPermission permission;
 
+    // ── Step 1: Check if location services are on ────────────────────────────
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Location services are disabled. Please enable GPS.';
+          _locationBlocked = true;
+          _isPermanentlyDenied = false;
+          _isGpsServiceDisabled = true;
+          _locationBlockReason = 'Location services are turned off. Please turn on GPS/Location to scan your campus code.';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location services are disabled. Please enable GPS.'), backgroundColor: Colors.orange),
-        );
       }
       return false;
     }
 
+    // ── Step 2: Check permission state ───────────────────────────────────────
     permission = await Geolocator.checkPermission();
+
+    if (permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        setState(() {
+          _locationBlocked = true;
+          _isPermanentlyDenied = true;
+          _isGpsServiceDisabled = false;
+          _locationBlockReason = 'Location access is needed to verify you are on campus. Please allow location permissions in your device settings.';
+        });
+      }
+      return false;
+    }
+
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
         if (mounted) {
           setState(() {
-            _errorMessage = 'Location permission is required to scan the campus QR Code.';
+            _locationBlocked = true;
+            _isPermanentlyDenied = false;
+            _isGpsServiceDisabled = false;
+            _locationBlockReason = 'Location access is needed to verify you are on campus. Please allow location permissions in your device settings.';
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location permission is required to scan the campus QR Code.'), backgroundColor: Colors.red),
-          );
+        }
+        return false;
+      }
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          setState(() {
+            _locationBlocked = true;
+            _isPermanentlyDenied = true;
+            _isGpsServiceDisabled = false;
+            _locationBlockReason = 'Location access is needed to verify you are on campus. Please allow location permissions in your device settings.';
+          });
         }
         return false;
       }
     }
 
-    if (permission == LocationPermission.deniedForever) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Location permission is required to scan the campus QR Code.';
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location permission is permanently denied. Please enable it in system settings.'), backgroundColor: Colors.red),
-        );
-      }
-      return false;
-    }
-
+    // ── Step 3: Permission granted — clear any blocking state ────────────────
     if (mounted) {
       setState(() {
+        _locationBlocked = false;
+        _locationBlockReason = '';
+        _isPermanentlyDenied = false;
+        _isGpsServiceDisabled = false;
         _isLoading = true;
       });
     }
@@ -110,33 +135,12 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
         timeLimit: const Duration(seconds: 15),
       );
 
-      if (position.accuracy > 30) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('GPS accuracy is poor (${position.accuracy.toStringAsFixed(1)}m). Waiting for a more accurate location...'),
-              backgroundColor: Colors.amber,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-        await Future.delayed(const Duration(seconds: 3));
-        position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 15),
-        );
-      }
-
       if (mounted) {
         setState(() {
           _latitude = position.latitude;
           _longitude = position.longitude;
           _accuracy = position.accuracy;
-          if (position.accuracy > 30) {
-            _errorMessage = 'GPS accuracy is poor (${position.accuracy.toStringAsFixed(1)}m). Please wait for a better GPS lock.';
-          } else {
-            _errorMessage = null;
-          }
+          _errorMessage = null;
         });
       }
       return true;
@@ -158,6 +162,22 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
       }
     }
   }
+
+  /// Opens device app settings and re-checks permission after user returns.
+  Future<void> _openSettingsAndRetry() async {
+    await Geolocator.openAppSettings();
+    // Give user time to change settings, then retry
+    await Future.delayed(const Duration(milliseconds: 500));
+    await _checkLocationPermissionAndGetGPS();
+  }
+
+  /// Opens location/GPS settings (for service-disabled case).
+  Future<void> _openGpsSettingsAndRetry() async {
+    await Geolocator.openLocationSettings();
+    await Future.delayed(const Duration(milliseconds: 500));
+    await _checkLocationPermissionAndGetGPS();
+  }
+
 
   void _resetFlow() {
     setState(() {
@@ -338,6 +358,19 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            onPressed: () {
+              setState(() {
+                _errorMessage = null;
+                _locationBlocked = false;
+              });
+              _scannerController.start();
+              _checkLocationPermissionAndGetGPS();
+            },
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -371,6 +404,75 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
   }
 
   Widget _buildQRScanStep() {
+    if (_locationBlocked) {
+      return Column(
+        key: const ValueKey('locationBlocked'),
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              _isGpsServiceDisabled ? Icons.location_off_rounded : Icons.gpp_bad_rounded,
+              color: Colors.red,
+              size: 48,
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Location Access Required',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0D1B38)),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _locationBlockReason,
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.5),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+          if (_isGpsServiceDisabled) ...[
+            ElevatedButton.icon(
+              onPressed: _openGpsSettingsAndRetry,
+              icon: const Icon(Icons.settings),
+              label: const Text('Enable GPS / Location'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1B3A6B),
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+          ] else if (_isPermanentlyDenied) ...[
+            ElevatedButton.icon(
+              onPressed: _openSettingsAndRetry,
+              icon: const Icon(Icons.open_in_new),
+              label: const Text('Open App Settings'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1B3A6B),
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _checkLocationPermissionAndGetGPS,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry Check'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       key: const ValueKey('qrScan'),
       children: [
@@ -401,6 +503,18 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
               children: [
                 MobileScanner(
                   controller: _scannerController,
+                  errorBuilder: (BuildContext context, MobileScannerException error) {
+                    return const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error, color: Colors.white, size: 40),
+                          SizedBox(height: 16),
+                          Text('Camera access is needed to scan QR codes.\nPlease allow camera permissions.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 14, height: 1.5)),
+                        ],
+                      ),
+                    );
+                  },
                   onDetect: (capture) {
                     final List<Barcode> barcodes = capture.barcodes;
                     if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
@@ -419,6 +533,29 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
             ),
           ),
         ),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.red.shade100),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: Colors.red, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _errorMessage!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }

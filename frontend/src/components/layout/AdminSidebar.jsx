@@ -318,7 +318,15 @@ const AdminSidebar = ({ isOpen = false, onClose = () => {} }) => {
           className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2 space-y-0.5 scrollbar-hide"
         >
           {adminNavSections.map((section) => {
-            const hasVisibleItem = section.items.length > 0;
+            // Filter out Role Management for staff
+            const visibleItems = section.items.filter(item => {
+              if (user?.role === 'staff' && item.path === '/admin/roles') {
+                return false;
+              }
+              return true;
+            });
+
+            const hasVisibleItem = visibleItems.length > 0;
             if (!hasVisibleItem) return null;
 
             return (
@@ -330,7 +338,7 @@ const AdminSidebar = ({ isOpen = false, onClose = () => {} }) => {
                   </span>
                 )}
 
-                {section.items.map((item) => {
+                {visibleItems.map((item) => {
                   const isActive =
                     location.pathname === item.path ||
                     (item.children && item.children.some((c) => location.pathname.startsWith(c.path)));

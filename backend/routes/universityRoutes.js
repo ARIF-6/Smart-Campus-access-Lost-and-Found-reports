@@ -27,7 +27,7 @@ const {
   getCampusQRPDF,
 } = require('../controllers/universityController');
 const { protect } = require('../middleware/authMiddleware');
-const { adminOrStaff } = require('../middleware/roleMiddleware');
+const { adminOrStaff, allowRoles } = require('../middleware/roleMiddleware');
 
 // Public GET endpoints
 router.get('/faculties', getFaculties);
@@ -36,34 +36,34 @@ router.get('/halls', getHalls);
 router.get('/classes', getClasses);
 router.get('/campuses', getCampuses);
 
-// Campus CRUD
-router.post('/campuses', protect, adminOrStaff, createCampus);
-router.put('/campuses/:id', protect, adminOrStaff, updateCampus);
-router.delete('/campuses/:id', protect, adminOrStaff, deleteCampus);
+// Campus CRUD — write operations: admin/superadmin only
+router.post('/campuses', protect, allowRoles('admin', 'superadmin'), createCampus);
+router.put('/campuses/:id', protect, allowRoles('admin', 'superadmin'), updateCampus);
+router.delete('/campuses/:id', protect, allowRoles('admin', 'superadmin'), deleteCampus);
 
-// Campus QR endpoints
+// Campus QR endpoints — staff can also view
 router.get('/campuses/:id/qr', protect, adminOrStaff, getCampusQR);
 router.get('/campuses/:id/qr/pdf', protect, adminOrStaff, getCampusQRPDF);
 
-// Faculty CRUD
-router.post('/faculties', protect, adminOrStaff, createFaculty);
-router.put('/faculties/:id', protect, adminOrStaff, updateFaculty);
-router.delete('/faculties/:id', protect, adminOrStaff, deleteFaculty);
+// Faculty CRUD — write operations: admin/superadmin only
+router.post('/faculties', protect, allowRoles('admin', 'superadmin'), createFaculty);
+router.put('/faculties/:id', protect, allowRoles('admin', 'superadmin'), updateFaculty);
+router.delete('/faculties/:id', protect, allowRoles('admin', 'superadmin'), deleteFaculty);
 
-// Department CRUD
-router.post('/departments', protect, adminOrStaff, createDepartment);
-router.put('/departments/:id', protect, adminOrStaff, updateDepartment);
-router.delete('/departments/:id', protect, adminOrStaff, deleteDepartment);
+// Department CRUD — write operations: admin/superadmin only
+router.post('/departments', protect, allowRoles('admin', 'superadmin'), createDepartment);
+router.put('/departments/:id', protect, allowRoles('admin', 'superadmin'), updateDepartment);
+router.delete('/departments/:id', protect, allowRoles('admin', 'superadmin'), deleteDepartment);
 
-// Class CRUD
-router.post('/classes', protect, adminOrStaff, createClass);
+// Class CRUD — write operations: admin/superadmin only, staff can update class hall assignment via PUT
+router.post('/classes', protect, allowRoles('admin', 'superadmin'), createClass);
 router.put('/classes/:id', protect, adminOrStaff, updateClass);
-router.delete('/classes/:id', protect, adminOrStaff, deleteClass);
+router.delete('/classes/:id', protect, allowRoles('admin', 'superadmin'), deleteClass);
 
-// Hall CRUD
-router.post('/halls', protect, adminOrStaff, createHall);
-router.put('/halls/:hallId', protect, adminOrStaff, editHall);
-router.delete('/halls/:hallId', protect, adminOrStaff, deleteHall);
+// Hall CRUD — write operations: admin/superadmin only
+router.post('/halls', protect, allowRoles('admin', 'superadmin'), createHall);
+router.put('/halls/:hallId', protect, allowRoles('admin', 'superadmin'), editHall);
+router.delete('/halls/:hallId', protect, allowRoles('admin', 'superadmin'), deleteHall);
 
 // Class Leader Management endpoints
 router.get('/classes/:classId/students', protect, getClassStudents);

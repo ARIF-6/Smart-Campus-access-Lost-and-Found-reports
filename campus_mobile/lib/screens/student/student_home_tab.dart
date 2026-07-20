@@ -257,286 +257,320 @@ class _StudentHomeTabState extends State<StudentHomeTab>
   // ── Dynamic Hero Header ─────────────────────────────────────────────
   Widget _buildDynamicHeroHeader(
       String fullName, String studentId, String photoUrl) {
-    final double headerHeight = 310.0;
-
-    return Stack(
-      children: [
-        // Carousel Slider
-        CarouselSlider.builder(
-          carouselController: _carouselController,
-          itemCount: _sliderImages.length,
-          options: CarouselOptions(
-            height: headerHeight,
-            viewportFraction: 1.0,
-            autoPlay: true,
-            autoPlayInterval: const Duration(seconds: 5),
-            autoPlayAnimationDuration: const Duration(milliseconds: 800),
-            autoPlayCurve: Curves.easeInOutCubic,
-            enableInfiniteScroll: true,
-            scrollDirection: Axis.horizontal,
-            onPageChanged: (index, reason) {
-              setState(() {
-                _carouselIndex = index;
-              });
-            },
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF0D2459), Color(0xFF1E3A8A)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(36),
+          bottomRight: Radius.circular(36),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 56, 20, 26),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Greeting Row
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Avatar on the left (matches image design)
+              GestureDetector(
+                onTap: () {
+                  final s = context.findAncestorStateOfType<StudentMainScreenState>();
+                  if (s != null) s.currentIndex = 3;
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(3.5),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.25),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: CircleAvatar(
+                    radius: 24,
+                    backgroundColor: const Color(0xFF2563EB),
+                    backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+                    child: photoUrl.isEmpty
+                        ? Text(
+                            fullName.isNotEmpty ? fullName[0].toUpperCase() : 'S',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          )
+                        : null,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              // Greeting + full name
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Good ${_greeting()} 👋',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.75),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      fullName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              // Notification Bell with badge
+              Consumer<NotificationProvider>(
+                builder: (context, provider, child) {
+                  return Stack(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.14),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 24),
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                          ),
+                        ),
+                      ),
+                      if (provider.unreadCount > 0)
+                        Positioned(
+                          right: 8,
+                          top: 8,
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFEF4444), // red dot
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ],
           ),
-          itemBuilder: (context, index, realIndex) {
-            final imagePath = _sliderImages[index];
-            final isLocal = !imagePath.startsWith('http');
-            return SizedBox(
-              width: double.infinity,
-              height: headerHeight,
+          const SizedBox(height: 20),
+          // Carousel Card Widget (matching the screenshot exactly)
+          Container(
+            height: 210,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  isLocal
-                      ? Image.asset(imagePath, fit: BoxFit.cover)
-                      : Image.network(imagePath,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Image.asset(
-                              'assets/images/header_bg.jpg',
-                              fit: BoxFit.cover)),
-                  // Dark gradient overlay
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.black.withValues(alpha: 0.65),
-                          Colors.black.withValues(alpha: 0.25),
-                          const Color(0xFF0F172A).withValues(alpha: 0.95),
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
+                  // Image Carousel Slider
+                  CarouselSlider.builder(
+                    carouselController: _carouselController,
+                    itemCount: _sliderImages.length,
+                    options: CarouselOptions(
+                      height: 210,
+                      viewportFraction: 1.0,
+                      autoPlay: true,
+                      autoPlayInterval: const Duration(seconds: 5),
+                      autoPlayAnimationDuration: const Duration(milliseconds: 800),
+                      autoPlayCurve: Curves.easeInOutCubic,
+                      enableInfiniteScroll: true,
+                      scrollDirection: Axis.horizontal,
+                      onPageChanged: (index, reason) {
+                        setState(() {
+                          _carouselIndex = index;
+                        });
+                      },
                     ),
+                    itemBuilder: (context, index, realIndex) {
+                      final imagePath = _sliderImages[index];
+                      final isLocal = !imagePath.startsWith('http');
+                      return Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          isLocal
+                              ? Image.asset(imagePath, fit: BoxFit.cover)
+                              : Image.network(
+                                  imagePath,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Image.asset(
+                                    'assets/images/header_bg.jpg',
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                          // Dark gradient overlay to make text highly readable
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withOpacity(0.35),
+                                  Colors.black.withOpacity(0.85),
+                                ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
-                ],
-              ),
-            );
-          },
-        ),
-
-        // Foreground content on top of slider
-        Container(
-          height: headerHeight,
-          padding: const EdgeInsets.fromLTRB(20, 52, 20, 22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // User Greeting Row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Greeting & Student Info (Left side)
-                  Expanded(
+                  // Welcome text overlays
+                  Positioned(
+                    bottom: 45,
+                    left: 20,
+                    right: 20,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                      children: const [
                         Text(
-                          'Good ${_greeting()} 👋',
-                          style: const TextStyle(
-                            color: Colors.cyanAccent,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
+                          'Welcome to',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.3,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        SizedBox(height: 2),
                         Text(
-                          fullName,
-                          style: const TextStyle(
+                          'Smart Campus',
+                          style: TextStyle(
                             color: Colors.white,
-                            fontSize: 18,
+                            fontSize: 26,
                             fontWeight: FontWeight.w900,
-                            letterSpacing: -0.2,
+                            letterSpacing: -0.5,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Your campus, in your hand.',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  // Bell & Avatar (Right side)
-                  Row(
-                    children: [
-                      // Refresh Icon Button
-                      Container(
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.12),
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.refresh_rounded,
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                          onPressed: () {
-                            _fetchRecentFoundItems();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Data refreshed successfully!'),
-                                duration: Duration(seconds: 1),
-                              ),
-                            );
-                          },
+                  // Page Pill Indicator ("1 / 6")
+                  Positioned(
+                    bottom: 14,
+                    left: 20,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1B3A6B),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        '${_carouselIndex + 1} / ${_sliderImages.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      // Bell icon
-                      Consumer<NotificationProvider>(builder: (_, prov, __) {
-                        return Stack(
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.12),
-                                shape: BoxShape.circle,
-                              ),
-                              child: IconButton(
-                                icon: const Icon(
-                                    Icons.notifications_none_rounded,
-                                    color: Colors.white,
-                                    size: 22),
-                                onPressed: () =>
-                                    _nav(const NotificationsScreen()),
-                              ),
-                            ),
-                            if (prov.unreadCount > 0)
-                              Positioned(
-                                right: 6,
-                                top: 6,
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFEF4444),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  constraints: const BoxConstraints(
-                                      minWidth: 16, minHeight: 16),
-                                  child: Text(
-                                    '${prov.unreadCount}',
-                                    style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.bold),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        );
-                      }),
-                      const SizedBox(width: 10),
-                      // Avatar
-                      GestureDetector(
-                        onTap: () {
-                          final s = context.findAncestorStateOfType<
-                              StudentMainScreenState>();
-                          if (s != null) s.currentIndex = 3;
-                        },
+                    ),
+                  ),
+                  // Dots/Dashes indicator at the bottom center
+                  Positioned(
+                    bottom: 18,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: AnimatedSmoothIndicator(
+                        activeIndex: _carouselIndex,
+                        count: _sliderImages.length,
+                        effect: const ExpandingDotsEffect(
+                          dotHeight: 5,
+                          dotWidth: 8,
+                          expansionFactor: 2.5,
+                          spacing: 6,
+                          activeDotColor: const Color(0xFF2563EB),
+                          dotColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Left Arrow Button
+                  Positioned(
+                    left: 12,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: GestureDetector(
+                        onTap: () => _carouselController.previousPage(),
                         child: Container(
-                          decoration: BoxDecoration(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF1B3A6B),
                             shape: BoxShape.circle,
-                            border: Border.all(
-                                color: Colors.cyanAccent.withValues(alpha: 0.6),
-                                width: 2),
                           ),
-                          child: CircleAvatar(
-                            radius: 20,
-                            backgroundColor: Colors.white24,
-                            backgroundImage: photoUrl.isNotEmpty
-                                ? NetworkImage(photoUrl)
-                                : null,
-                            child: photoUrl.isEmpty
-                                ? Text(
-                                    fullName.isNotEmpty
-                                        ? fullName[0].toUpperCase()
-                                        : 'S',
-                                    style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15),
-                                  )
-                                : null,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-
-              // Bottom Section of Header: Glassmorphism ID Badge + Smooth Page Indicator
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // Glassmorphic Student ID badge
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              width: 1.2),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: Colors.cyanAccent,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'ID: $studentId',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
+                          child: const Icon(Icons.arrow_back_ios_rounded, color: Colors.white, size: 18),
                         ),
                       ),
                     ),
                   ),
-
-                  // Carousel Smooth Page Indicators
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: AnimatedSmoothIndicator(
-                      activeIndex: _carouselIndex,
-                      count: _sliderImages.length,
-                      effect: const ExpandingDotsEffect(
-                        dotHeight: 6,
-                        dotWidth: 6,
-                        expansionFactor: 3,
-                        spacing: 5,
-                        activeDotColor: Colors.cyanAccent,
-                        dotColor: Colors.white24,
+                  // Right Arrow Button
+                  Positioned(
+                    right: 12,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: GestureDetector(
+                        onTap: () => _carouselController.nextPage(),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF1B3A6B),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
-            ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

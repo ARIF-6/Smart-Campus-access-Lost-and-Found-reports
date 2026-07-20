@@ -37,90 +37,192 @@ class AnimatedActionCard extends StatefulWidget {
   State<AnimatedActionCard> createState() => _AnimatedActionCardState();
 }
 
-class _AnimatedActionCardState extends State<AnimatedActionCard> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+class _AnimatedActionCardState extends State<AnimatedActionCard>
+    with TickerProviderStateMixin {
+  bool _isHovered = false;
+  late AnimationController _pressController;
+  late AnimationController _entranceController;
   late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    // Press scale animation
+    _pressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 100),
-      lowerBound: 0.94,
+      duration: const Duration(milliseconds: 120),
+      lowerBound: 0.93,
       upperBound: 1.0,
+    )..value = 1.0;
+    _scaleAnimation = _pressController;
+
+    // Entrance animation
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 450),
     );
-    _scaleAnimation = _controller;
+    _fadeAnimation = CurvedAnimation(
+      parent: _entranceController,
+      curve: Curves.easeOut,
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.18),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _entranceController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    // Stagger entrance slightly
+    Future.delayed(const Duration(milliseconds: 80), () {
+      if (mounted) _entranceController.forward();
+    });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _pressController.dispose();
+    _entranceController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => _controller.reverse(),
-      onTapUp: (_) {
-        _controller.forward();
-        widget.onTap();
-      },
-      onTapCancel: () => _controller.forward(),
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade100),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 6,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: widget.color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _isHovered = true),
+          onExit: (_) => setState(() => _isHovered = false),
+          child: GestureDetector(
+            onTapDown: (_) => _pressController.reverse(),
+            onTapUp: (_) {
+              _pressController.forward();
+              widget.onTap();
+            },
+            onTapCancel: () => _pressController.forward(),
+            child: AnimatedScale(
+              scale: _isHovered ? 1.05 : 1.0,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              child: ScaleTransition(
+                scale: _scaleAnimation,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: widget.color.withOpacity(0.12),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.03),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                    border: Border.all(color: widget.color.withOpacity(0.1), width: 1.5),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          child: Container(
+                            width: 60,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [widget.color, widget.color.withOpacity(0.0)],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(11),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          widget.color.withOpacity(0.18),
+                                          widget.color.withOpacity(0.05),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: widget.color.withOpacity(0.2),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Icon(widget.icon, color: widget.color, size: 22),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.all(5),
+                                    decoration: BoxDecoration(
+                                      color: widget.color.withOpacity(0.08),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(Icons.arrow_forward_ios_rounded,
+                                        size: 10, color: widget.color),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.title,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 14,
+                                      color: Color(0xFF0F172A),
+                                      letterSpacing: -0.3,
+                                      height: 1.2,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    widget.subtitle,
+                                    style: const TextStyle(
+                                      color: Color(0xFF64748B),
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.2,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    child: Icon(widget.icon, color: widget.color, size: 20),
                   ),
-                  Icon(Icons.arrow_forward_ios_rounded, size: 10, color: Colors.grey.shade300),
-                ],
+                ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, height: 1.1),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    widget.subtitle,
-                    style: TextStyle(color: Colors.grey.shade500, fontSize: 9.5, height: 1.1),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -248,6 +350,13 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
     return 'No shift has been assigned to you yet. Contact an administrator.';
   }
 
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Morning';
+    if (hour < 17) return 'Afternoon';
+    return 'Evening';
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
@@ -277,34 +386,66 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                   // Sliver Navy Header
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 56, 16, 26),
+                      padding: const EdgeInsets.fromLTRB(20, 56, 20, 26),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              IconButton(
-                                icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 24),
-                                onPressed: widget.openDrawer,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
+                              // Avatar on the left (matches image design)
+                              Container(
+                                padding: const EdgeInsets.all(3.5),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.25),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: const Color(0xFF2563EB),
+                                  backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+                                  child: photoUrl.isEmpty
+                                      ? Text(
+                                          user?['fullName']?[0]?.toUpperCase() ?? 'S',
+                                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                                        )
+                                      : null,
+                                ),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 14),
+                              // Greeting + name
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Security Portal 👋',
-                                        style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11)),
+                                    Text(
+                                      'Good ${_greeting()} 👋',
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.75),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
                                     Text(
                                       user?['fullName'] ?? 'Officer',
-                                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: -0.3,
+                                      ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
                                 ),
                               ),
+                              // Notification Bell with badge
                               Consumer<NotificationProvider>(
                                 builder: (context, provider, child) {
                                   return Stack(
@@ -315,7 +456,7 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                                           shape: BoxShape.circle,
                                         ),
                                         child: IconButton(
-                                          icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 22),
+                                          icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 24),
                                           onPressed: () => Navigator.push(
                                             context,
                                             MaterialPageRoute(builder: (_) => const NotificationsScreen()),
@@ -324,39 +465,25 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                                       ),
                                       if (provider.unreadCount > 0)
                                         Positioned(
-                                          right: 6,
-                                          top: 6,
+                                          right: 8,
+                                          top: 8,
                                           child: Container(
-                                            padding: const EdgeInsets.all(4),
-                                            decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                                            constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                                            child: Text('${provider.unreadCount}',
-                                                style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                                                textAlign: TextAlign.center),
+                                            width: 10,
+                                            height: 10,
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFFEF4444),
+                                              shape: BoxShape.circle,
+                                            ),
                                           ),
                                         ),
                                     ],
                                   );
                                 },
                               ),
+                              // Menu
                               IconButton(
-                                icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
-                                onPressed: () {
-                                  _fetchLive();
-                                  Provider.of<AuthProvider>(context, listen: false).fetchLatestProfile();
-                                },
-                              ),
-                              const SizedBox(width: 8),
-                              CircleAvatar(
-                                radius: 18,
-                                backgroundColor: Colors.white24,
-                                backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
-                                child: photoUrl.isEmpty
-                                    ? Text(
-                                        user?['fullName']?[0] ?? 'S',
-                                        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                                      )
-                                    : null,
+                                icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 24),
+                                onPressed: widget.openDrawer,
                               ),
                             ],
                           ),
@@ -489,14 +616,14 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                               physics: const NeverScrollableScrollPhysics(),
                               crossAxisSpacing: 12,
                               mainAxisSpacing: 12,
-                              childAspectRatio: 1.35, // Flattened/miniaturized card size
+                              childAspectRatio: 1.18, // Adjusted to avoid any vertical overflow
                               children: [
-                                AnimatedActionCard(title: 'QR Scanner', subtitle: 'Scan student ID', icon: Icons.qr_code_scanner, color: const Color(0xFF1A73E8), onTap: () => _go(const ScannerScreen())),
-                                AnimatedActionCard(title: 'Access Logs', subtitle: 'Entry & exit history', icon: Icons.list_alt, color: const Color(0xFF1E8E3E), onTap: () => _go(const AccessLogsScreen())),
-                                AnimatedActionCard(title: 'Visitor Reg.', subtitle: 'Register visitors', icon: Icons.person_add, color: const Color(0xFF00695C), onTap: () => _go(const VisitorsScreen())),
+                                AnimatedActionCard(title: 'QR Scanner', subtitle: 'Scan student ID', icon: Icons.qr_code_scanner_rounded, color: const Color(0xFF1A73E8), onTap: () => _go(const ScannerScreen())),
+                                AnimatedActionCard(title: 'Access Logs', subtitle: 'Entry & exit history', icon: Icons.list_alt_rounded, color: const Color(0xFF1E8E3E), onTap: () => _go(const AccessLogsScreen())),
+                                AnimatedActionCard(title: 'Visitor Reg.', subtitle: 'Register visitors', icon: Icons.person_add_alt_1_rounded, color: const Color(0xFF00695C), onTap: () => _go(const VisitorsScreen())),
                                 AnimatedActionCard(title: 'Incidents', subtitle: 'Report events', icon: Icons.warning_amber_rounded, color: const Color(0xFFD93025), onTap: () => _go(const IncidentsScreen())),
-                                AnimatedActionCard(title: 'Blacklist', subtitle: 'Manage blacklist', icon: Icons.block, color: const Color(0xFF8B0000), onTap: () => _go(const BlacklistScreen())),
-                                AnimatedActionCard(title: 'Reports', subtitle: 'Daily/monthly stats', icon: Icons.bar_chart, color: const Color(0xFFF57C00), onTap: () => _go(const SecurityReportsScreen())),
+                                AnimatedActionCard(title: 'Blacklist', subtitle: 'Manage blacklist', icon: Icons.block_flipped, color: const Color(0xFF8B0000), onTap: () => _go(const BlacklistScreen())),
+                                AnimatedActionCard(title: 'Reports', subtitle: 'Daily/monthly stats', icon: Icons.bar_chart_rounded, color: const Color(0xFFF57C00), onTap: () => _go(const SecurityReportsScreen())),
                               ],
                             ),
                             const SizedBox(height: 20),

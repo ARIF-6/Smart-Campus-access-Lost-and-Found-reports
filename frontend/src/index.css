@@ -41,3 +41,13 @@
     animation-name: fade-in;
   }
 }
+
+/* Hide scrollbar globally across all elements */
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}

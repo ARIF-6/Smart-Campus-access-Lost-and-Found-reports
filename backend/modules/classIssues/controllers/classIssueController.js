@@ -279,7 +279,14 @@ exports.getIssueDetails = asyncHandler(async (req, res) => {
     .populate('student', 'fullName studentId email phone faculty department class')
     .populate('assignedTo', 'fullName email')
     .populate('issueType', 'issueName category')
-    .populate('supportedBy', 'fullName studentId department faculty')
+    .populate({
+      path: 'supportedBy',
+      select: 'fullName studentId department faculty',
+      populate: [
+        { path: 'department', select: 'name' },
+        { path: 'faculty', select: 'name' }
+      ]
+    })
     .lean();
 
   if (!issue) {
@@ -319,6 +326,14 @@ exports.getIssueDetails = asyncHandler(async (req, res) => {
         if (hall) issue.student.hallName = hall.name;
       }
     }
+  }
+
+  if (issue.supportedBy && issue.supportedBy.length > 0) {
+    issue.supportedBy = issue.supportedBy.map(s => ({
+      ...s,
+      department: s.department?.name || '',
+      faculty: s.faculty?.name || ''
+    }));
   }
 
   // Ensure response includes proper name fields

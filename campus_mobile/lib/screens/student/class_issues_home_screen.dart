@@ -90,48 +90,71 @@ class _ClassIssuesHomeScreenState extends State<ClassIssuesHomeScreen> {
     final resolvedCount = issues.where((i) => i.status == 'resolved').length;
     final rejectedCount = issues.where((i) => i.status == 'rejected').length;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _statusCard('Pending', Colors.black87, pendingCount, 'pending'),
-          _statusCard('Resolved', Colors.green, resolvedCount, 'resolved'),
-          _statusCard('Rejected', Colors.red, rejectedCount, 'rejected'),
+          _statusCard('Pending', const Color(0xFFF59E0B), pendingCount, 'pending', Icons.schedule_rounded),
+          const SizedBox(width: 10),
+          _statusCard('Resolved', const Color(0xFF10B981), resolvedCount, 'resolved', Icons.check_circle_rounded),
+          const SizedBox(width: 10),
+          _statusCard('Rejected', const Color(0xFFEF4444), rejectedCount, 'rejected', Icons.cancel_rounded),
         ],
       ),
     );
   }
 
-  Widget _statusCard(String label, Color color, int count, String status) {
+  Widget _statusCard(String label, Color color, int count, String status, IconData icon) {
     final isSelected = _selectedStatus == status;
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => _selectedStatus = isSelected ? null : status),
-        child: Card(
-          color: isSelected ? color.withValues(alpha: 0.7) : color,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(label,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: color == Colors.black87 ? Colors.white : null,
-                    )),
-                const SizedBox(height: 8),
-                Text('$count',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                      color: color == Colors.black87 ? Colors.white : null,
-                    )),
-              ],
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isSelected
+                  ? [color, color.withOpacity(0.8)]
+                  : [color.withOpacity(0.08), color.withOpacity(0.04)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSelected ? color : color.withOpacity(0.15),
+              width: isSelected ? 1.5 : 1,
+            ),
+            boxShadow: isSelected
+                ? [BoxShadow(color: color.withOpacity(0.25), blurRadius: 12, offset: const Offset(0, 6))]
+                : [],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: isSelected ? Colors.white : color, size: 20),
+              const SizedBox(height: 8),
+              Text(
+                '$count',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 22,
+                  color: isSelected ? Colors.white : color,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                  color: isSelected ? Colors.white.withOpacity(0.9) : color.withOpacity(0.8),
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
           ),
         ),
       ),

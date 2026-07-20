@@ -8,10 +8,8 @@ const CAMPUS_MIN_SUPPORTS = 20;
 const ComplaintDetailsModal = ({ complaintId, staffUsers, onClose, onUpdate }) => {
   const [complaint, setComplaint] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('info'); // info, timeline, manage
+  const [activeTab, setActiveTab] = useState('info'); // info, timeline
   const [selectedImageIdx, setSelectedImageIdx] = useState(0);
-  const [manageStatus, setManageStatus] = useState('');
-  const [manageComment, setManageComment] = useState('');
   useEffect(() => {
     if (complaintId) fetchDetails();
   }, [complaintId]);
@@ -21,34 +19,11 @@ const ComplaintDetailsModal = ({ complaintId, staffUsers, onClose, onUpdate }) =
       setLoading(true);
       const data = await getComplaintDetails(complaintId);
       setComplaint(data);
-      setManageStatus(data.status);
     } catch (error) {
       toast.error('Failed to fetch details');
       onClose();
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Returns true when attempting to resolve but support threshold is not met
-  const resolveBlocked =
-    manageStatus === 'resolved' &&
-    (complaint?.supportCount || 0) < CAMPUS_MIN_SUPPORTS;
-
-  // Update complaint status and add comment
-  const handleManageSubmit = async () => {
-    if (resolveBlocked) {
-      toast.error('This campus issue cannot be resolved until it receives at least 20 student supports.');
-      return;
-    }
-    try {
-      await updateComplaintStatus(complaintId, { status: manageStatus, note: manageComment });
-      toast.success('Complaint updated successfully');
-      setManageComment('');
-      fetchDetails();
-      if (onUpdate) onUpdate();
-    } catch (e) {
-      toast.error(e?.response?.data?.message || 'Failed to update complaint');
     }
   };
 
@@ -66,16 +41,14 @@ const ComplaintDetailsModal = ({ complaintId, staffUsers, onClose, onUpdate }) =
               <span className="w-2 h-6 bg-indigo-600 rounded-full"></span>
               Complaint Details
             </h2>
-            <p className="text-xs text-gray-500 mt-0.5">ID: {complaint._id}</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-400">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
-        {/* Tabs */}
         <div className="flex border-b border-gray-100 px-6 bg-white">
-          {['info', 'timeline', 'manage'].map((tab) => (
+          {['info', 'timeline'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -304,78 +277,6 @@ const ComplaintDetailsModal = ({ complaintId, staffUsers, onClose, onUpdate }) =
             )
           )}
 
-          {activeTab === 'manage' && (
-            <div className="p-6 bg-white rounded-xl shadow-md border border-slate-100">
-              <h3 className="text-lg font-bold mb-6 text-slate-800">Manage Complaint</h3>
-
-              {/* Support counter */}
-              <div className="mb-5 flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="text-2xl font-black text-indigo-600">{complaint.supportCount || 0}</span>
-                <div>
-                  <p className="text-xs font-bold text-slate-700">Student Supports</p>
-                  <p className="text-[11px] text-slate-400">
-                    {(complaint.supportCount || 0) >= CAMPUS_MIN_SUPPORTS
-                      ? '✅ Threshold reached — issue can be resolved'
-                      : `⚠️ ${CAMPUS_MIN_SUPPORTS - (complaint.supportCount || 0)} more needed to enable Resolve`}
-                  </p>
-                </div>
-              </div>
-
-              {/* Resolve-blocked warning */}
-              {resolveBlocked && (
-                <div className="mb-5 flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm">
-                  <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                  </svg>
-                  <p className="text-amber-800 font-semibold">
-                    This campus issue cannot be resolved until it receives at least 20 student supports.
-                  </p>
-                </div>
-              )}
-
-              <div className="mb-6">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                  Status
-                </label>
-                <select
-                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
-                  value={manageStatus}
-                  onChange={e => setManageStatus(e.target.value)}
-                >
-                  <option value="pending">Pending</option>
-                  <option value="in_review">In Review</option>
-                  <option value="resolved" disabled={(complaint.supportCount || 0) < CAMPUS_MIN_SUPPORTS}>
-                    Resolved{(complaint.supportCount || 0) < CAMPUS_MIN_SUPPORTS ? ` (need ${CAMPUS_MIN_SUPPORTS} supports)` : ''}
-                  </option>
-                  <option value="completed">Completed</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-              </div>
-              <div className="mb-6">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                  Comment
-                </label>
-                <textarea
-                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none resize-y"
-                  rows="4"
-                  placeholder="e.g. Maintenance team assigned."
-                  value={manageComment}
-                  onChange={e => setManageComment(e.target.value)}
-                ></textarea>
-              </div>
-              <button
-                className={`px-6 py-2.5 text-sm font-bold rounded-xl shadow-md transition-all ${
-                  resolveBlocked
-                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                    : 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700 hover:shadow-lg hover:-translate-y-0.5'
-                }`}
-                onClick={handleManageSubmit}
-                disabled={resolveBlocked}
-              >
-                Submit
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>

@@ -27,41 +27,47 @@ class _CampusIssuesHomeScreenState extends State<CampusIssuesHomeScreen> {
     });
   }
 
-  Future<void> _supportIssue(dynamic issue) async {
+  Future<void> _toggleSupport(dynamic issue) async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final currentUser = authProvider.user;
-    final isOwner = currentUser != null &&
-        (currentUser['studentId'] == issue.studentId || currentUser['email'] == issue.studentEmail);
+    final isOwner = currentUser != null && issue.studentUserId != null &&
+        (currentUser['_id'] == issue.studentUserId || currentUser['id'] == issue.studentUserId);
     final isPending = issue.status.toLowerCase() == 'pending';
-    
-    if (isOwner || !isPending) {
-      return;
-    }
+
+    if (isOwner || !isPending) return;
 
     try {
       final provider = Provider.of<CampusIssueProvider>(context, listen: false);
-      await provider.supportIssue(issue.id);
-      
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Success', style: TextStyle(fontWeight: FontWeight.bold)),
-            content: const Text('Support recorded successfully.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Got It'),
-              ),
-            ],
-          ),
-        );
+      if (issue.hasUserSupported) {
+        // Already supported — remove support
+        await provider.removeSupport(issue.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Support removed.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        // Not yet supported — add support
+        await provider.supportIssue(issue.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Support recorded successfully.'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to record support. Please try again later.'),
+            content: Text('Action failed. Please try again later.'),
             backgroundColor: AppConstants.errorColor,
           ),
         );
@@ -148,8 +154,8 @@ class _CampusIssuesHomeScreenState extends State<CampusIssuesHomeScreen> {
         itemCount: filtered.length,
         itemBuilder: (context, index) {
           final issue = filtered[index];
-          final isOwner = currentUser != null &&
-              (currentUser['studentId'] == issue.studentId || currentUser['email'] == issue.studentEmail);
+          final isOwner = currentUser != null && issue.studentUserId != null &&
+              (currentUser['_id'] == issue.studentUserId || currentUser['id'] == issue.studentUserId);
           final isSupportDisabled = isOwner || issue.status.toLowerCase() != 'pending';
 
           return IssueCard(
@@ -162,7 +168,8 @@ class _CampusIssuesHomeScreenState extends State<CampusIssuesHomeScreen> {
             createdAt: issue.createdAt,
             isSupportDisabled: isSupportDisabled,
             isOwner: isOwner,
-            onSupport: () => _supportIssue(issue),
+            hasUserSupported: issue.hasUserSupported,
+            onSupport: () => _toggleSupport(issue),
             onSeeDetails: () {
               Navigator.push(
                 context,
@@ -183,53 +190,75 @@ class _CampusIssuesHomeScreenState extends State<CampusIssuesHomeScreen> {
     final resolved = issues.where((i) => i.status.toLowerCase() == 'resolved').length;
     final rejected = issues.where((i) => i.status.toLowerCase() == 'rejected').length;
 
-    Widget card(String label, int count, Color color, String status) {
-      return Expanded(
-        child: InkWell(
-          onTap: () {
-            setState(() {
-              _selectedStatus = status;
-            });
-          },
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            decoration: BoxDecoration(
-              color: color == Colors.black87 ? color : color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        children: [
+          _statusCard('Pending', const Color(0xFFF59E0B), pending, 'pending', Icons.schedule_rounded),
+          const SizedBox(width: 10),
+          _statusCard('Resolved', const Color(0xFF10B981), resolved, 'resolved', Icons.check_circle_rounded),
+          const SizedBox(width: 10),
+          _statusCard('Rejected', const Color(0xFFEF4444), rejected, 'rejected', Icons.cancel_rounded),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusCard(String label, Color color, int count, String status, IconData icon) {
+    final isSelected = _selectedStatus == status;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedStatus = isSelected ? null : status),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isSelected
+                  ? [color, color.withOpacity(0.8)]
+                  : [color.withOpacity(0.08), color.withOpacity(0.04)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  count.toString(),
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: color == Colors.black87 ? Colors.white : color,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: color == Colors.black87 ? Colors.white : color,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSelected ? color : color.withOpacity(0.15),
+              width: isSelected ? 1.5 : 1,
             ),
+            boxShadow: isSelected
+                ? [BoxShadow(color: color.withOpacity(0.25), blurRadius: 12, offset: const Offset(0, 6))]
+                : [],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: isSelected ? Colors.white : color, size: 20),
+              const SizedBox(height: 8),
+              Text(
+                '$count',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 22,
+                  color: isSelected ? Colors.white : color,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                  color: isSelected ? Colors.white.withOpacity(0.9) : color.withOpacity(0.8),
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
           ),
         ),
-      );
-    }
-
-    return Row(
-      children: [
-        card('Pending', pending, Colors.black87, 'pending'),
-        card('Resolved', resolved, Colors.green, 'resolved'),
-        card('Rejected', rejected, Colors.red, 'rejected'),
-      ],
+      ),
     );
   }
 }

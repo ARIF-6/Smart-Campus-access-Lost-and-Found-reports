@@ -551,6 +551,18 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
       children: [
         MobileScanner(
           controller: _cameraController,
+          errorBuilder: (BuildContext context, MobileScannerException error) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error, color: Colors.white, size: 40),
+                  SizedBox(height: 16),
+                  Text('Camera access is needed to scan QR codes.\nPlease allow camera permissions.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 14, height: 1.5)),
+                ],
+              ),
+            );
+          },
           onDetect: _onDetect,
         ),
         Center(

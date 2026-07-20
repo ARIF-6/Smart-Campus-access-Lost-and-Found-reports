@@ -14,6 +14,8 @@ class CampusIssue {
 
   final String? studentId;
   final String? studentEmail;
+  final String? studentUserId;
+  final bool hasUserSupported;
 
   CampusIssue({
     required this.id,
@@ -28,6 +30,8 @@ class CampusIssue {
     required this.createdAt,
     this.studentId,
     this.studentEmail,
+    this.studentUserId,
+    this.hasUserSupported = false,
   });
 
   factory CampusIssue.fromJson(Map<String, dynamic> json) {
@@ -38,9 +42,11 @@ class CampusIssue {
 
     String? parsedStudentId;
     String? parsedStudentEmail;
+    String? parsedStudentUserId;
     if (json['student'] != null && json['student'] is Map) {
       parsedStudentId = json['student']['studentId']?.toString();
       parsedStudentEmail = json['student']['email']?.toString();
+      parsedStudentUserId = json['student']['_id']?.toString();
     }
 
     return CampusIssue(
@@ -56,6 +62,8 @@ class CampusIssue {
       createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
       studentId: parsedStudentId,
       studentEmail: parsedStudentEmail,
+      studentUserId: parsedStudentUserId,
+      hasUserSupported: json['hasUserSupported'] == true,
     );
   }
 }
