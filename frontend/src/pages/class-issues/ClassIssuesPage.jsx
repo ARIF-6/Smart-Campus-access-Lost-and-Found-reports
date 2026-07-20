@@ -6,6 +6,7 @@ import {
 } from '../../services/api';
 import { fetchCategories, createCategory, updateCategory, deleteCategory } from '../../services/categoryService';
 import toast from 'react-hot-toast';
+import { customConfirm } from '../../utils/confirm';
 import { useSocket } from '../../context/SocketContext';
 import ClassIssueDetailsModal from '../../components/class-issues/ClassIssueDetailsModal';
 
@@ -223,7 +224,8 @@ const ClassIssuesPage = () => {
   };
 
   const handleDeleteCategory = async (id) => {
-    if (!window.confirm('Delete this category?')) return;
+    const confirmed = await customConfirm('Delete this category?');
+    if (!confirmed) return;
     try {
       await deleteCategory(id);
       toast.success('Category deleted');

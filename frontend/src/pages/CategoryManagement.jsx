@@ -4,6 +4,7 @@ import { fetchHosts, createHost, updateHost, deleteHost } from '../services/host
 import api from '../services/api';
 import { toast } from 'react-hot-toast';
 import AdminLayout from '../components/layout/AdminLayout';
+import { customConfirm } from '../utils/confirm';
 
 // ─── Reusable category panel ────────────────────────────────────────────────
 const CategoryPanel = ({ categoryType, accentColor }) => {
@@ -76,7 +77,8 @@ const CategoryPanel = ({ categoryType, accentColor }) => {
   };
 
   const handleDeleteClick = async (id) => {
-    if (window.confirm('Are you sure you want to delete this category?')) {
+    const confirmed = await customConfirm('Are you sure you want to delete this category?');
+    if (confirmed) {
       try {
         await deleteCategory(id);
         toast.success('Category deleted successfully');
@@ -371,7 +373,8 @@ const HostPanel = ({ accentColor }) => {
   };
 
   const handleDeleteClick = async (id) => {
-    if (window.confirm('Are you sure you want to delete this host?')) {
+    const confirmed = await customConfirm('Are you sure you want to delete this host?');
+    if (confirmed) {
       try {
         await deleteHost(id);
         toast.success('Host deleted successfully');

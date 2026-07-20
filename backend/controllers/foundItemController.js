@@ -338,19 +338,45 @@ exports.markItemReturned = asyncHandler(async (req, res) => {
     });
   }
 
-  // Find the approved claim for this item to resolve who received it
-  const claim = await Claim.findOne({ item: item._id, status: 'approved' });
-  if (!claim) {
+  // Find if there is an approved claim or if the item status was approved.
+  // Standard Claim Approved -> item.status becomes 'approved' (and we find the approved claim record)
+  // Dispute/Ownership Report -> item.status becomes 'under_ownership_review' (and we have the approved ownership report/dispute resolving it)
+  // If the item status is 'approved', it must have an approved claim.
+  let claim = await Claim.findOne({ item: item._id, status: 'approved' });
+  
+  if (item.status === 'under_ownership_review') {
+    // If it is in dispute/ownership review, we only require that the dispute is resolved or ownership report is approved.
+    // In this case, we don't block the return. Let's find the current student who should receive it.
+    const dispute = await OwnershipDispute.findOne({ foundItem: item._id }).sort({ createdAt: -1 });
+    if (dispute && dispute.status.startsWith('resolved')) {
+      // Resolved dispute!
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'This item cannot be returned while an ownership dispute is pending resolution.'
+      });
+    }
+  } else if (!claim) {
     return res.status(400).json({
       success: false,
-      message: 'This item cannot be returned before an ownership claim has been approved.'
+      message: 'This item cannot be returned before a claim has been approved.'
     });
+  }
+
+  let targetStudent = null;
+  if (claim) {
+    targetStudent = claim.user;
+  } else if (item.status === 'under_ownership_review') {
+    const dispute = await OwnershipDispute.findOne({ foundItem: item._id }).sort({ createdAt: -1 });
+    if (dispute) {
+      targetStudent = dispute.status === 'resolved_new' ? dispute.newClaimant : dispute.originalReturnedStudent;
+    }
   }
 
   item.status = 'returned';
   item.returnedAt = new Date();
   item.returnedBy = req.user.id;
-  item.currentReturnedStudent = claim.user;
+  item.currentReturnedStudent = targetStudent;
 
   const updatedItem = await item.save();
 

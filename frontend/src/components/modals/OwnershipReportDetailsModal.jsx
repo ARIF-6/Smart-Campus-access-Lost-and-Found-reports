@@ -3,6 +3,8 @@ import { resolveOwnershipReport, addOwnershipReportComment, getOwnershipReportBy
 import { getImageUrl } from '../../utils/imageUtils';
 import toast from 'react-hot-toast';
 
+import { customConfirm } from '../../utils/confirm';
+
 const OwnershipReportDetailsModal = ({ isOpen, onClose, reportId, onSuccess }) => {
   const [report, setReport] = useState(null);
   const [comments, setComments] = useState([]);
@@ -68,7 +70,8 @@ const OwnershipReportDetailsModal = ({ isOpen, onClose, reportId, onSuccess }) =
 
   const handleResolve = async (status) => {
     const confirmMsg = `Are you sure you want to ${status} this ownership report?`;
-    if (!window.confirm(confirmMsg)) return;
+    const confirmed = await customConfirm(confirmMsg);
+    if (!confirmed) return;
 
     try {
       setResolving(true);

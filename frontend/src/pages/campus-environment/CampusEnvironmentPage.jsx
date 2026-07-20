@@ -3,6 +3,7 @@ import AdminLayout from '../../components/layout/AdminLayout';
 import { getComplaints, updateComplaintStatus, getAllUsers } from '../../services/api';
 import { fetchCategories, createCategory, updateCategory, deleteCategory } from '../../services/categoryService';
 import toast from 'react-hot-toast';
+import { customConfirm } from '../../utils/confirm';
 import { useSocket } from '../../context/SocketContext';
 import ComplaintDetailsModal from '../../components/campus-environment/ComplaintDetailsModal';
 
@@ -123,7 +124,8 @@ const CampusEnvironmentPage = () => {
   };
 
   const handleDeleteCategory = async (id) => {
-    if (!window.confirm('Delete this category?')) return;
+    const confirmed = await customConfirm('Delete this category?');
+    if (!confirmed) return;
     try {
       await deleteCategory(id);
       toast.success('Category deleted');

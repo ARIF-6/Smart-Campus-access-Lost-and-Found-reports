@@ -1068,16 +1068,39 @@ class _StudentHomeTabState extends State<StudentHomeTab>
 
   // ── Transaction-style item row ─────────────────────────────────────
   Widget _buildItemRow(FoundItem item) {
-    final isReturned = item.status == 'returned' ||
-        item.status == 'claimed' ||
-        item.status == 'approved';
-    final isRejected = item.isRejectedByUser;
-    final statusColor = isReturned ? const Color(0xFF22C55E) : _blue;
-    final statusBg =
-        isReturned ? const Color(0xFFDCFCE7) : const Color(0xFFEFF6FF);
+    final bool isClaimed = item.status == 'claimed';
+    final bool isReturned = item.status == 'returned';
+    final bool isApproved = item.status == 'approved';
+    
+    final bool isRejected = item.isRejectedByUser;
+    
+    Color statusColor = _blue;
+    Color statusBg = const Color(0xFFEFF6FF);
+    String statusLabel = 'Available';
+
+    if (isReturned) {
+      statusColor = const Color(0xFF22C55E);
+      statusBg = const Color(0xFFDCFCE7);
+      statusLabel = 'Returned';
+    } else if (isClaimed) {
+      statusColor = Colors.orange;
+      statusBg = const Color(0xFFFEF3C7);
+      statusLabel = 'Claimed';
+    } else if (isApproved) {
+      statusColor = Colors.teal;
+      statusBg = const Color(0xFFCCFBF1);
+      statusLabel = 'Approved';
+    }
 
     return GestureDetector(
       onTap: () {
+        if (item.status.toLowerCase() == 'claimed' && !item.isClaimedByUser) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('This item already has an active ownership claim and cannot be claimed until the current claim has been resolved.'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating));
+          return;
+        }
         if (isReturned) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
               content: Text('This item has already been returned.'),
@@ -1151,12 +1174,11 @@ class _StudentHomeTabState extends State<StudentHomeTab>
                 ],
               ),
             ),
-            // Status badge (non-interactive, just a chip)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
                   color: statusBg, borderRadius: BorderRadius.circular(12)),
-              child: Text(isReturned ? 'Returned' : 'Available',
+              child: Text(statusLabel,
                   style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,

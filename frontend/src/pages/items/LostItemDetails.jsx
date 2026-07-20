@@ -5,6 +5,7 @@ import { getLostItemById, deleteLostItem, getMatchesForLostItem } from '../../se
 import EditLostItemModal from '../../components/modals/EditLostItemModal';
 
 import toast from 'react-hot-toast';
+import { customConfirm } from '../../utils/confirm';
 import { getImageUrl } from '../../utils/imageUtils';
 
 const LostItemDetails = () => {
@@ -36,7 +37,8 @@ const LostItemDetails = () => {
   }, [id]);
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this lost item report?')) {
+    const confirmed = await customConfirm('Are you sure you want to delete this lost item report?');
+    if (confirmed) {
       try {
         await deleteLostItem(id);
         toast.success('Report deleted successfully');

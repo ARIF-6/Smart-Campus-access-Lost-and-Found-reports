@@ -10,6 +10,8 @@ import SearchBar from '../../components/common/SearchBar';
 import Pagination from '../../components/common/Pagination';
 import Filter from '../../components/common/Filter';
 import { getImageUrl } from '../../utils/imageUtils';
+import toast from 'react-hot-toast';
+import { customConfirm } from '../../utils/confirm';
 
 const FoundItemsList = () => {
   const [items, setItems] = useState([]);
@@ -56,24 +58,29 @@ const FoundItemsList = () => {
 
   const handleMarkReturned = async (id, itemStatus) => {
     if (itemStatus === 'pending') {
-      alert('This item cannot be returned while its status is Pending.');
+      toast.error('This item cannot be returned while its status is Pending.');
+      return;
+    }
+    if (itemStatus === 'claimed') {
+      toast.error('This item cannot be returned until the ownership claim has been resolved.');
       return;
     }
     try {
       await markItemReturned(id);
       fetchItems();
     } catch (err) {
-      alert(err.response?.data?.message || 'Error updating status.');
+      toast.error(err.response?.data?.message || 'Error updating status.');
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to permanently delete this record?')) {
+    const confirmed = await customConfirm('Are you sure you want to permanently delete this record?');
+    if (confirmed) {
       try {
         await deleteFoundItem(id);
         fetchItems();
       } catch (err) {
-        alert('Error deleting item.');
+        toast.error('Error deleting item.');
       }
     }
   };
@@ -225,13 +232,7 @@ const FoundItemsList = () => {
                           <Link to={`/admin/found-items/${item._id}`} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="View Details">
                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                           </Link>
-                          
-                          {/* Comment Icon Button */}
-                          <button onClick={() => setCommentItem(item)} className="p-2 text-slate-400 hover:bg-slate-50 hover:text-indigo-600 rounded-xl transition-all" title="View & Add Comments">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                            </svg>
-                          </button>
+
 
                           {/* Always allow Editing for Full CRUD */}
                           <button onClick={() => setEditingItem(item)} className="p-2 text-blue-400 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-all" title="Edit Item Info">

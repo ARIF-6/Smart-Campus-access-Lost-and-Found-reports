@@ -90,8 +90,7 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                             .user?['_id'];
                     final bool isOwner = item.foundBy == currentUserId;
                     final bool isUnderReview = item.status.toLowerCase() == 'under_ownership_review';
-                    final bool isReturned = ['returned', 'claimed', 'approved']
-                        .contains(item.status);
+                    final bool isReturned = item.status == 'returned';
                     final bool isRejected = item.isRejectedByUser;
                     
                     final DateTime returnedTime = item.returnedAt ?? item.updatedAt ?? DateTime.now();
@@ -131,6 +130,16 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                             _fetchItems();
                           }
                         });
+                        return;
+                      }
+                      if (item.status.toLowerCase() == 'claimed' && !item.isClaimedByUser) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('This item has already been claimed by another student. Please wait for it to be resolved.'),
+                            backgroundColor: Colors.orange,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
                         return;
                       }
                       if (isReturned) {
@@ -259,6 +268,12 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                         icon: Icons.hourglass_top_rounded,
                         text: 'Claim Submitted',
                         color: Colors.black87,
+                      );
+                    } else if (item.status.toLowerCase() == 'claimed') {
+                      actionWidget = _infoLabel(
+                        icon: Icons.lock_outline,
+                        text: 'Claim Submitted',
+                        color: Colors.orange,
                       );
                     } else {
                       actionWidget = SizedBox(

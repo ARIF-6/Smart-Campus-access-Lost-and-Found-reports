@@ -9,6 +9,7 @@ import {
 } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import { getImageUrl } from '../../utils/imageUtils';
+import { customConfirm } from '../../utils/confirm';
 
 /* ─────────────────────────────────────────────────────────────────────────
    Sub-component: Student Picker
@@ -211,7 +212,8 @@ const AdminAnnouncements = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this announcement?')) {
+    const confirmed = await customConfirm('Are you sure you want to delete this announcement?');
+    if (confirmed) {
       try {
         await deleteAnnouncement(id);
         toast.success('Announcement deleted successfully');

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { customConfirm } from '../../utils/confirm';
 
 // Minimal DataTable component used by CategoryManagement.
 // Props:
@@ -35,7 +36,8 @@ const DataTable = ({ data = [], loading = false, onCreate, onUpdate, onDelete })
 
   const handleDelete = async (item) => {
     const id = getItemId(item);
-    if (window.confirm('Delete this category?')) {
+    const confirmed = await customConfirm('Delete this category?');
+    if (confirmed) {
       await onDelete(id);
     }
   };

@@ -3,6 +3,8 @@ import { getOwnershipDisputeById, resolveOwnershipDispute } from '../../services
 import toast from 'react-hot-toast';
 import { getImageUrl } from '../../utils/imageUtils';
 
+import { customConfirm } from '../../utils/confirm';
+
 const OwnershipDisputeDetailsModal = ({ isOpen, onClose, disputeId, onSuccess }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -59,7 +61,8 @@ const OwnershipDisputeDetailsModal = ({ isOpen, onClose, disputeId, onSuccess })
       : 'transfer ownership to the new claimant';
 
     const confirmMsg = `Are you sure you want to ${decisionText}?`;
-    if (!window.confirm(confirmMsg)) return;
+    const confirmed = await customConfirm(confirmMsg);
+    if (!confirmed) return;
 
     try {
       setResolving(true);

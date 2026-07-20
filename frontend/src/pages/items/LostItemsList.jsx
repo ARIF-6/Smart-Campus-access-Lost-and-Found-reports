@@ -9,6 +9,8 @@ import SearchBar from '../../components/common/SearchBar';
 import Pagination from '../../components/common/Pagination';
 import Filter from '../../components/common/Filter';
 import { getImageUrl } from '../../utils/imageUtils';
+import toast from 'react-hot-toast';
+import { customConfirm } from '../../utils/confirm';
 
 const LostItemsList = () => {
   const [items, setItems] = useState([]);
@@ -53,12 +55,13 @@ const LostItemsList = () => {
   }, []);
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to permanently delete this report?')) {
+    const confirmed = await customConfirm('Are you sure you want to permanently delete this report?');
+    if (confirmed) {
       try {
         await deleteLostItem(id);
         fetchItems();
       } catch (err) {
-        alert(err.response?.data?.message || 'Error deleting item.');
+        toast.error(err.response?.data?.message || 'Error deleting item.');
       }
     }
   };

@@ -4,6 +4,7 @@ import AdminLayout from '../../components/layout/AdminLayout';
 import { getUserNotifications, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification } from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
 import toast from 'react-hot-toast';
+import { customConfirm } from '../../utils/confirm';
 
 const NotificationsPage = () => {
   const [notifications, setNotifications] = useState([]);
@@ -63,7 +64,8 @@ const NotificationsPage = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Remove this notification?')) {
+    const confirmed = await customConfirm('Remove this notification?');
+    if (confirmed) {
       try {
         await deleteNotification(id);
         setNotifications(notifications.filter(n => (n._id !== id && n.id !== id)));

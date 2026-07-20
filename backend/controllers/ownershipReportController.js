@@ -30,10 +30,10 @@ exports.submitReport = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Found item not found' });
   }
 
-  if (item.status === 'under_ownership_review') {
+  if (item.status === 'claimed' || item.status === 'under_ownership_review') {
     return res.status(400).json({
       success: false,
-      message: 'This item is currently under ownership review. No further reports are allowed.'
+      message: 'This item already has an active ownership claim and cannot be claimed until the current claim has been resolved.'
     });
   }
 
@@ -76,21 +76,8 @@ exports.submitReport = asyncHandler(async (req, res) => {
 
   await newReport.save();
 
-  // Create OwnershipDispute
-  const originalReturnedStudent = item.currentReturnedStudent || item.user || null;
-  const dispute = new OwnershipDispute({
-    foundItem: itemId,
-    ownershipReport: newReport._id,
-    originalReturnedStudent,
-    newClaimant: userId,
-    status: 'pending'
-  });
-
-  await dispute.save();
-
-  // Update item status and active dispute reference
-  item.status = 'under_ownership_review';
-  item.activeDispute = dispute._id;
+  // Mark item as claimed/locked
+  item.status = 'claimed';
   await item.save();
 
   // Audit Log for Report Submission
@@ -103,56 +90,13 @@ exports.submitReport = asyncHandler(async (req, res) => {
     req
   });
 
-  // Audit Log for Dispute Creation
-  await logAction({
-    userId: userId,
-    action: 'CREATE_OWNERSHIP_DISPUTE',
-    targetId: dispute._id,
-    targetType: 'OwnershipDispute',
-    details: `Ownership dispute automatically created for item: ${item.title}`,
-    req
-  });
-
-  // Create OwnershipHistory record
-  try {
-    await OwnershipHistory.create({
-      foundItem: item._id,
-      eventType: 'dispute_created',
-      originalFinder: item.createdBy,
-      returnedStudent: originalReturnedStudent,
-      claimant: userId,
-      reason: reason.trim(),
-      comments: comments ? comments.trim() : '',
-      previousStatus: 'returned',
-      newStatus: 'under_ownership_review'
-    });
-  } catch (err) {
-    console.error('Failed to create ownership history:', err);
-  }
-
-  // Real-time Notification to the original student who received the item
-  if (originalReturnedStudent) {
-    try {
-      await createNotification({
-        userId: originalReturnedStudent,
-        title: 'Ownership Dispute',
-        message: 'Another student has claimed ownership of the item that was returned to you. Please visit the administration office for verification.',
-        type: 'OWNERSHIP_DISPUTE',
-        relatedId: dispute._id,
-        module: 'LostFound'
-      });
-    } catch (err) {
-      console.error('Notification Error (Original Student):', err);
-    }
-  }
-
   // Real-time Notification to Administrator
   try {
     await createNotification({
-      title: 'New Ownership Dispute',
-      message: `An ownership dispute has been raised for the item "${item.title}".`,
+      title: 'New Ownership Claim',
+      message: `An ownership claim has been submitted for the item "${item.title}".`,
       type: 'CLAIM_SUBMITTED',
-      relatedId: dispute._id,
+      relatedId: newReport._id,
       recipientRole: 'admin',
       module: 'LostFound'
     });
@@ -162,7 +106,7 @@ exports.submitReport = asyncHandler(async (req, res) => {
 
   emitDashboardRefresh('admin');
 
-  return sendSuccess(res, 'Ownership report submitted and dispute created successfully', { report: newReport, dispute }, 201);
+  return sendSuccess(res, 'Ownership report submitted successfully', newReport);
 });
 
 // @desc    Get all ownership reports
@@ -254,6 +198,92 @@ exports.resolveReport = asyncHandler(async (req, res) => {
   }
 
   await report.save();
+
+  // If approved, create dispute record and update item status
+  if (status === 'approved') {
+    const item = await FoundItem.findById(report.foundItem._id || report.foundItem);
+    if (item) {
+      const originalReturnedStudent = item.currentReturnedStudent || item.user || null;
+      
+      const dispute = new OwnershipDispute({
+        foundItem: item._id,
+        ownershipReport: report._id,
+        originalReturnedStudent,
+        newClaimant: report.student,
+        status: 'pending'
+      });
+
+      await dispute.save();
+
+      // Update item status and active dispute reference
+      item.status = 'under_ownership_review';
+      item.activeDispute = dispute._id;
+      await item.save();
+
+      // Audit Log for Dispute Creation
+      await logAction({
+        userId: req.user.id,
+        action: 'CREATE_OWNERSHIP_DISPUTE',
+        targetId: dispute._id,
+        targetType: 'OwnershipDispute',
+        details: `Ownership dispute automatically created for item: ${item.title} after claim approval`,
+        req
+      });
+
+      // Create OwnershipHistory record
+      try {
+        await OwnershipHistory.create({
+          foundItem: item._id,
+          eventType: 'dispute_created',
+          originalFinder: item.createdBy,
+          returnedStudent: originalReturnedStudent,
+          claimant: report.student,
+          reason: report.reason,
+          comments: report.comments || '',
+          previousStatus: 'returned',
+          newStatus: 'under_ownership_review'
+        });
+      } catch (err) {
+        console.error('Failed to create ownership history:', err);
+      }
+
+      // Real-time Notification to the original student who received the item
+      if (originalReturnedStudent) {
+        try {
+          await createNotification({
+            userId: originalReturnedStudent,
+            title: 'Ownership Dispute',
+            message: 'Another student has claimed ownership of the item that was returned to you. Please visit the administration office for verification.',
+            type: 'OWNERSHIP_DISPUTE',
+            relatedId: dispute._id,
+            module: 'LostFound'
+          });
+        } catch (err) {
+          console.error('Notification Error (Original Student):', err);
+        }
+      }
+
+      // Real-time Notification to Administrator about new Dispute
+      try {
+        await createNotification({
+          title: 'New Ownership Dispute',
+          message: `An ownership dispute has been raised for the item "${item.title}".`,
+          type: 'CLAIM_SUBMITTED',
+          relatedId: dispute._id,
+          recipientRole: 'admin',
+          module: 'LostFound'
+        });
+      } catch (err) {
+        console.error('Notification Error (Admin):', err);
+      }
+    }
+  } else if (status === 'rejected') {
+    const item = await FoundItem.findById(report.foundItem._id || report.foundItem);
+    if (item) {
+      item.status = 'returned';
+      await item.save();
+    }
+  }
 
   // Audit Log
   await logAction({

@@ -7,6 +7,7 @@ import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
 import { TableSkeleton } from '../../components/common/Skeleton';
 import { useAutoRefreshSignal } from '../../context/AutoRefreshContext';
+import { customConfirm } from '../../utils/confirm';
 
 const Blacklist = () => {
   const [list, setList] = useState([]);
@@ -88,7 +89,8 @@ const Blacklist = () => {
   };
 
   const handleRemove = async (id) => {
-    if (window.confirm('Are you sure you want to delete this blacklist record?')) {
+    const confirmed = await customConfirm('Are you sure you want to delete this blacklist record?');
+    if (confirmed) {
       try {
         await removeFromBlacklist(id);
         toast.success('Blacklist record deleted permanently');

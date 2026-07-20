@@ -220,9 +220,9 @@ class _ClaimRequestScreenState extends State<ClaimRequestScreen> {
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: (_isSubmitting || widget.item.isClaimedByUser || isOwner) ? null : _submitClaim,
+                        onPressed: (_isSubmitting || widget.item.isClaimedByUser || isOwner || (widget.item.status.toLowerCase() == 'claimed' && !widget.item.isClaimedByUser)) ? null : _submitClaim,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: (widget.item.isClaimedByUser || isOwner) ? Colors.grey : const Color(0xFF2563EB), // #2563EB
+                          backgroundColor: (widget.item.isClaimedByUser || isOwner || (widget.item.status.toLowerCase() == 'claimed' && !widget.item.isClaimedByUser)) ? Colors.grey : const Color(0xFF2563EB),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           elevation: 2,
@@ -235,9 +235,11 @@ class _ClaimRequestScreenState extends State<ClaimRequestScreen> {
                                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                               )
                             : Text(
-                                isOwner 
-                                    ? 'Cannot Claim Your Own Item' 
-                                    : (widget.item.isClaimedByUser ? 'Claim Already Submitted' : 'Submit Claim Request'),
+                                isOwner
+                                    ? 'Cannot Claim Your Own Item'
+                                    : (widget.item.status.toLowerCase() == 'claimed' && !widget.item.isClaimedByUser)
+                                        ? 'Claim Submitted'
+                                        : (widget.item.isClaimedByUser ? 'Claim Already Submitted' : 'Submit Claim Request'),
                                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                               ),
                       ),
@@ -250,6 +252,17 @@ class _ClaimRequestScreenState extends State<ClaimRequestScreen> {
                             'You are the one who submitted this item.',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: Colors.orange, fontSize: 14, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      )
+                    else if (widget.item.status.toLowerCase() == 'claimed' && !widget.item.isClaimedByUser)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 12),
+                        child: Center(
+                          child: Text(
+                            'An ownership claim has already been submitted for this item. Please wait until the current claim is resolved.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.orange, fontSize: 13, fontWeight: FontWeight.w500),
                           ),
                         ),
                       )

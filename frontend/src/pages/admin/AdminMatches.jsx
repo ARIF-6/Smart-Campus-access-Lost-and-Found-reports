@@ -4,6 +4,7 @@ import AdminLayout from '../../components/layout/AdminLayout';
 import { getAllMatches, recalculateMatches, deleteMatch } from '../../services/api';
 import toast from 'react-hot-toast';
 import { getImageUrl } from '../../utils/imageUtils';
+import { customConfirm } from '../../utils/confirm';
 import { useAutoRefreshSignal } from '../../context/AutoRefreshContext';
 
 const AdminMatches = () => {
@@ -46,7 +47,8 @@ const AdminMatches = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Remove this suggested match?')) {
+    const confirmed = await customConfirm('Remove this suggested match?');
+    if (confirmed) {
       try {
         await deleteMatch(id);
         setMatches(matches.filter(m => m._id !== id));

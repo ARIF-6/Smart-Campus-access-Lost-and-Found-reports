@@ -6,6 +6,7 @@ import ClaimItemModal from '../../components/modals/ClaimItemModal';
 import EditFoundItemModal from '../../components/modals/EditFoundItemModal';
 
 import toast from 'react-hot-toast';
+import { customConfirm } from '../../utils/confirm';
 import { getImageUrl } from '../../utils/imageUtils';
 
 const FoundItemDetails = () => {
@@ -44,6 +45,11 @@ const FoundItemDetails = () => {
       toast.error('This item cannot be returned while its status is Pending.');
       return;
     }
+    // Guard: cannot return while an ownership claim is active
+    if (item.status === 'claimed') {
+      toast.error('This item cannot be returned until the ownership claim has been resolved.');
+      return;
+    }
     try {
       const updatedItem = await markItemReturned(id);
       setItem(updatedItem); 
@@ -55,7 +61,8 @@ const FoundItemDetails = () => {
   };
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this item record permanently?')) {
+    const confirmed = await customConfirm('Are you sure you want to delete this item record permanently?');
+    if (confirmed) {
       try {
         await deleteFoundItem(id);
         toast.success('Item record deleted successfully.');

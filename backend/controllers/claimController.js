@@ -53,7 +53,10 @@ exports.submitClaim = asyncHandler(async (req, res) => {
 
   // Prevent claiming items that are already returned, claimed, or approved
   if (['returned', 'claimed', 'approved'].includes(item.status)) {
-    return res.status(400).json({ success: false, message: "This item has already been claimed or returned" });
+    return res.status(400).json({
+      success: false,
+      message: "An ownership claim has already been submitted for this item. Please wait until the current claim is resolved."
+    });
   }
 
   // Prevent Duplicate Claim (also block users whose previous claim was rejected)
@@ -86,6 +89,15 @@ exports.submitClaim = asyncHandler(async (req, res) => {
     });
 
   await newClaim.save();
+
+  // Mark item as claimed/locked immediately so other students cannot claim it
+  if (itemModelName === 'FoundItem') {
+    await FoundItem.findByIdAndUpdate(itemId, { status: 'claimed' });
+  } else if (itemModelName === 'LostItem') {
+    await LostItem.findByIdAndUpdate(itemId, { status: 'claimed' });
+  } else if (itemModelName === 'Item') {
+    await Item.findByIdAndUpdate(itemId, { status: 'claimed' });
+  }
 
   // Log audit
   await logAction({

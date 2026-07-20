@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { customConfirm } from '../../utils/confirm';
 
 const UserTable = ({ users, onEdit, onDelete, onChangeRole, onChangeStatus, onView, availableRoles = [], allRoles = [] }) => {
   const { user: currentUser } = useAuth();
@@ -75,10 +76,12 @@ const UserTable = ({ users, onEdit, onDelete, onChangeRole, onChangeStatus, onVi
                           const newRole = e.target.value;
                           if (newRole === user.role) return;
                           const roleLabel = availableRoles.find(r => r.name === newRole)?.displayName || newRole;
-                          const confirmed = window.confirm(
-                            `Change "${user.fullName || user.name}"'s role to "${roleLabel}"?\n\nThis will immediately update their access permissions.`
-                          );
-                          if (confirmed) onChangeRole(user, newRole);
+                          (async () => {
+                            const confirmed = await customConfirm(
+                              `Change "${user.fullName || user.name}"'s role to "${roleLabel}"?\n\nThis will immediately update their access permissions.`
+                            );
+                            if (confirmed) onChangeRole(user, newRole);
+                          })();
                         }}
                       >
                         {availableRoles.map((role) => (

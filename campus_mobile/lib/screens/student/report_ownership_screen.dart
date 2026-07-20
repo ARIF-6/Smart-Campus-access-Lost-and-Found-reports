@@ -17,7 +17,6 @@ class _ReportOwnershipScreenState extends State<ReportOwnershipScreen> {
   final _formKey = GlobalKey<FormState>();
   final ApiService _apiService = ApiService();
   final TextEditingController _reasonController = TextEditingController();
-  final TextEditingController _commentsController = TextEditingController();
 
   bool _isSubmitting = false;
 
@@ -43,7 +42,6 @@ class _ReportOwnershipScreenState extends State<ReportOwnershipScreen> {
       final reportData = {
         'itemId': itemId,
         'reason': _reasonController.text.trim(),
-        'comments': _commentsController.text.trim(),
       };
 
       final response = await _apiService.post('/ownership-reports', data: reportData);
@@ -78,7 +76,6 @@ class _ReportOwnershipScreenState extends State<ReportOwnershipScreen> {
   @override
   void dispose() {
     _reasonController.dispose();
-    _commentsController.dispose();
     super.dispose();
   }
 
@@ -182,33 +179,6 @@ class _ReportOwnershipScreenState extends State<ReportOwnershipScreen> {
                       },
                       decoration: InputDecoration(
                         hintText: 'Enter details proving that this returned item belongs to you...',
-                        fillColor: Colors.white,
-                        filled: true,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: Colors.grey.shade200),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: Colors.grey.shade200),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: AppConstants.primaryColor),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Additional Comments (Optional)',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppConstants.textPrimary),
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _commentsController,
-                      maxLines: 3,
-                      decoration: InputDecoration(
-                        hintText: 'Any extra details or comments...',
                         fillColor: Colors.white,
                         filled: true,
                         border: OutlineInputBorder(
