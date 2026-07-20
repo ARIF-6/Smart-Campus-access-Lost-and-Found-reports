@@ -39,13 +39,50 @@ class PermissionHelper {
   static Permission get photosPermission {
     if (Platform.isAndroid) {
       final major = getAndroidMajorVersion();
-      // Use Permission.photos (READ_MEDIA_IMAGES) on Android 13+
-      if (major >= 13) {
+      // If we couldn't parse the version, or it claims Android 13+, default to photos.
+      if (major == 0 || major >= 13) {
         return Permission.photos;
       }
-      // Use legacy storage permission on older Android
       return Permission.storage;
     }
     return Permission.photos;
+  }
+
+  /// Helper to request all possible photo/storage permissions on Android to ensure compatibility.
+  static Future<PermissionStatus> requestPhotosPermission() async {
+    if (!Platform.isAndroid) {
+      return await Permission.photos.request();
+    }
+    
+    final major = getAndroidMajorVersion();
+    if (major >= 13) {
+      // Modern Android: Request photos permission
+      final status = await Permission.photos.request();
+      if (status.isGranted || status.isLimited) return status;
+      // Fallback in case of custom manufacturer ROM quirks:
+      return await Permission.storage.request();
+    } else if (major > 0 && major <= 12) {
+      // Legacy Android: Request storage permission
+      return await Permission.storage.request();
+    } else {
+      // Unknown version: Request both simultaneously to guarantee dialog trigger!
+      final statuses = await [
+        Permission.photos,
+        Permission.storage,
+      ].request();
+      
+      if (statuses[Permission.photos]?.isGranted == true ||
+          statuses[Permission.photos]?.isLimited == true) {
+        return PermissionStatus.granted;
+      }
+      if (statuses[Permission.storage]?.isGranted == true) {
+        return PermissionStatus.granted;
+      }
+      if (statuses[Permission.photos]?.isPermanentlyDenied == true ||
+          statuses[Permission.storage]?.isPermanentlyDenied == true) {
+        return PermissionStatus.permanentlyDenied;
+      }
+      return PermissionStatus.denied;
+    }
   }
 }

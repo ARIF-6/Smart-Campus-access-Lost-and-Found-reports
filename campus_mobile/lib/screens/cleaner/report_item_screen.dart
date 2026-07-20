@@ -146,24 +146,9 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
     }
 
     // ── Native (Android / iOS) ──────────────────────────────────────
-    // Determine the correct permission for this device/OS version.
-    // Calling permission.request() triggers the OS system dialog just like the
-    // camera permission dialog — the user sees "Allow / Deny" before anything opens.
-    late final Permission permission;
-    if (source == ImageSource.camera) {
-      permission = Permission.camera;
-    } else if (Platform.isAndroid) {
-      final major = PermissionHelper.getAndroidMajorVersion();
-      // Android 13+ (API 33+): READ_MEDIA_IMAGES → Permission.photos
-      // Android 12 and below: READ_EXTERNAL_STORAGE → Permission.storage
-      permission = (major >= 13) ? Permission.photos : Permission.storage;
-    } else {
-      permission = Permission.photos; // iOS
-    }
-
-    // request() shows the system permission dialog on the first call.
-    // On subsequent calls it returns the cached status without a dialog.
-    final PermissionStatus status = await permission.request();
+    final PermissionStatus status = source == ImageSource.camera
+        ? await Permission.camera.request()
+        : await PermissionHelper.requestPhotosPermission();
 
     if (status.isGranted || status.isLimited) {
       // ✅ Permission granted — open the picker
