@@ -146,42 +146,46 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
     }
 
     // ── Native (Android / iOS) ──────────────────────────────────────
+    // Request permission, but fall back to direct picker call if request is denied/restricted
+    // because some Android versions or manufacturers do not report storage status correctly
+    // or handle photo access permissions differently.
     final Permission permission =
         source == ImageSource.camera ? Permission.camera : PermissionHelper.photosPermission;
 
-    PermissionStatus status = await permission.request();
+    PermissionStatus status = await permission.status;
+    if (status.isDenied || status.isRestricted) {
+      status = await permission.request();
+    }
 
-    if (status.isGranted) {
+    // Always attempt to pick the image even if status is not explicitly granted,
+    // allowing the system photo picker fallback to execute or ask itself.
+    try {
       final XFile? picked = await _picker.pickImage(
         source: source,
         maxWidth: 1200,
         imageQuality: 85,
       );
-      if (!mounted || picked == null) return;
-      final bytes = await picked.readAsBytes();
-      if (!mounted) return;
-      setState(() { _imageFile = picked; _webImage = bytes; });
-    } else if (status.isPermanentlyDenied) {
+      if (picked != null && mounted) {
+        final bytes = await picked.readAsBytes();
+        if (mounted) {
+          setState(() {
+            _imageFile = picked;
+            _webImage = bytes;
+          });
+        }
+      }
+    } catch (e) {
       if (!mounted) return;
       final label = source == ImageSource.camera ? 'Camera' : 'Photos';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$label permission permanently denied. Please enable it in Settings.'),
+          content: Text('Could not open $label picker. Please grant permission in Settings.'),
           backgroundColor: AppConstants.errorColor,
           action: SnackBarAction(
             label: 'Settings',
             textColor: Colors.white,
             onPressed: openAppSettings,
           ),
-        ),
-      );
-    } else {
-      if (!mounted) return;
-      final label = source == ImageSource.camera ? 'Camera' : 'Photos';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$label permission denied. Cannot open ${source == ImageSource.camera ? "camera" : "gallery"}.'),
-          backgroundColor: AppConstants.errorColor,
         ),
       );
     }

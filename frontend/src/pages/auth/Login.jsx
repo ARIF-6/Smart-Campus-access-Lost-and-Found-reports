@@ -16,7 +16,7 @@ const Login = () => {
 
   // Warm up Render instance immediately on page hit to handle cold starts
   useEffect(() => {
-    getSystemStatus().catch(() => {});
+    getSystemStatus().catch(() => { });
   }, []);
 
 
@@ -92,14 +92,14 @@ const Login = () => {
 
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1" htmlFor="email">
-            Username / Student ID
+            Username
           </label>
           <input
             id="email"
             type="text"
             required
             className={`appearance-none block w-full px-3 py-2.5 border rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-sm ${fieldErrors.email ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
-            placeholder="Enter your username or ID"
+            placeholder="Enter your username"
             value={email}
             onChange={(e) => {
               setEmail(e.target.value);

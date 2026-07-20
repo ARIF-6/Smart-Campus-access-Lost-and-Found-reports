@@ -426,16 +426,22 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
     }
 
     // ── Native (Android / iOS) ─────────────────────────────────────────────
-    // Always request the correct permission BEFORE opening the picker so that
-    // the OS does not silently redirect to the gallery when camera is denied.
+    // Request permission, but fall back to direct picker call if request is denied/restricted
+    // because some Android versions or manufacturers do not report storage status correctly
+    // or handle photo access permissions differently.
     final Permission permission =
         source == ImageSource.camera ? Permission.camera : PermissionHelper.photosPermission;
 
-    final PermissionStatus status = await permission.request();
+    PermissionStatus status = await permission.status;
+    if (status.isDenied || status.isRestricted) {
+      status = await permission.request();
+    }
 
-    if (status.isGranted) {
+    // Always attempt to pick the image even if status is not explicitly granted,
+    // allowing the system photo picker fallback to execute or ask itself.
+    try {
       final XFile? picked = await _picker.pickImage(
-        source: source,          // camera → device camera, gallery → gallery
+        source: source,
         maxWidth: 1200,
         maxHeight: 1200,
         imageQuality: 85,
@@ -446,12 +452,12 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
           _webImage = null; // not needed on native
         });
       }
-    } else if (status.isPermanentlyDenied) {
+    } catch (e) {
       if (!mounted) return;
       final label = source == ImageSource.camera ? 'Camera' : 'Photos';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$label permission permanently denied. Please enable it in Settings.'),
+          content: Text('Could not open $label picker. Please grant permission in Settings.'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
           action: SnackBarAction(
@@ -459,16 +465,6 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
             textColor: Colors.white,
             onPressed: openAppSettings,
           ),
-        ),
-      );
-    } else {
-      if (!mounted) return;
-      final label = source == ImageSource.camera ? 'Camera' : 'Photos';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$label permission denied.'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
         ),
       );
     }
