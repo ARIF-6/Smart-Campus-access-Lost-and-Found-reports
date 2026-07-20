@@ -37,7 +37,7 @@ class _CleanerProfileScreenState extends State<CleanerProfileScreen> {
 
     // ── Android: request photo / storage permission before opening gallery ──
     if (!kIsWeb) {
-      final status = await PermissionHelper.photosPermission.request();
+      final status = await PermissionHelper.requestPhotosPermission();
       if (!mounted) return;
       if (status.isPermanentlyDenied) {
         messenger.showSnackBar(SnackBar(
@@ -51,12 +51,9 @@ class _CleanerProfileScreenState extends State<CleanerProfileScreen> {
         ));
         return;
       }
-      if (!status.isGranted) {
-        messenger.showSnackBar(const SnackBar(
-          content: Text('Photos permission denied. Cannot open gallery.'),
-          backgroundColor: AppConstants.errorColor,
-        ));
-        return;
+      if (!status.isGranted && !status.isLimited) {
+        // Fallback: If denied but not permanently denied, try to show Picker anyway
+        debugPrint('Photos permission not granted explicitly. Attempting picker fallback.');
       }
     }
 
