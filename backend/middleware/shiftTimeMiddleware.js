@@ -50,8 +50,18 @@ const checkShiftWindow = async (req, res, next) => {
       });
     }
 
-    // ── Option 2: Legacy fallback – use assignedShift name ───────────────────
+    // ── Option 2: Full-Time shift — requires custom start/end times ─────────
     const assignedShift = (req.user.assignedShift || 'none').toLowerCase();
+
+    if (assignedShift === 'full-time' || assignedShift === 'fulltime') {
+      if (!customStart || !customEnd) {
+        return res.status(403).json({
+          success: false,
+          message: 'Full-Time shift requires assigned start and end times. Please contact an administrator.',
+        });
+      }
+      // Custom times are validated above in Option 1 block — fall through if not set
+    }
 
     if (assignedShift === 'none' || assignedShift === '') {
       return res.status(403).json({

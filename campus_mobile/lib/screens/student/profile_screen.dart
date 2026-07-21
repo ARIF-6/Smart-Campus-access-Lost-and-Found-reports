@@ -51,26 +51,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final messenger = ScaffoldMessenger.of(context);
 
-    // ── Android: request photo / storage permission before opening gallery ──
+    // ── Android: request correct permission via Build.VERSION.SDK_INT ──
     if (!kIsWeb) {
       final status = await PermissionHelper.requestPhotosPermission();
       if (!mounted) return;
-      if (status.isPermanentlyDenied) {
-        messenger.showSnackBar(SnackBar(
-          content: const Text('Photos permission permanently denied. Enable it in Settings.'),
-          backgroundColor: AppConstants.errorColor,
-          action: SnackBarAction(
-            label: 'Settings',
-            textColor: Colors.white,
-            onPressed: openAppSettings,
+      if (status.isPermanentlyDenied || status.isRestricted) {
+        showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Photos Permission Required'),
+            content: const Text(
+              'Photos access was permanently denied.\n\n'
+              'To upload a profile photo:\n'
+              '1. Tap "Open Settings"\n'
+              '2. Select "Permissions" → enable "Photos"\n'
+              '3. Return to the app and try again.',
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () { Navigator.of(ctx).pop(); openAppSettings(); },
+                child: const Text('Open Settings'),
+              ),
+            ],
           ),
-        ));
+        );
         return;
       }
-      if (!status.isGranted && !status.isLimited) {
-        // Fallback: If denied but not permanently denied, try to show Picker anyway
-        debugPrint('Photos permission not granted explicitly. Attempting picker fallback.');
-      }
+      // If denied (not permanently), proceed anyway — picker may still work
     }
 
     final picker = ImagePicker();

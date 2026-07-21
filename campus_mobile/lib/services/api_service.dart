@@ -15,6 +15,7 @@ class ApiService {
 
   // ── In-memory token cache ─────────────────────────────────────────────────
   static String? _cachedToken;
+  static String? _cachedDeviceId;
 
   /// Call this immediately after login so subsequent requests use the token
   /// without waiting for SharedPreferences.
@@ -22,9 +23,17 @@ class ApiService {
     _cachedToken = token;
   }
 
+  static void setDeviceId(String deviceId) {
+    _cachedDeviceId = deviceId;
+  }
+
   /// Call this on logout to invalidate the in-memory cache.
   static void clearToken() {
     _cachedToken = null;
+  }
+
+  static void clearDeviceId() {
+    _cachedDeviceId = null;
   }
 
   ApiService._internal() {
@@ -59,6 +68,9 @@ class ApiService {
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
         options.headers['x-client-platform'] = 'mobile';
+        if (_cachedDeviceId != null) {
+          options.headers['x-device-id'] = _cachedDeviceId;
+        }
 
         // Normalize path resolution: remove leading slash to prevent Dio from stripping '/api/'
         if (options.path.startsWith('/')) {

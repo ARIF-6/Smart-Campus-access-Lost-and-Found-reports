@@ -82,6 +82,8 @@ class _ShiftScreenState extends State<ShiftScreen> {
       return nowMins >= (5 * 60) && nowMins <= (13 * 60 + 29);
     } else if (assignedShift == 'afternoon') {
       return nowMins >= (13 * 60 + 30) && nowMins <= (18 * 60);
+    } else if (assignedShift == 'full-time') {
+      return false;
     }
 
     return false;
@@ -103,6 +105,8 @@ class _ShiftScreenState extends State<ShiftScreen> {
       return 'Your shift runs from ${_fmtTimeStr('05:00')} to ${_fmtTimeStr('13:29')} (Morning).';
     } else if (assignedShift == 'afternoon') {
       return 'Your shift runs from ${_fmtTimeStr('13:30')} to ${_fmtTimeStr('18:00')} (Afternoon).';
+    } else if (assignedShift == 'full-time') {
+      return 'Your Full-Time shift requires assigned start and end times.';
     }
 
     return 'No active shift is assigned to you today.';

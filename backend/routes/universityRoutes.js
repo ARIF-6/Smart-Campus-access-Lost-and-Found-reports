@@ -27,14 +27,15 @@ const {
   getCampusQRPDF,
 } = require('../controllers/universityController');
 const { protect } = require('../middleware/authMiddleware');
+const { optionalProtect } = require('../middleware/optionalAuthMiddleware');
 const { adminOrStaff, allowRoles } = require('../middleware/roleMiddleware');
 
-// Public GET endpoints
-router.get('/faculties', getFaculties);
-router.get('/departments', getDepartments);
-router.get('/halls', getHalls);
-router.get('/classes', getClasses);
-router.get('/campuses', getCampuses);
+// Public GET endpoints — optional auth enables staff campus filtering when logged in
+router.get('/faculties', optionalProtect, getFaculties);
+router.get('/departments', optionalProtect, getDepartments);
+router.get('/halls', optionalProtect, getHalls);
+router.get('/classes', optionalProtect, getClasses);
+router.get('/campuses', optionalProtect, getCampuses);
 
 // Campus CRUD — write operations: admin/superadmin only
 router.post('/campuses', protect, allowRoles('admin', 'superadmin'), createCampus);

@@ -6,6 +6,7 @@ const Class = require('../models/Class');
 const Campus = require('../models/Campus');
 const Hall = require('../models/Hall');
 const { enforceHallCapacityForClass } = require('../utils/hallCapacityHelper');
+const { validateSecurityShift } = require('../utils/shiftValidationHelper');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const path = require('path');
@@ -15,6 +16,7 @@ const fs = require('fs');
 const { logAction } = require('../utils/auditLogger');
 const { isValidObjectId } = require('mongoose');
 const { emitToUser } = require('../socket/events/notificationEvents');
+const { staffCanViewUser, applyStaffUserListFilter, isClassInStaffCampus } = require('../utils/campusScopeHelper');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -111,21 +113,9 @@ exports.getAllUsers = async (req, res) => {
 
     const query = { isDeleted: { $ne: true } };
 
-    // Staff can only see students whose class belongs to a hall in their campus
-    if (req.user && req.user.role === 'staff') {
-      if (req.user.campus) {
-        const campusHalls = await Hall.find({ campus: req.user.campus }).select('classes').lean();
-        const classIds = campusHalls.flatMap(h => h.classes || []);
-        query.class = { $in: classIds };
-        // Only show students (not other staff, admins, etc.)
-        if (!query.role) query.role = 'student';
-      } else {
-        // No campus assigned → staff sees nothing
-        query._id = { $in: [] };
-      }
-    }
+    await applyStaffUserListFilter(req, query, role);
 
-    if (role && role !== 'All') {
+    if (role && role !== 'All' && !(req.user && req.user.role === 'staff')) {
       const roles = role.split(',').map((r) => r.trim().toLowerCase()).filter(Boolean);
       if (roles.length === 1) query.role = roles[0];
       else query.role = { $in: roles };
@@ -135,7 +125,19 @@ exports.getAllUsers = async (req, res) => {
     else if (status === 'inactive') query.isActive = false;
 
     if (department && isValidObjectId(department)) query.department = department;
-    if (classId && isValidObjectId(classId)) query.class = classId;
+    if (classId && isValidObjectId(classId)) {
+      if (req.user && req.user.role === 'staff') {
+        if (!(await isClassInStaffCampus(req, classId))) {
+          return sendSuccess(res, 'Users fetched successfully', {
+            users: [],
+            total: 0,
+            page,
+            pages: 0,
+          });
+        }
+      }
+      query.class = classId;
+    }
 
     if (search) {
       query.$or = [
@@ -185,17 +187,8 @@ exports.getUserById = async (req, res) => {
     const user = await User.findById(req.params.id).select('-password').lean();
     if (!user) return sendError(res, 'User not found', 404);
 
-    if (req.user && req.user.role === 'staff') {
-      if (req.user.campus) {
-        // Staff can only view students in their campus halls
-        const campusHalls = await Hall.find({ campus: req.user.campus }).select('classes').lean();
-        const classIds = campusHalls.flatMap(h => h.classes || []).map(id => String(id));
-        if (user.role !== 'student' || !classIds.includes(String(user.class))) {
-          return sendError(res, 'Not authorized to view this user', 403);
-        }
-      } else {
-        return sendError(res, 'Not authorized to view this user', 403);
-      }
+    if (!(await staffCanViewUser(req, user))) {
+      return sendError(res, 'Not authorized to view this user', 403);
     }
 
     const [enriched] = await enrichUsers([user]);
@@ -279,15 +272,9 @@ exports.createUser = async (req, res) => {
     } else if (['staff', 'clean', 'security'].includes(userRole)) {
       userData.campus = campus || null;
       if (userRole === 'security') {
-        if (shiftStartTime && shiftEndTime) {
-          if (shiftStartTime === shiftEndTime) {
-            return sendError(res, 'Start Shift and End Shift cannot be the same. Please select different times.', 400);
-          }
-          const [h1, m1] = shiftStartTime.split(':').map(Number);
-          const [h2, m2] = shiftEndTime.split(':').map(Number);
-          if ((h2 * 60 + m2) < (h1 * 60 + m1)) {
-            return sendError(res, 'End Shift must be later than the Start Shift.', 400);
-          }
+        const shiftError = validateSecurityShift(assignedShift, shiftStartTime, shiftEndTime);
+        if (shiftError) {
+          return sendError(res, shiftError, 400);
         }
         userData.assignedShift = assignedShift || 'none';
         userData.shiftStartTime = shiftStartTime || '';
@@ -403,17 +390,12 @@ exports.updateUser = async (req, res) => {
     if (['staff', 'clean', 'security'].includes(userRole)) {
       user.campus = campus !== undefined ? (campus || null) : user.campus;
       if (userRole === 'security') {
+        const checkShift = assignedShift !== undefined ? assignedShift : user.assignedShift;
         const checkStart = shiftStartTime !== undefined ? shiftStartTime : user.shiftStartTime;
         const checkEnd = shiftEndTime !== undefined ? shiftEndTime : user.shiftEndTime;
-        if (checkStart && checkEnd) {
-          if (checkStart === checkEnd) {
-            return sendError(res, 'Start Shift and End Shift cannot be the same. Please select different times.', 400);
-          }
-          const [h1, m1] = checkStart.split(':').map(Number);
-          const [h2, m2] = checkEnd.split(':').map(Number);
-          if ((h2 * 60 + m2) < (h1 * 60 + m1)) {
-            return sendError(res, 'End Shift must be later than the Start Shift.', 400);
-          }
+        const shiftError = validateSecurityShift(checkShift, checkStart, checkEnd);
+        if (shiftError) {
+          return sendError(res, shiftError, 400);
         }
         if (assignedShift !== undefined) user.assignedShift = assignedShift;
         if (shiftStartTime !== undefined) user.shiftStartTime = shiftStartTime;
@@ -875,7 +857,13 @@ exports.uploadExcelStudents = async (req, res) => {
 
 exports.getTrashedUsers = async (req, res) => {
   try {
-    const users = await User.find({ isDeleted: true })
+    const query = { isDeleted: true };
+
+    if (req.user && req.user.role === 'staff') {
+      await applyStaffUserListFilter(req, query, null);
+    }
+
+    const users = await User.find(query)
       .select('-password')
       .sort({ deletedAt: -1 })
       .lean();
@@ -918,3 +906,104 @@ exports.updateUserPhoto = async (req, res) => {
     return sendError(res, error.message || 'Server Error');
   }
 };
+
+// ─── PATCH /api/admin/users/:id/device-status ────────────────────────────────
+
+exports.changeDeviceRegistrationStatus = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+      return sendError(res, 'Not authorized. Only administrators can change device registration status.', 403);
+    }
+
+    const { deviceRegistrationStatus } = req.body;
+    if (!['Active', 'Inactive'].includes(deviceRegistrationStatus)) {
+      return sendError(res, 'deviceRegistrationStatus must be Active or Inactive.', 400);
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) return sendError(res, 'User not found', 404);
+
+    if (user.role !== 'student') {
+      return sendError(res, 'Device registration status can only be changed for students.', 400);
+    }
+
+    const previousStatus = user.deviceRegistrationStatus || 'Active';
+    const previousDeviceId = user.deviceId;
+
+    user.deviceRegistrationStatus = deviceRegistrationStatus;
+
+    if (deviceRegistrationStatus === 'Inactive') {
+      user.isActivated = false;
+      user.deviceId = null;
+    }
+
+    await user.save();
+
+    await logAction({
+      userId: req.user.id,
+      action: deviceRegistrationStatus === 'Inactive' ? 'DEACTIVATE_DEVICE' : 'ACTIVATE_DEVICE',
+      targetId: user._id,
+      targetType: 'User',
+      details: `Device registration changed from ${previousStatus} to ${deviceRegistrationStatus} for student: ${user.studentId} (${user.fullName})${previousDeviceId ? `, cleared device: ${previousDeviceId}` : ''}`,
+      req
+    });
+
+    return sendSuccess(res, `Device registration status updated to ${deviceRegistrationStatus}.`, {
+      _id: user._id,
+      isActivated: user.isActivated,
+      deviceId: user.deviceId,
+      deviceRegistrationStatus: user.deviceRegistrationStatus
+    });
+  } catch (error) {
+    return sendError(res, error.message || 'Server Error');
+  }
+};
+
+// @desc    Reset student device registration (sets status to Inactive)
+// @route   POST /api/admin/users/:id/reset-device
+// @access  Private (Admin only)
+exports.resetDevice = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+      return sendError(res, 'Not authorized. Only administrators can reset device registration.', 403);
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) return sendError(res, 'User not found', 404);
+
+    if (user.role !== 'student') {
+      return sendError(res, 'Device binding can only be reset for students.', 400);
+    }
+
+    user.isActivated = false;
+    user.deviceId = null;
+    user.deviceRegistrationStatus = 'Active';
+    await user.save();
+
+    await logAction({
+      userId: req.user.id,
+      action: 'RESET_DEVICE',
+      targetId: user._id,
+      targetType: 'User',
+      details: `Administrator reset device registration for student: ${user.studentId} (${user.fullName}). Student may register a new device on next login.`,
+      req
+    });
+
+    return sendSuccess(res, 'Device registration reset successfully.', {
+      _id: user._id,
+      isActivated: false,
+      deviceId: null,
+      deviceRegistrationStatus: 'Active'
+    });
+  } catch (error) {
+    return sendError(res, error.message || 'Server Error');
+  }
+};
+
+// @desc    Generate a new activation code for student (deprecated)
+// @route   POST /api/admin/users/:id/generate-code
+// @access  Private (Admin only)
+exports.generateCode = async (req, res) => {
+  return sendError(res, 'Activation codes are no longer used. Set device registration status to Active to allow the student to register a new device on next login.', 410);
+};
+

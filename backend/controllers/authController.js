@@ -149,6 +149,83 @@ exports.loginUser = asyncHandler(async (req, res) => {
     return res.status(401).json({ success: false, message: 'Invalid username or password' });
   }
 
+  // Device binding for student role — enforced on every login
+  if (user.role === 'student') {
+    const incomingDeviceId = parsedBody.deviceId;
+
+    if (!incomingDeviceId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Device ID is required to login.'
+      });
+    }
+
+    // Device registration disabled by administrator
+    if (user.deviceRegistrationStatus === 'Inactive') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your device registration is inactive. Please contact the administrator if you have changed your phone.'
+      });
+    }
+
+    // Prevent another student from using this device
+    const otherStudent = await User.findOne({
+      role: 'student',
+      deviceId: incomingDeviceId,
+      _id: { $ne: user._id },
+      isDeleted: false
+    });
+    if (otherStudent) {
+      return res.status(403).json({
+        success: false,
+        message: 'This device is already registered to another student account. Please contact the administrator.'
+      });
+    }
+
+    const isDeviceRegistered = user.isActivated === true && user.deviceId;
+
+    if (isDeviceRegistered) {
+      if (user.deviceId !== incomingDeviceId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Your account is already registered on another device. Please contact the administrator if you have changed your phone.'
+        });
+      }
+    } else {
+      // First login or re-bind after admin reset — auto-register this device
+      try {
+        await User.updateOne(
+          { _id: user._id },
+          {
+            deviceId: incomingDeviceId,
+            isActivated: true,
+            deviceRegistrationStatus: 'Active'
+          }
+        );
+      } catch (err) {
+        if (err.code === 11000) {
+          return res.status(403).json({
+            success: false,
+            message: 'This device is already registered to another student account. Please contact the administrator.'
+          });
+        }
+        throw err;
+      }
+
+      user.deviceId = incomingDeviceId;
+      user.isActivated = true;
+
+      await logAction({
+        userId: user._id,
+        action: 'REGISTER_DEVICE',
+        targetId: user._id,
+        targetType: 'User',
+        details: `Student device registered on first login: ${user.studentId} (${user.fullName || user.name}), device: ${incomingDeviceId}`,
+        req
+      });
+    }
+  }
+
   // Log audit action — fire-and-forget so it doesn't delay the login response
   logAction({
     userId: user._id,
@@ -168,12 +245,15 @@ exports.loginUser = asyncHandler(async (req, res) => {
       role: user.role,
       studentId: user.studentId,
       qrCode: user.qrCode,
-      classId: user.class ? user.class._id.toString() : null,
-      class: user.class ? user.class.name : '',
-      className: user.class ? user.class.name : '',
+      classId: user.class ? (user.class._id ? user.class._id.toString() : user.class.toString()) : null,
+      class: user.class ? (user.class.name || '') : '',
+      className: user.class ? (user.class.name || '') : '',
       faculty: user.faculty ? (user.faculty.name || user.faculty.toString()) : '',
       department: user.department ? (user.department.name || user.department.toString()) : '',
       isActive: user.isActive,
+      isActivated: user.isActivated !== false,
+      deviceRegistrationStatus: user.deviceRegistrationStatus || 'Active',
+      deviceId: user.deviceId || null,
       isClassLeader: user.isClassLeader || false,
       accessStatus: user.isActive ? 'active' : 'inactive',
       photoUrl: user.photoUrl,
@@ -211,6 +291,9 @@ exports.getUserProfile = asyncHandler(async (req, res) => {
     faculty: user.faculty ? (user.faculty.name || user.faculty.toString()) : '',
     department: user.department ? (user.department.name || user.department.toString()) : '',
     isActive: user.isActive,
+    isActivated: user.isActivated !== false,
+    deviceRegistrationStatus: user.deviceRegistrationStatus || 'Active',
+    deviceId: user.deviceId || null,
     isClassLeader: user.isClassLeader || false,
     accessStatus: user.isActive ? 'active' : 'inactive',
     photoUrl: user.photoUrl,
@@ -296,3 +379,14 @@ exports.logoutUser = asyncHandler(async (req, res) => {
   });
   return sendSuccess(res, 'Logout successful');
 });
+
+// @desc    Activate student account (deprecated — device binds automatically on login)
+// @route   POST /api/auth/activate
+// @access  Private (Authenticated student)
+exports.activateAccount = asyncHandler(async (req, res) => {
+  return res.status(410).json({
+    success: false,
+    message: 'Account activation codes are no longer required. Please log in again to register your device.'
+  });
+});
+

@@ -7,6 +7,12 @@ const { createNotification } = require('./notificationController');
 const { getIO } = require('../socket');
 const { emitDashboardRefresh, emitNotification } = require('../socket/events/notificationEvents');
 const { checkAndGenerateDailyNoExitReports } = require('../utils/reportHelper');
+const { getStudentCrossCampusAttendance } = require('../utils/attendanceHelper');
+
+const buildScanResponse = (payload, crossCampusAttendance) => ({
+  ...payload,
+  crossCampusAttendance,
+});
 
 // @desc    Scan QR Code for Campus Access
 // @route   POST /api/access/scan
@@ -50,6 +56,11 @@ exports.scanQRCode = async (req, res) => {
       });
     }
 
+    const guardCampusId = req.user?.campus || null;
+    const crossCampusAttendance = user.role === 'student'
+      ? await getStudentCrossCampusAttendance(user._id, guardCampusId)
+      : { records: [], isInsideOtherCampus: false, otherCampusAlert: null, latestRecord: null };
+
     // ── Blacklist check ──────────────────────────────────
     const blacklisted = await Blacklist.findOne({
       isActive: true,
@@ -77,13 +88,13 @@ exports.scanQRCode = async (req, res) => {
           module: 'Security'
         });
       }
-      return res.status(403).json({
+      return res.status(403).json(buildScanResponse({
         status: 'BLACKLISTED',
         color: 'red',
         message: `⚠️ ALERT: ${user.fullName} is BLACKLISTED. Reason: ${blacklisted.reason}`,
         student: { name: user.fullName, studentId: user.studentId || '', photoUrl: user.photoUrl || '' },
         blacklist: { reason: blacklisted.reason, severity: 'banned' },
-      });
+      }, crossCampusAttendance));
     }
     // ─────────────────────────────────────────────────────
 
@@ -112,21 +123,21 @@ exports.scanQRCode = async (req, res) => {
 
     // Student already completed their daily cycle (IN → OUT)
     if (todayLog && todayLog.status === 'OUT') {
-      return res.status(400).json({
+      return res.status(400).json(buildScanResponse({
         status: 'Limit Reached',
         color: 'red',
-        message: `sorry you have reached the limit of entry/exit of this day`,
+        message: 'sorry you have reached the limit of entry/exit of this day',
         student: studentPayload,
-      });
+      }, crossCampusAttendance));
     }
 
     if (user.role !== 'student') {
-      return res.status(400).json({
+      return res.status(400).json(buildScanResponse({
         status: 'Access Denied',
         color: 'red',
         message: 'Only student QR codes or Student IDs can be scanned here.',
         student: studentPayload,
-      });
+      }, crossCampusAttendance));
     }
 
     const notifyAccess = async (log, nextStatus) => {
@@ -161,12 +172,17 @@ exports.scanQRCode = async (req, res) => {
       });
       emitDashboardRefresh('security');
       emitDashboardRefresh('admin');
-      return res.status(200).json({
+
+      const exitMessage = crossCampusAttendance.isInsideOtherCampus
+        ? `Exit recorded for ${studentPayload.name}. Prior status: ${crossCampusAttendance.otherCampusAlert}`
+        : `Exit recorded for ${studentPayload.name}`;
+
+      return res.status(200).json(buildScanResponse({
         status: 'Exit Recorded',
-        color: 'yellow',
-        message: `Exit recorded for ${studentPayload.name}`,
+        color: crossCampusAttendance.isInsideOtherCampus ? 'orange' : 'yellow',
+        message: exitMessage,
         student: studentPayload,
-      });
+      }, crossCampusAttendance));
     }
 
     // No log today — record first entry
@@ -188,12 +204,17 @@ exports.scanQRCode = async (req, res) => {
     });
     emitDashboardRefresh('security');
     emitDashboardRefresh('admin');
-    return res.status(200).json({
+
+    const entryMessage = crossCampusAttendance.isInsideOtherCampus
+      ? `Entry recorded for ${studentPayload.name}. Note: ${crossCampusAttendance.otherCampusAlert}`
+      : `Entry recorded for ${studentPayload.name}`;
+
+    return res.status(200).json(buildScanResponse({
       status: 'Access Granted',
-      color: 'green',
-      message: `Entry recorded for ${studentPayload.name}`,
+      color: crossCampusAttendance.isInsideOtherCampus ? 'orange' : 'green',
+      message: entryMessage,
       student: studentPayload,
-    });
+    }, crossCampusAttendance));
 
   } catch (error) {
     console.error('Scan QR Error:', error);

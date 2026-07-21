@@ -1,6 +1,13 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+const isMobileClient = (req) => {
+  const userAgent = req.headers['user-agent'] || '';
+  return userAgent.toLowerCase().includes('dart') ||
+    userAgent.toLowerCase().includes('flutter') ||
+    req.headers['x-client-platform'] === 'mobile';
+};
+
 const protect = async (req, res, next) => {
   let token;
 
@@ -45,6 +52,17 @@ const protect = async (req, res, next) => {
       });
     }
 
+    // Enforce device binding for students on mobile clients
+    if (user.role === 'student' && user.isActivated && user.deviceId && isMobileClient(req)) {
+      const incomingDeviceId = req.headers['x-device-id'];
+      if (incomingDeviceId && incomingDeviceId !== user.deviceId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Your account is already registered on another device. Please contact the administrator if you have changed your phone.'
+        });
+      }
+    }
+
     req.user = user;
     next();
   } catch (error) {
@@ -57,4 +75,3 @@ const protect = async (req, res, next) => {
 };
 
 module.exports = { protect };
-

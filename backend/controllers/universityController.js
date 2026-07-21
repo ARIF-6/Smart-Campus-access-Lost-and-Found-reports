@@ -3,6 +3,12 @@ const Department = require('../models/Department');
 const Class = require('../models/Class');
 const Campus = require('../models/Campus');
 const { enforceHallCapacityForClass, enforceHallCapacityForHall } = require('../utils/hallCapacityHelper');
+const {
+  isStaffUser,
+  getStaffCampusScope,
+  isClassInStaffCampus,
+  isCampusInStaffScope,
+} = require('../utils/campusScopeHelper');
 
 // Fallback dummy data if models not defined
 const dummyFaculties = [
@@ -86,15 +92,37 @@ exports.createDepartment = async (req, res) => {
 exports.getClasses = async (req, res) => {
   try {
     const Hall = require('../models/Hall');
+    let hallQuery = {};
+    if (isStaffUser(req)) {
+      const scope = await getStaffCampusScope(req);
+      if (!scope.campusId) {
+        return res.status(200).json({ success: true, data: [] });
+      }
+      hallQuery = { campus: scope.campusId };
+    }
+
     const [classes, halls] = await Promise.all([
       Class.find().populate({
         path: 'departmentId',
         populate: { path: 'facultyId', select: 'name' }
       }),
-      Hall.find().lean()
+      Hall.find(hallQuery).lean()
     ]);
-    const mappedClasses = classes.map(c => {
-      const assignedHall = halls.find(h => h.classes && h.classes.some(clsId => String(clsId) === String(c._id)));
+
+    const campusClassIds = new Set(
+      halls.flatMap((h) => (h.classes || []).map((clsId) => String(clsId)))
+    );
+
+    const visibleClasses = isStaffUser(req)
+      ? classes.filter((c) => campusClassIds.has(String(c._id)))
+      : classes;
+
+    const allHalls = isStaffUser(req)
+      ? halls
+      : await Hall.find().lean();
+
+    const mappedClasses = visibleClasses.map(c => {
+      const assignedHall = allHalls.find(h => h.classes && h.classes.some(clsId => String(clsId) === String(c._id)));
       return {
         _id: c._id,
         name: c.name,
@@ -148,7 +176,17 @@ exports.createClass = async (req, res) => {
 
 exports.getHalls = async (req, res) => {
   try {
-    const halls = await require('../models/Hall').find().populate('classes', 'name').populate('campus', 'name');
+    const Hall = require('../models/Hall');
+    let hallQuery = {};
+    if (isStaffUser(req)) {
+      const scope = await getStaffCampusScope(req);
+      if (!scope.campusId) {
+        return res.status(200).json({ success: true, data: [] });
+      }
+      hallQuery = { campus: scope.campusId };
+    }
+
+    const halls = await Hall.find(hallQuery).populate('classes', 'name').populate('campus', 'name');
     const mapped = halls.map(h => ({
       _id: h._id,
       name: h.name,
@@ -253,6 +291,11 @@ exports.editHall = async (req, res) => {
 exports.getClassStudents = async (req, res) => {
   try {
     const { classId } = req.params;
+
+    if (!(await isClassInStaffCampus(req, classId))) {
+      return res.status(403).json({ success: false, message: 'Not authorized to view this class' });
+    }
+
     const mongoose = require('mongoose');
     const ClassModel = require('../models/Class');
     const User = require('../models/User');
@@ -337,6 +380,11 @@ exports.assignClassLeader = async (req, res) => {
   try {
     const { classId } = req.params;
     const { studentId } = req.body; // User's _id
+
+    if (!(await isClassInStaffCampus(req, classId))) {
+      return res.status(403).json({ success: false, message: 'Not authorized to manage this class' });
+    }
+
     const ClassModel = require('../models/Class');
     const User = require('../models/User');
 
@@ -408,7 +456,16 @@ const ensureValidCampusQR = async (campus) => {
 
 exports.getCampuses = async (req, res) => {
   try {
-    const campuses = await Campus.find();
+    let campusQuery = {};
+    if (isStaffUser(req)) {
+      const scope = await getStaffCampusScope(req);
+      if (!scope.campusId) {
+        return res.status(200).json({ success: true, data: [] });
+      }
+      campusQuery = { _id: scope.campusId };
+    }
+
+    const campuses = await Campus.find(campusQuery);
     // Dynamically ensure every campus has a valid active QR code
     for (let i = 0; i < campuses.length; i++) {
       campuses[i] = await ensureValidCampusQR(campuses[i]);
@@ -589,6 +646,12 @@ exports.updateClass = async (req, res) => {
     const existingClass = await ClassModel.findById(id);
     if (!existingClass) return res.status(404).json({ success: false, message: 'Class not found' });
 
+    if (req.user && req.user.role === 'staff') {
+      if (!(await isClassInStaffCampus(req, id))) {
+        return res.status(403).json({ success: false, message: 'You are not authorized to update this class.' });
+      }
+    }
+
     // If staff, they can only edit the hallId. Ignore/override other fields.
     if (req.user && req.user.role === 'staff') {
       name = existingClass.name;
@@ -687,6 +750,11 @@ exports.deleteHall = async (req, res) => {
 exports.getCampusQR = async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!(await isCampusInStaffScope(req, id))) {
+      return res.status(403).json({ success: false, message: 'Not authorized to view this campus QR code' });
+    }
+
     let campus = await Campus.findById(id);
     if (!campus) return res.status(404).json({ success: false, message: 'Campus not found' });
 
@@ -718,6 +786,10 @@ exports.getCampusQRPDF = async (req, res) => {
     const QRCode = require('qrcode');
     const PDFDocument = require('pdfkit');
     const { id } = req.params;
+
+    if (!(await isCampusInStaffScope(req, id))) {
+      return res.status(403).json({ success: false, message: 'Not authorized to download this campus QR code' });
+    }
 
     let campus = await Campus.findById(id);
     if (!campus) return res.status(404).json({ success: false, message: 'Campus not found' });

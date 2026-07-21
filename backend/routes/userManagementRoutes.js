@@ -13,6 +13,9 @@ const {
   permanentDeleteUser,
   uploadExcelStudents,
   updateUserPhoto,
+  resetDevice,
+  generateCode,
+  changeDeviceRegistrationStatus,
 } = require('../controllers/userManagementController');
 
 const { protect } = require('../middleware/authMiddleware');
@@ -26,6 +29,13 @@ const { validate } = require('../middleware/validator');
 router.use(protect, adminOrStaff);
 
 router.post('/upload-excel', upload.excel.single('excel'), uploadExcelStudents);
+
+router.post('/:id/reset-device', resetDevice);
+router.post('/:id/generate-code', generateCode);
+router.patch('/:id/device-status', [
+  body('deviceRegistrationStatus', 'deviceRegistrationStatus is required').isIn(['Active', 'Inactive']),
+  validate
+], changeDeviceRegistrationStatus);
 
 router.route('/')
   .get(getAllUsers)

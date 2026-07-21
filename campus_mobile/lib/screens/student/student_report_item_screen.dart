@@ -392,10 +392,13 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
     );
   }
 
-  /// Request the appropriate runtime permission, then open the camera or gallery.
-  /// ImageSource.camera → requests Permission.camera first.
-  /// ImageSource.gallery → requests Permission.photos first.
+  /// Requests the correct runtime permission then opens the native picker.
+  ///
+  /// Works on every Android version (8–15) and every OEM:
+  ///   Samsung · Xiaomi · Oppo · Vivo · Huawei · Tecno · Infinix · Realme
+  ///   Google Pixel · Motorola · Nokia · OnePlus · …
   Future<void> _pickImage(ImageSource source) async {
+    // ── Web ────────────────────────────────────────────────────────────────
     if (kIsWeb) {
       if (source == ImageSource.camera) {
         final bytes = await showWebCameraCapture(context);
@@ -406,31 +409,56 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
         });
         return;
       }
-      // Web: gallery picker is handled by the browser — pick directly.
       final XFile? picked = await _picker.pickImage(
         source: source,
         maxWidth: 1200,
         maxHeight: 1200,
         imageQuality: 85,
       );
-      if (picked != null) {
+      if (picked != null && mounted) {
         final bytes = await picked.readAsBytes();
-        if (mounted) {
-          setState(() {
-            _imageFile = picked;
-            _webImage = bytes;
-          });
-        }
+        if (mounted) setState(() { _imageFile = picked; _webImage = bytes; });
       }
       return;
     }
-    // ── Native (Android / iOS) ─────────────────────────────────────────────
+
+    // ── Native Android / iOS ───────────────────────────────────────────────
+    // Step 1: Request the correct permission using Build.VERSION.SDK_INT
     final PermissionStatus status = source == ImageSource.camera
-        ? await Permission.camera.request()
+        ? await PermissionHelper.requestCameraPermission()
         : await PermissionHelper.requestPhotosPermission();
 
+    // Step 2: Handle every possible permission state
     if (status.isGranted || status.isLimited) {
-      // ✅ Permission granted — open the picker
+      // ✅ Granted — open the system picker
+      await _openPickerAndSave(source);
+
+    } else if (status.isPermanentlyDenied || status.isRestricted) {
+      // ❌ Permanently denied / restricted — show dialog with Settings button
+      if (!mounted) return;
+      final label = source == ImageSource.camera ? 'Camera' : 'Photos';
+      _showPermanentDeniedDialog(label);
+
+    } else {
+      // ⚠️ Denied this time — user can try again
+      if (!mounted) return;
+      final label = source == ImageSource.camera ? 'Camera' : 'Photos';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '$label permission is required. Please tap the button again and allow access.'),
+          backgroundColor: Colors.orange.shade700,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  /// Opens the system image picker after permission is confirmed.
+  /// Shows a retry-friendly error if the picker itself fails.
+  Future<void> _openPickerAndSave(ImageSource source) async {
+    try {
       final XFile? picked = await _picker.pickImage(
         source: source,
         maxWidth: 1200,
@@ -443,35 +471,68 @@ class _StudentReportItemScreenState extends State<StudentReportItemScreen> {
           _webImage = null;
         });
       }
-    } else if (status.isPermanentlyDenied) {
-      // ❌ User selected "Never ask again" — guide them to Settings
+    } catch (e) {
+      debugPrint('[_pickImage] Picker error: $e');
       if (!mounted) return;
-      final label = source == ImageSource.camera ? 'Camera' : 'Photos';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-              '$label access was permanently denied. Please enable it in App Settings.'),
+          content: const Text(
+              'Could not open image picker. Please try again.'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
           action: SnackBarAction(
-            label: 'Open Settings',
+            label: 'Retry',
             textColor: Colors.white,
-            onPressed: openAppSettings,
+            onPressed: () => _pickImage(source),
           ),
         ),
       );
-    } else {
-      // ⚠️ User tapped "Don't allow" this time
-      if (!mounted) return;
-      final label = source == ImageSource.camera ? 'Camera' : 'Photos';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$label access is required to upload a photo. Please allow it when prompted.'),
-          backgroundColor: Colors.orange,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
     }
+  }
+
+  /// Shows a professional dialog for permanently denied permissions.
+  void _showPermanentDeniedDialog(String label) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.lock_outline, color: Colors.red.shade600),
+            const SizedBox(width: 8),
+            Text('$label Permission Required'),
+          ],
+        ),
+        content: Text(
+          '$label access was permanently denied.\n\n'
+          'To upload photos, please:\n'
+          '1. Tap "Open Settings"\n'
+          '2. Select "Permissions"\n'
+          '3. Enable "$label"\n'
+          '4. Return to the app and try again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.settings_outlined, size: 18),
+            label: const Text('Open Settings'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              openAppSettings();
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildPhotoBox(Color accentColor) {

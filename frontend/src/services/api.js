@@ -163,6 +163,16 @@ export const updateUserPhoto = async (id, formData) => {
   return response.data;
 };
 
+export const resetDeviceRegistration = async (id) => {
+  const response = await api.post(`/admin/users/${id}/reset-device`);
+  return response.data;
+};
+
+export const changeDeviceRegistrationStatus = async (id, deviceRegistrationStatus) => {
+  const response = await api.patch(`/admin/users/${id}/device-status`, { deviceRegistrationStatus });
+  return response.data;
+};
+
 /* Lost Item Endpoints */
 export const reportLostItem = async (formData) => {
   const response = await api.post('/lost-items', formData, {

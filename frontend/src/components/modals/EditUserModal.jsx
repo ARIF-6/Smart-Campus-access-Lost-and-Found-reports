@@ -116,7 +116,7 @@ const handleSubmit = async (e) => {
   setIsLoading(true);
 
   if (formData.role === 'security') {
-    const error = validateShiftTimes(formData.shiftStartTime, formData.shiftEndTime);
+    const error = validateShiftTimes(formData.shiftStartTime, formData.shiftEndTime, formData.assignedShift);
     if (error) {
       toast.error(error);
       setIsLoading(false);
@@ -170,18 +170,46 @@ const handleSubmit = async (e) => {
 
   const isStudent = formData.role === 'student';
 
-  const validateShiftTimes = (start, end) => {
+  const validateShiftTimes = (start, end, assignedShift) => {
     if (!start || !end) return '';
     if (start === end) return 'Start Shift and End Shift cannot be the same. Please select different times.';
     const [h1, m1] = start.split(':').map(Number);
     const [h2, m2] = end.split(':').map(Number);
-    if ((h2 * 60 + m2) < (h1 * 60 + m1)) {
+    const startMin = h1 * 60 + m1;
+    const endMin = h2 * 60 + m2;
+    if (endMin <= startMin) {
       return 'End Shift must be later than the Start Shift.';
     }
+
+    const shift = (assignedShift || '').toLowerCase();
+    if (shift === 'full-time') return '';
+
+    if (shift === 'morning') {
+      if (startMin < 360 || startMin > 780) {
+        return 'Morning Shift start time must be between 06:00 AM and 01:00 PM.';
+      }
+      if (endMin > 780) {
+        return 'Morning Shift end time cannot exceed 01:00 PM.';
+      }
+      return '';
+    }
+
+    if (shift === 'afternoon') {
+      if (startMin < 781 || startMin > 1230) {
+        return 'Afternoon Shift start time must be between 01:01 PM and 08:30 PM.';
+      }
+      if (endMin > 1230) {
+        return 'Afternoon Shift end time cannot exceed 08:30 PM.';
+      }
+      return '';
+    }
+
     return '';
   };
 
-  const shiftError = formData.role === 'security' ? validateShiftTimes(formData.shiftStartTime, formData.shiftEndTime) : '';
+  const shiftError = formData.role === 'security'
+    ? validateShiftTimes(formData.shiftStartTime, formData.shiftEndTime, formData.assignedShift)
+    : '';
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -427,6 +455,7 @@ const handleSubmit = async (e) => {
                                 <option value="none" disabled>Select Shift</option>
                                 <option value="morning">Morning Shift</option>
                                 <option value="afternoon">Afternoon Shift</option>
+                                <option value="full-time">Full-Time</option>
                               </select>
                             </div>
 

@@ -123,9 +123,10 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
     }
   }
 
-  /// Request camera permission explicitly, then open the camera.
-  /// For gallery, request photos permission (Android 13+) then open gallery.
+  /// Requests the correct runtime permission then opens the native picker.
+  /// Supports every Android version (8–15) and every OEM.
   Future<void> _pickImage(ImageSource source) async {
+    // ── Web ────────────────────────────────────────────────────────────────
     if (kIsWeb) {
       if (source == ImageSource.camera) {
         final bytes = await showWebCameraCapture(context);
@@ -136,7 +137,6 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
         });
         return;
       }
-      // Web: gallery picker is handled by the browser — pick directly.
       final XFile? picked = await _picker.pickImage(source: source, maxWidth: 1200, imageQuality: 85);
       if (!mounted || picked == null) return;
       final bytes = await picked.readAsBytes();
@@ -145,52 +145,84 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
       return;
     }
 
-    // ── Native (Android / iOS) ──────────────────────────────────────
+    // ── Native Android / iOS ───────────────────────────────────────────────
     final PermissionStatus status = source == ImageSource.camera
-        ? await Permission.camera.request()
+        ? await PermissionHelper.requestCameraPermission()
         : await PermissionHelper.requestPhotosPermission();
 
     if (status.isGranted || status.isLimited) {
-      // ✅ Permission granted — open the picker
-      final XFile? picked = await _picker.pickImage(
-        source: source,
-        maxWidth: 1200,
-        imageQuality: 85,
-      );
-      if (picked != null && mounted) {
-        final bytes = await picked.readAsBytes();
-        if (mounted) {
-          setState(() {
-            _imageFile = picked;
-            _webImage = bytes;
-          });
+      // ✅ Granted — open picker
+      try {
+        final XFile? picked = await _picker.pickImage(
+          source: source,
+          maxWidth: 1200,
+          imageQuality: 85,
+        );
+        if (picked != null && mounted) {
+          final bytes = await picked.readAsBytes();
+          if (mounted) setState(() { _imageFile = picked; _webImage = bytes; });
         }
+      } catch (e) {
+        debugPrint('[_pickImage] Picker error: $e');
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Could not open image picker. Please try again.'),
+            backgroundColor: AppConstants.errorColor,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () => _pickImage(source),
+            ),
+          ),
+        );
       }
-    } else if (status.isPermanentlyDenied) {
-      // ❌ User selected "Never ask again" — guide them to Settings
+    } else if (status.isPermanentlyDenied || status.isRestricted) {
+      // ❌ Permanently denied — professional dialog
       if (!mounted) return;
       final label = source == ImageSource.camera ? 'Camera' : 'Photos';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(children: [
+            Icon(Icons.lock_outline, color: AppConstants.errorColor),
+            const SizedBox(width: 8),
+            Text('$label Permission Required'),
+          ]),
           content: Text(
-              '$label access was permanently denied. Please enable it in App Settings.'),
-          backgroundColor: AppConstants.errorColor,
-          action: SnackBarAction(
-            label: 'Open Settings',
-            textColor: Colors.white,
-            onPressed: openAppSettings,
+            '$label access was permanently denied.\n\n'
+            'To upload photos:\n'
+            '1. Tap "Open Settings"\n'
+            '2. Select "Permissions"\n'
+            '3. Enable "$label"\n'
+            '4. Return to the app and try again.',
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.settings_outlined, size: 18),
+              label: const Text('Open Settings'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppConstants.errorColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () { Navigator.of(ctx).pop(); openAppSettings(); },
+            ),
+          ],
         ),
       );
     } else {
-      // ⚠️ User tapped "Don't allow" this time — they can try again
+      // ⚠️ Denied this time — allow retry
       if (!mounted) return;
       final label = source == ImageSource.camera ? 'Camera' : 'Photos';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$label access is required to upload a photo. Please allow it when prompted.'),
-          backgroundColor: Colors.orange,
+          content: Text('$label permission is required. Please tap the button again and allow access.'),
+          backgroundColor: Colors.orange.shade700,
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
         ),
       );
     }

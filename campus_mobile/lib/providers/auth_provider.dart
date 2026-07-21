@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import '../services/api_service.dart';
 import '../core/constants.dart';
+import '../core/device_helper.dart';
 import 'package:dio/dio.dart';
 import '../services/socket_service.dart';
 import '../core/error_handler.dart';
@@ -54,11 +55,13 @@ class AuthProvider extends ChangeNotifier {
     if (userData != null) {
       _user = jsonDecode(userData);
       if (_token != null) {
-        // Populate in-memory token cache so API requests don't need disk reads
         ApiService.setToken(_token!);
+        final deviceId = await DeviceHelper.getDeviceId();
+        if (deviceId != null) {
+          ApiService.setDeviceId(deviceId);
+        }
         _socketService.connect(_token!);
         _listenForShiftUpdates();
-        // Fetch latest profile in background — don't await; UI shows cached data immediately
         fetchLatestProfile();
       }
     }
@@ -75,14 +78,11 @@ class AuthProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
-  /// Registers a socket listener for real-time shift updates pushed by the
-  /// backend whenever an admin edits a security guard's shift fields.
   void _listenForShiftUpdates() {
-    _socketService.off('user:shiftUpdated'); // remove any stale listener first
+    _socketService.off('user:shiftUpdated');
     _socketService.on('user:shiftUpdated', (data) {
       if (data is Map) {
         final incoming = Map<String, dynamic>.from(data);
-        // Only update shift-related fields to avoid overwriting other profile data
         final shiftFields = <String, dynamic>{};
         if (incoming.containsKey('assignedShift')) shiftFields['assignedShift'] = incoming['assignedShift'];
         if (incoming.containsKey('shiftStartTime')) shiftFields['shiftStartTime'] = incoming['shiftStartTime'];
@@ -99,17 +99,23 @@ class AuthProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
+      final deviceId = await DeviceHelper.getDeviceId();
+      if (deviceId != null) {
+        ApiService.setDeviceId(deviceId);
+      }
       final response = await _apiService.post('/auth/login', data: {
         'email': email,
         'password': password,
+        if (deviceId != null) 'deviceId': deviceId,
       });
 
       if (response.statusCode == 200) {
-        if (response.data['token'] == null || response.data['user'] == null) {
-           throw Exception('Invalid server response: Missing token or user data');
+        final raw = response.data;
+        if (raw is Map && (raw['token'] == null || raw['user'] == null)) {
+          throw Exception('Invalid server response: Missing token or user data');
         }
-        _token = response.data['token'];
-        _user = response.data['user'];
+        _token = (raw is Map ? raw['token'] : null) as String?;
+        _user  = (raw is Map ? raw['user']  : null) as Map<String, dynamic>?;
         
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(AppConstants.tokenKey, _token!);
@@ -127,7 +133,6 @@ class AuthProvider extends ChangeNotifier {
       }
     } catch (e) {
       if (e is DioException) {
-        // Detect connection-level failures (Render cold start, no network)
         _isConnectionError = e.type == DioExceptionType.connectionTimeout ||
             e.type == DioExceptionType.sendTimeout ||
             e.type == DioExceptionType.receiveTimeout ||
@@ -148,12 +153,10 @@ class AuthProvider extends ChangeNotifier {
     await prefs.remove(AppConstants.tokenKey);
     await prefs.remove(AppConstants.userKey);
 
-    // Invalidate the in-memory token cache
     ApiService.clearToken();
+    ApiService.clearDeviceId();
 
-    // Remove shift update listener before disconnecting socket
     _socketService.off('user:shiftUpdated');
-    // Disconnect Socket
     _socketService.disconnect();
 
     _token = null;
@@ -162,7 +165,6 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> updateUserLocally(Map<String, dynamic> updatedUserData) async {
-    // Merge or replace user data
     if (_user != null) {
       _user = {..._user!, ...updatedUserData};
     } else {
@@ -172,10 +174,6 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(AppConstants.userKey, jsonEncode(_user));
 
-    // Use addPostFrameCallback to safely notify listeners after the current
-    // frame completes. This prevents the "Trying to render a disposed
-    // EngineFlutterView" crash on Flutter Web when the provider notifies
-    // during widget disposal.
     if (SchedulerBinding.instance.schedulerPhase != SchedulerPhase.idle) {
       SchedulerBinding.instance.addPostFrameCallback((_) {
         notifyListeners();

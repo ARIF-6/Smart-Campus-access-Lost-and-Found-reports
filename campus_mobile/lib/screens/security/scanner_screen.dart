@@ -352,6 +352,8 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
       return nowMins >= (5 * 60) && nowMins <= (13 * 60 + 29);
     } else if (assignedShift == 'afternoon') {
       return nowMins >= (13 * 60 + 30) && nowMins <= (18 * 60);
+    } else if (assignedShift == 'full-time') {
+      return false;
     }
 
     return false;
@@ -368,6 +370,7 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
     final assignedShift = (user['assignedShift'] as String? ?? 'none').toLowerCase();
     if (assignedShift == 'morning')   return 'Your shift runs 05:00 – 13:29 (Morning).';
     if (assignedShift == 'afternoon') return 'Your shift runs 13:30 – 18:00 (Afternoon).';
+    if (assignedShift == 'full-time') return 'Your Full-Time shift requires assigned start and end times.';
     return 'No active shift is assigned to you. Contact an administrator.';
   }
 
@@ -670,7 +673,16 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
     }
     // ───────────────────────────────────────────────────────
 
-    final statusColor = res['color'] == 'green' ? AppConstants.statusValid : (res['color'] == 'yellow' ? Colors.orange : AppConstants.statusInvalid);
+    final statusColor = res['color'] == 'green'
+        ? AppConstants.statusValid
+        : (res['color'] == 'yellow'
+            ? Colors.orange
+            : (res['color'] == 'orange' ? Colors.deepOrange : AppConstants.statusInvalid));
+
+    final crossCampus = res['crossCampusAttendance'] as Map<String, dynamic>?;
+    final attendanceRecords = (crossCampus?['records'] as List?) ?? [];
+    final isInsideOtherCampus = crossCampus?['isInsideOtherCampus'] == true;
+    final otherCampusAlert = crossCampus?['otherCampusAlert'] as String?;
     
     return Container(
       padding: const EdgeInsets.all(24),
@@ -685,7 +697,11 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
           Row(
             children: [
               Icon(
-                res['color'] == 'green' ? Icons.check_circle : (res['color'] == 'yellow' ? Icons.logout : Icons.error),
+                res['color'] == 'green'
+                    ? Icons.check_circle
+                    : (res['color'] == 'yellow'
+                        ? Icons.logout
+                        : (res['color'] == 'orange' ? Icons.warning_amber_rounded : Icons.error)),
                 color: statusColor,
                 size: 32,
               ),
@@ -753,6 +769,90 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
               ),
             ),
           
+          if (isInsideOtherCampus && otherCampusAlert != null)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.deepOrange.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.35)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.deepOrange, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      otherCampusAlert,
+                      style: const TextStyle(
+                        color: Colors.deepOrange,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          if (attendanceRecords.isNotEmpty)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blueGrey.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blueGrey.withValues(alpha: 0.15)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Today\'s Attendance (All Campuses)',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 8),
+                  ...attendanceRecords.map((record) {
+                    final item = Map<String, dynamic>.from(record as Map);
+                    final campusName = item['campusName']?.toString() ?? 'Unknown Campus';
+                    final status = item['status']?.toString() ?? '';
+                    final entryTime = item['entryTimeFormatted']?.toString() ?? '';
+                    final method = item['method']?.toString() ?? 'Security Guard';
+                    final isInside = status == 'Inside';
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            isInside ? Icons.login : Icons.logout,
+                            size: 16,
+                            color: isInside ? Colors.green : Colors.grey,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '$campusName • ${entryTime.isNotEmpty ? entryTime : '—'} • $status • $method',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[800],
+                                fontWeight: isInside ? FontWeight.w600 : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+
           const SizedBox(height: 16),
           Text(
             res['message'] ?? '',

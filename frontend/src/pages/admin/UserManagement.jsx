@@ -970,7 +970,7 @@ const UserManagement = () => {
           />
           <ViewUserModal
             isOpen={isViewOpen}
-            onClose={() => setIsViewOpen(false)}
+            onClose={() => { setIsViewOpen(false); fetchUsers(); }}
             user={activeUser}
             allRoles={allRoles}
             availableRoles={availableRoles}

@@ -1,88 +1,111 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
+/// Production-ready permission helper for image/camera access.
+///
+/// Uses [DeviceInfoPlugin] to read [Build.VERSION.SDK_INT] from the native
+/// Android API — the ONLY reliable SDK detection method across all OEMs
+/// (Samsung, Xiaomi, Oppo, Vivo, Huawei, Tecno, Infinix, Realme, etc.).
+///
+/// Supports all Android versions 8 (API 26) through 15 (API 35).
 class PermissionHelper {
-  /// Returns the Android major version integer from [Platform.operatingSystemVersion].
-  ///
-  /// On Android, [Platform.operatingSystemVersion] returns the *version string*,
-  /// e.g. "13", "14", "Android 13", "Android 14.0", "13.0.0" — it NEVER contains
-  /// "SDK XX". We extract the first numeric token which is the major version.
-  ///
-  /// Android 13 → SDK 33, Android 14 → SDK 34 (major + 20 for Android ≥ 10)
-  static int getAndroidMajorVersion() {
+  static final _deviceInfo = DeviceInfoPlugin();
+
+  // ─── SDK Version ──────────────────────────────────────────────────────────
+
+  /// Returns the true Android SDK_INT via [DeviceInfoPlugin].
+  /// Falls back to 0 on any error (triggers safest path).
+  static Future<int> getAndroidSdkInt() async {
     if (!Platform.isAndroid) return 0;
     try {
-      final raw = Platform.operatingSystemVersion.trim();
-      // Extract the first run of digits from the version string.
-      final match = RegExp(r'(\d+)').firstMatch(raw);
-      if (match != null) {
-        return int.tryParse(match.group(1)!) ?? 0;
-      }
-    } catch (_) {}
-    return 0;
-  }
-
-  /// Kept for backward compatibility — returns approximate SDK level.
-  static int getAndroidSdkInt() {
-    final major = getAndroidMajorVersion();
-    // Android 13 → SDK 33, Android 14 → SDK 34, etc. (major + 20 for modern versions)
-    if (major >= 10) return major + 20;
-    // Rough fallback for older versions
-    return 0;
-  }
-
-  /// Returns the correct photo-reading permission for the current Android version.
-  ///
-  /// - Android 13+ (API 33+): READ_MEDIA_IMAGES  → [Permission.photos]
-  /// - Android ≤ 12  (API ≤ 32): READ_EXTERNAL_STORAGE → [Permission.storage]
-  /// - iOS / other: [Permission.photos]
-  static Permission get photosPermission {
-    if (Platform.isAndroid) {
-      final major = getAndroidMajorVersion();
-      // If we couldn't parse the version, or it claims Android 13+, default to photos.
-      if (major == 0 || major >= 13) {
-        return Permission.photos;
-      }
-      return Permission.storage;
+      final info = await _deviceInfo.androidInfo;
+      return info.version.sdkInt;
+    } catch (e) {
+      debugPrint('[PermissionHelper] Could not read sdkInt: $e');
+      return 0;
     }
-    return Permission.photos;
   }
 
-  /// Helper to request all possible photo/storage permissions on Android to ensure compatibility.
+  // ─── Camera ───────────────────────────────────────────────────────────────
+
+  /// Requests [Permission.camera].
+  /// Returns [PermissionStatus.granted] on success.
+  static Future<PermissionStatus> requestCameraPermission() async {
+    if (kIsWeb) return PermissionStatus.granted;
+    return await Permission.camera.request();
+  }
+
+  // ─── Photos / Gallery ─────────────────────────────────────────────────────
+
+  /// Requests the correct gallery permission for the running Android version.
+  ///
+  /// | Android version | API  | Permission requested        |
+  /// |-----------------|------|-----------------------------|
+  /// | 14 + 15         | 34+  | READ_MEDIA_IMAGES           |
+  /// | 13              | 33   | READ_MEDIA_IMAGES           |
+  /// | 10 – 12         | 29–32| READ_EXTERNAL_STORAGE       |
+  /// | 8 – 9           | 26–28| READ_EXTERNAL_STORAGE       |
+  /// | Unknown / error | —    | Both (safest fallback)      |
+  ///
+  /// On iOS / web: requests [Permission.photos].
   static Future<PermissionStatus> requestPhotosPermission() async {
+    if (kIsWeb) return PermissionStatus.granted;
+
     if (!Platform.isAndroid) {
+      // iOS
       return await Permission.photos.request();
     }
-    
-    final major = getAndroidMajorVersion();
-    if (major >= 13) {
-      // Modern Android: Request photos permission
+
+    final sdk = await getAndroidSdkInt();
+    debugPrint('[PermissionHelper] Android SDK_INT = $sdk');
+
+    if (sdk >= 33) {
+      // Android 13+ (API 33+): READ_MEDIA_IMAGES
       final status = await Permission.photos.request();
-      if (status.isGranted || status.isLimited) return status;
-      // Fallback in case of custom manufacturer ROM quirks:
-      return await Permission.storage.request();
-    } else if (major > 0 && major <= 12) {
-      // Legacy Android: Request storage permission
-      return await Permission.storage.request();
+      debugPrint('[PermissionHelper] photos status = $status');
+      return status;
+    } else if (sdk >= 26) {
+      // Android 8–12 (API 26–32): READ_EXTERNAL_STORAGE
+      final status = await Permission.storage.request();
+      debugPrint('[PermissionHelper] storage status = $status');
+      return status;
     } else {
-      // Unknown version: Request both simultaneously to guarantee dialog trigger!
-      final statuses = await [
+      // Unknown SDK — request both to guarantee OS dialog appears on any device
+      debugPrint('[PermissionHelper] Unknown SDK — requesting both permissions');
+      final results = await [
         Permission.photos,
         Permission.storage,
       ].request();
-      
-      if (statuses[Permission.photos]?.isGranted == true ||
-          statuses[Permission.photos]?.isLimited == true) {
-        return PermissionStatus.granted;
-      }
-      if (statuses[Permission.storage]?.isGranted == true) {
-        return PermissionStatus.granted;
-      }
-      if (statuses[Permission.photos]?.isPermanentlyDenied == true ||
-          statuses[Permission.storage]?.isPermanentlyDenied == true) {
+
+      final photosStatus = results[Permission.photos] ?? PermissionStatus.denied;
+      final storageStatus = results[Permission.storage] ?? PermissionStatus.denied;
+
+      if (photosStatus.isGranted || photosStatus.isLimited) return photosStatus;
+      if (storageStatus.isGranted) return PermissionStatus.granted;
+      if (photosStatus.isPermanentlyDenied || storageStatus.isPermanentlyDenied) {
         return PermissionStatus.permanentlyDenied;
       }
       return PermissionStatus.denied;
     }
+  }
+
+  // ─── Legacy getter (kept for backward-compat, do NOT use for new code) ───
+
+  /// Deprecated: use [requestPhotosPermission()] instead.
+  ///
+  /// Returns the correct [Permission] object for the running Android version,
+  /// but this is a SYNCHRONOUS call that cannot use [DeviceInfoPlugin].
+  /// Retained only for callers not yet migrated to the async method.
+  @Deprecated('Use requestPhotosPermission() instead')
+  static Permission get photosPermission {
+    if (Platform.isAndroid) {
+      // Without DeviceInfoPlugin we cannot know SDK_INT reliably here.
+      // Default to photos (READ_MEDIA_IMAGES) which works on Android 13+.
+      // For older devices the async requestPhotosPermission() should be used.
+      return Permission.photos;
+    }
+    return Permission.photos;
   }
 }

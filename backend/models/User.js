@@ -95,7 +95,7 @@ const userSchema = new mongoose.Schema({
   },
   assignedShift: {
     type: String,
-    enum: ['morning', 'afternoon', 'none'],
+    enum: ['morning', 'afternoon', 'full-time', 'none'],
     default: 'none'
   },
   shiftStartTime: {
@@ -115,6 +115,28 @@ const userSchema = new mongoose.Schema({
     ref: 'User',
     default: null,
     set: v => v === '' ? null : v
+  },
+  isActivated: {
+    type: Boolean,
+    default: true
+  },
+  deviceRegistrationStatus: {
+    type: String,
+    enum: ['Active', 'Inactive'],
+    default: 'Active'
+  },
+  activationCode: {
+    type: String
+  },
+  activationCodeStatus: {
+    type: String,
+    enum: ['Unused', 'Used'],
+    default: 'Unused'
+  },
+  deviceId: {
+    type: String,
+    default: null,
+    sparse: true
   }
 }, {
   timestamps: true
@@ -127,6 +149,10 @@ userSchema.index({ isActive: 1 });
 userSchema.index({ faculty: 1 });
 userSchema.index({ department: 1 });
 userSchema.index({ campus: 1 });
+userSchema.index(
+  { deviceId: 1 },
+  { unique: true, sparse: true, partialFilterExpression: { role: 'student', deviceId: { $type: 'string' } } }
+);
 
 // Compatibility hook for legacy documents
 userSchema.pre('validate', function () {
@@ -135,14 +161,18 @@ userSchema.pre('validate', function () {
   }
 });
 
-// Hash password before saving
+// Hash password before saving; prepare new students for device binding on first login
 userSchema.pre('save', async function () {
-  if (!this.isModified('password')) {
-    return;
+  if (this.role === 'student' && this.isNew) {
+    this.isActivated = false;
+    this.deviceId = null;
+    this.deviceRegistrationStatus = 'Active';
   }
 
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  if (this.isModified('password')) {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+  }
 });
 
 // Match user entered password to hashed password in database
@@ -151,3 +181,4 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 };
 
 module.exports = mongoose.model('User', userSchema);
+
