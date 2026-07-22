@@ -422,10 +422,37 @@ exports.updateUser = async (req, res) => {
     const [enriched] = await enrichUsers([plain]);
 
     // If a security guard's shift was updated, push the fresh profile to their
-    // connected socket so the mobile app refreshes without requiring a re-login.
+    // connected socket so the mobile app refreshes immediately without re-login.
     if (updatedUser.role === 'security' &&
         (assignedShift !== undefined || shiftStartTime !== undefined || shiftEndTime !== undefined)) {
-      emitToUser(updatedUser._id.toString(), 'user:shiftUpdated', enriched);
+      const shiftName = (updatedUser.assignedShift || 'Assigned').toUpperCase();
+      const startTime = updatedUser.shiftStartTime || '';
+      const endTime = updatedUser.shiftEndTime || '';
+      const timeStr = (startTime && endTime) ? `${startTime} - ${endTime}` : '';
+      const shiftMessage = `Your security shift schedule has been updated: ${shiftName}${timeStr ? ` (${timeStr})` : ''}.`;
+
+      emitToUser(updatedUser._id.toString(), 'user:shiftUpdated', {
+        ...enriched,
+        assignedShift: updatedUser.assignedShift,
+        shiftStartTime: updatedUser.shiftStartTime,
+        shiftEndTime: updatedUser.shiftEndTime,
+        message: shiftMessage
+      });
+
+      try {
+        const notif = await createNotification({
+          userId: updatedUser._id,
+          title: 'Shift Schedule Updated',
+          message: shiftMessage,
+          type: 'SECURITY_ALERT',
+          module: 'Security'
+        });
+        emitNotification(notif);
+      } catch (err) {
+        console.error('Failed to create shift update notification:', err.message);
+      }
+
+      emitDashboardRefresh('security');
     }
 
     return sendSuccess(res, 'User updated successfully', enriched);

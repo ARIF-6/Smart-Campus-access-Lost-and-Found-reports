@@ -100,6 +100,13 @@ class _StudentHomeTabState extends State<StudentHomeTab>
   String? _parseAttendanceStatus(dynamic data) {
     if (data is Map) {
       final displayStatus = data['displayStatus']?.toString();
+      final status = data['status']?.toString();
+      if (displayStatus == 'Inside' || status == 'IN') {
+        return 'Inside';
+      }
+      if (displayStatus == 'Exited' || displayStatus == 'Outside' || status == 'OUT') {
+        return 'Exited';
+      }
       if (displayStatus != null && displayStatus.isNotEmpty) {
         return displayStatus;
       }
@@ -227,8 +234,48 @@ class _StudentHomeTabState extends State<StudentHomeTab>
                   SliverToBoxAdapter(
                     child: DashboardHeroHeader(
                       fullName: fullName,
-                      subtitle: _attendanceStatus,
+                      subtitle: 'Real-Time Campus Access',
                       photoUrl: photoUrl,
+                      badgeRow: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _attendanceStatus == 'Inside'
+                              ? const Color(0xFF22C55E).withValues(alpha: 0.18)
+                              : Colors.amber.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: _attendanceStatus == 'Inside'
+                                ? const Color(0xFF22C55E).withValues(alpha: 0.4)
+                                : Colors.amber.withValues(alpha: 0.4),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _attendanceStatus == 'Inside'
+                                    ? const Color(0xFF22C55E)
+                                    : Colors.amber,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Status: ${_attendanceStatus == 'Inside' ? 'Inside' : 'Exited'}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       onAvatarTap: () {
                         final s = context
                             .findAncestorStateOfType<StudentMainScreenState>();

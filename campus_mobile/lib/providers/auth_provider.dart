@@ -91,6 +91,7 @@ class AuthProvider extends ChangeNotifier {
           updateUserLocally(shiftFields);
         }
       }
+      fetchLatestProfile();
     });
   }
 

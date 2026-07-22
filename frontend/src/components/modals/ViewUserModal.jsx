@@ -136,6 +136,15 @@ const ViewUserModal = ({ isOpen, onClose, user, allRoles = [], availableRoles = 
               </span>
             </div>
 
+            {['security', 'clean', 'staff'].includes(localUser.role) && (
+              <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Assigned Campus</span>
+                <span className="text-sm font-bold text-gray-800">
+                  {typeof localUser.campus === 'object' ? (localUser.campus?.name || '-') : (localUser.campus || '-')}
+                </span>
+              </div>
+            )}
+
             {localUser.role === 'student' && (
               <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3 animate-fadeIn">
                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block border-b border-gray-50 pb-1.5">Academic Details</span>

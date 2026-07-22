@@ -56,9 +56,10 @@ async function clearItemImage(item) {
 // @route   POST /api/found-items
 // @access  Private (Security, Cleaner, Admin)
 exports.reportFoundItem = asyncHandler(async (req, res) => {
-  const { title, description, category, locationFound, dateFound, storageLocation, priority, notes } = req.body;
+  const { title, description, category, locationFound, location, dateFound, storageLocation, priority, notes } = req.body;
+  const itemLocation = locationFound || location || '';
   
-  if (!title || !category || !locationFound) {
+  if (!title || !category || !itemLocation) {
     return res.status(400).json({ success: false, message: 'Title, category, and location are required' });
   }
 
@@ -67,7 +68,7 @@ exports.reportFoundItem = asyncHandler(async (req, res) => {
     title,
     description,
     category,
-    location: locationFound,
+    location: itemLocation,
     dateFound: dateFound || Date.now(),
     image: storedImage.image,
     imageUrl: storedImage.imageUrl,

@@ -28,7 +28,13 @@ router.route('/')
       body('title', 'Title is required').notEmpty().trim().escape(),
       body('description', 'Description is required').notEmpty().trim().escape(),
       body('category', 'Category is required').notEmpty().trim().escape(),
-      body('locationLost', 'Location is required').notEmpty().trim().escape(),
+      body('locationLost').custom((value, { req }) => {
+        const loc = req.body.locationLost || req.body.location;
+        if (!loc || !loc.trim()) {
+          throw new Error('Location is required');
+        }
+        return true;
+      }),
       validate
     ],
     reportLostItem

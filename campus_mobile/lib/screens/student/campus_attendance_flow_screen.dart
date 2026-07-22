@@ -5,7 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
 
-enum _FlowStep { qrScan, idEntry, confirm, success }
+enum _FlowStep { qrScan, success }
 
 class CampusAttendanceFlowScreen extends StatefulWidget {
   const CampusAttendanceFlowScreen({super.key});
@@ -18,7 +18,6 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
   _FlowStep _currentStep = _FlowStep.qrScan;
   final MobileScannerController _scannerController = MobileScannerController(autoStart: true);
   final ApiService _apiService = ApiService();
-  final TextEditingController _idController = TextEditingController();
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -49,7 +48,6 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
   @override
   void dispose() {
     _scannerController.dispose();
-    _idController.dispose();
     super.dispose();
   }
 
@@ -63,7 +61,6 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
     bool serviceEnabled;
     LocationPermission permission;
 
-    // ── Step 1: Check if location services are on ────────────────────────────
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       if (mounted) {
@@ -77,7 +74,6 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
       return false;
     }
 
-    // ── Step 2: Check permission state ───────────────────────────────────────
     permission = await Geolocator.checkPermission();
 
     if (permission == LocationPermission.deniedForever) {
@@ -118,7 +114,6 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
       }
     }
 
-    // ── Step 3: Permission granted — clear any blocking state ────────────────
     if (mounted) {
       setState(() {
         _locationBlocked = false;
@@ -149,9 +144,6 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
         setState(() {
           _errorMessage = 'Failed to obtain GPS location. Please try again.';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to obtain GPS location: $e'), backgroundColor: Colors.red),
-        );
       }
       return false;
     } finally {
@@ -163,21 +155,17 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
     }
   }
 
-  /// Opens device app settings and re-checks permission after user returns.
   Future<void> _openSettingsAndRetry() async {
     await Geolocator.openAppSettings();
-    // Give user time to change settings, then retry
     await Future.delayed(const Duration(milliseconds: 500));
     await _checkLocationPermissionAndGetGPS();
   }
 
-  /// Opens location/GPS settings (for service-disabled case).
   Future<void> _openGpsSettingsAndRetry() async {
     await Geolocator.openLocationSettings();
     await Future.delayed(const Duration(milliseconds: 500));
     await _checkLocationPermissionAndGetGPS();
   }
-
 
   void _resetFlow() {
     setState(() {
@@ -189,7 +177,6 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
       _studentFullName = null;
       _studentPhotoUrl = null;
       _nextAction = null;
-      _idController.clear();
       _scannerController.start();
       _latitude = null;
       _longitude = null;
@@ -198,7 +185,7 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
     _checkLocationPermissionAndGetGPS();
   }
 
-  // Step 2: Validate scanned QR code token
+  // Automatic Scan Handler (No ID input required)
   Future<void> _handleQrDetected(String qrToken) async {
     if (_isLoading) return;
 
@@ -213,129 +200,73 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
     });
 
     try {
+      // Step 1: Validate QR code token
       final response = await _apiService.post('/campus-attendance/scan', data: {
         'qrToken': qrToken,
       });
 
       if (response.statusCode == 200 && response.data != null) {
-        // ApiService interceptor already unwraps the {success, data} envelope,
-        // so response.data IS the inner data object directly.
         final campusData = response.data is Map ? response.data : {};
         _scannerController.stop();
-        setState(() {
-          _campusId = campusData['campusId']?.toString();
-          _campusName = campusData['campusName']?.toString();
-          _currentStep = _FlowStep.idEntry;
-        });
-      }
-    } catch (e) {
-      String msg = 'Invalid or expired campus QR Code. Please scan the current campus QR Code.';
-      if (e is DioException && e.response?.data != null) {
-        msg = e.response?.data['message'] ?? msg;
-      }
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = msg;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg), backgroundColor: Colors.red),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
 
-  // Step 3: Verify Student ID
-  Future<void> _verifyStudentId() async {
-    final inputId = _idController.text.trim();
-    if (inputId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your Student ID.'), backgroundColor: Colors.orange),
-      );
-      return;
-    }
+        final campusId = campusData['campusId']?.toString();
+        final campusName = campusData['campusName']?.toString();
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+        // Step 2: Retrieve logged-in student ID automatically from AuthProvider
+        final authUser = Provider.of<AuthProvider>(context, listen: false).user;
+        final studentId = authUser?['studentId']?.toString() ?? '';
 
-    try {
-      final response = await _apiService.post('/campus-attendance/verify-id', data: {
-        'studentId': inputId,
-        'campusId': _campusId,
-      });
-
-      if (response.statusCode == 200 && response.data != null) {
-        // ApiService interceptor already unwraps the {success, data} envelope.
-        final studentData = response.data is Map ? response.data : {};
-        setState(() {
-          _studentUserId = studentData['userId']?.toString();
-          _studentFullName = studentData['fullName']?.toString();
-          _studentPhotoUrl = studentData['photoUrl']?.toString();
-          _nextAction = studentData['nextAction']?.toString();
-          _currentStep = _FlowStep.confirm;
-        });
-      }
-    } catch (e) {
-      String msg = 'Invalid Student ID. Please try again.';
-      if (e is DioException && e.response?.data != null) {
-        final errorData = e.response?.data;
-        if (errorData['code'] == 'BLACKLISTED') {
-          msg = 'Access Denied. This student has been blacklisted from campus access.';
-        } else {
-          msg = errorData['message'] ?? msg;
+        if (studentId.isEmpty) {
+          throw Exception('Registered Student ID not found on login session.');
         }
-      }
-      setState(() {
-        _errorMessage = msg;
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
 
-  // Step 4: Submit Entry/Exit check-in
-  Future<void> _submitAttendance() async {
-    if (_isLoading) return;
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final response = await _apiService.post('/campus-attendance/submit', data: {
-        'userId': _studentUserId,
-        'studentId': _idController.text.trim(),
-        'campusId': _campusId,
-        'action': _nextAction,
-        'latitude': _latitude,
-        'longitude': _longitude,
-        'accuracy': _accuracy,
-        'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      });
-
-      // Success on either 200 (exit) or 201 (entry)
-      if ((response.statusCode == 200 || response.statusCode == 201) ||
-          response.data != null) {
-        setState(() {
-          _currentStep = _FlowStep.success;
+        // Step 3: Verify Student ID automatically
+        final verifyRes = await _apiService.post('/campus-attendance/verify-id', data: {
+          'studentId': studentId,
+          'campusId': campusId,
         });
+
+        final studentData = verifyRes.data is Map ? verifyRes.data : {};
+        final userId = studentData['userId']?.toString();
+        final nextAction = studentData['nextAction']?.toString(); // 'ENTER' or 'EXIT'
+
+        // Step 4: Automatically submit entry/exit attendance
+        await _apiService.post('/campus-attendance/submit', data: {
+          'userId': userId,
+          'studentId': studentId,
+          'campusId': campusId,
+          'action': nextAction,
+          'latitude': _latitude,
+          'longitude': _longitude,
+          'accuracy': _accuracy,
+          'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        });
+
+        if (mounted) {
+          setState(() {
+            _campusId = campusId;
+            _campusName = campusName;
+            _studentUserId = userId;
+            _studentFullName = studentData['fullName']?.toString() ?? authUser?['fullName']?.toString();
+            _studentPhotoUrl = studentData['photoUrl']?.toString();
+            _nextAction = nextAction;
+            _currentStep = _FlowStep.success;
+          });
+        }
       }
     } catch (e) {
       String msg = 'Failed to record attendance. Please try again.';
       if (e is DioException && e.response?.data != null) {
-        msg = e.response?.data['message'] ?? msg;
+        final errorData = e.response?.data;
+        msg = errorData['message'] ?? msg;
+      } else if (e is Exception) {
+        msg = e.toString().replaceFirst('Exception: ', '');
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg), backgroundColor: Colors.red),
-      );
+      setState(() {
+        _errorMessage = msg;
+      });
+      _scannerController.start();
     } finally {
       if (mounted) {
         setState(() {
@@ -394,384 +325,22 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
     switch (_currentStep) {
       case _FlowStep.qrScan:
         return _buildQRScanStep();
-      case _FlowStep.idEntry:
-        return _buildIDEntryStep();
-      case _FlowStep.confirm:
-        return _buildConfirmStep();
       case _FlowStep.success:
         return _buildSuccessStep();
     }
   }
 
-  Widget _buildQRScanStep() {
-    if (_locationBlocked) {
-      return Column(
-        key: const ValueKey('locationBlocked'),
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.red.shade50,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              _isGpsServiceDisabled ? Icons.location_off_rounded : Icons.gpp_bad_rounded,
-              color: Colors.red,
-              size: 48,
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Location Access Required',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0D1B38)),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            _locationBlockReason,
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.5),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 32),
-          if (_isGpsServiceDisabled) ...[
-            ElevatedButton.icon(
-              onPressed: _openGpsSettingsAndRetry,
-              icon: const Icon(Icons.settings),
-              label: const Text('Enable GPS / Location'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1B3A6B),
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-            ),
-          ] else if (_isPermanentlyDenied) ...[
-            ElevatedButton.icon(
-              onPressed: _openSettingsAndRetry,
-              icon: const Icon(Icons.open_in_new),
-              label: const Text('Open App Settings'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1B3A6B),
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _checkLocationPermissionAndGetGPS,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Retry Check'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return Column(
-      key: const ValueKey('qrScan'),
-      children: [
-        const Text(
-          'Scan Campus Entrance QR Code',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0D1B38)),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Position the dynamic QR code printed at the entrance gate within the camera scanner.',
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.4),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 32),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Container(
-            height: 300,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.black,
-              border: Border.all(color: Colors.white, width: 4),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 18, offset: const Offset(0, 8)),
-              ],
-            ),
-            child: Stack(
-              children: [
-                MobileScanner(
-                  controller: _scannerController,
-                  errorBuilder: (BuildContext context, MobileScannerException error) {
-                    return const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.error, color: Colors.white, size: 40),
-                          SizedBox(height: 16),
-                          Text('Camera access is needed to scan QR codes.\nPlease allow camera permissions.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 14, height: 1.5)),
-                        ],
-                      ),
-                    );
-                  },
-                  onDetect: (capture) {
-                    final List<Barcode> barcodes = capture.barcodes;
-                    if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
-                      _handleQrDetected(barcodes.first.rawValue!);
-                    }
-                  },
-                ),
-                if (_isLoading)
-                  Container(
-                    color: Colors.black54,
-                    child: const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        if (_errorMessage != null) ...[
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.red.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.red.shade100),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.error_outline_rounded, color: Colors.red, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _errorMessage!,
-                    style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildIDEntryStep() {
-    return Card(
-      key: const ValueKey('idEntry'),
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: const Color(0xFF2563EB).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(Icons.domain_rounded, color: Color(0xFF2563EB), size: 20),
-                ),
-                const SizedBox(width: 12),
-                Text(_campusName ?? 'Campus Selected', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0D1B38))),
-              ],
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Verify Student Identity',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0D1B38)),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Enter your official registered Student ID to verify access permissions.',
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.4),
-            ),
-            const SizedBox(height: 24),
-            TextField(
-              controller: _idController,
-              decoration: InputDecoration(
-                labelText: 'Student ID',
-                hintText: 'e.g. S-001',
-                prefixIcon: const Icon(Icons.badge_outlined),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                filled: true,
-                fillColor: Colors.grey.shade50,
-              ),
-              textCapitalization: TextCapitalization.characters,
-            ),
-            if (_errorMessage != null) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.red.shade100)),
-                child: Row(
-                  children: [
-                    const Icon(Icons.error_outline_rounded, color: Colors.red, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _errorMessage!,
-                        style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 28),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: _resetFlow,
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    child: const Text('Rescan QR', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _verifyStudentId,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1B3A6B),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      elevation: 0,
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Text('Verify ID', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildConfirmStep() {
-    final isEnter = _nextAction == 'ENTER';
-    final themeColor = isEnter ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
-
-    return Card(
-      key: const ValueKey('confirm'),
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            // Student Info Header card
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 26,
-                  backgroundColor: const Color(0xFF1B3A6B).withValues(alpha: 0.1),
-                  backgroundImage: _studentPhotoUrl != null ? NetworkImage(AppConstants.getImageUrl(_studentPhotoUrl!)) : null,
-                  child: _studentPhotoUrl == null
-                      ? Text(_studentFullName?.substring(0, 1).toUpperCase() ?? 'S', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Color(0xFF1B3A6B)))
-                      : null,
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(_studentFullName ?? 'Student Name', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0D1B38))),
-                      const SizedBox(height: 2),
-                      Text('Student ID: ${_idController.text.trim()}', style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: 36),
-            const Text(
-              'Confirm Campus Access Action',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0D1B38)),
-            ),
-            const SizedBox(height: 24),
-            // Entry / Exit indicator card
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: themeColor.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: themeColor.withValues(alpha: 0.2), width: 1.5),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    isEnter ? Icons.login_rounded : Icons.logout_rounded,
-                    color: themeColor,
-                    size: 40,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    isEnter ? 'ENTRY' : 'EXIT',
-                    style: TextStyle(color: themeColor, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 1),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Campus: $_campusName',
-                    style: const TextStyle(color: Color(0xFF0D1B38), fontSize: 13, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _resetFlow,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      side: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _submitAttendance,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: themeColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      elevation: 0,
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : Text(isEnter ? 'Confirm Entry' : 'Confirm Exit', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildSuccessStep() {
+    final bool isEnter = _nextAction == 'ENTER';
+    final Color primaryColor = isEnter ? const Color(0xFF22C55E) : const Color(0xFF2563EB);
+    final String titleText = isEnter ? 'Welcome' : 'Good Bye';
+    final String subtitleText = isEnter
+        ? 'Welcome to ${_campusName ?? "Campus"}!'
+        : 'Good Bye from ${_campusName ?? "Campus"}!';
+    final String bodyText = isEnter
+        ? 'Your entry has been automatically recorded.'
+        : 'Your exit has been automatically recorded. See you next time!';
+
     return Card(
       key: const ValueKey('success'),
       color: Colors.white,
@@ -782,20 +351,42 @@ class _CampusAttendanceFlowScreenState extends State<CampusAttendanceFlowScreen>
         child: Column(
           children: [
             Container(
-              width: 72,
-              height: 72,
-              decoration: const BoxDecoration(color: Color(0xFFE8F5E9), shape: BoxShape.circle),
-              child: const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 48),
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: primaryColor.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isEnter ? Icons.check_circle_rounded : Icons.waving_hand_rounded,
+                color: primaryColor,
+                size: 48,
+              ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Access Recorded Successfully',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0D1B38)),
+            Text(
+              titleText,
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
+                color: primaryColor,
+                letterSpacing: 0.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitleText,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0D1B38),
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             Text(
-              'Your ${_nextAction == 'ENTER' ? 'entry to' : 'exit from'} $_campusName campus has been logged into the student portal.',
+              bodyText,
               style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.5),
               textAlign: TextAlign.center,
             ),

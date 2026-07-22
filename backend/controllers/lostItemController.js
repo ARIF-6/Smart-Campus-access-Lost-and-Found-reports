@@ -12,7 +12,8 @@ const { sendSuccess } = require('../utils/responseHandler');
 // @route   POST /api/lost-items
 // @access  Private (student, admin)
 exports.reportLostItem = asyncHandler(async (req, res) => {
-  const { title, description, category, locationLost, dateLost } = req.body;
+  const { title, description, category, locationLost, location, dateLost } = req.body;
+  const itemLocation = locationLost || location || '';
   
   const storedImage = await resolveStoredImagePath(req.file, 'campus-access/lost-items');
   
@@ -20,7 +21,7 @@ exports.reportLostItem = asyncHandler(async (req, res) => {
     title,
     description,
     category,
-    location: locationLost,
+    location: itemLocation,
     dateLost: dateLost || Date.now(),
     image: storedImage.image,
     imageUrl: storedImage.imageUrl,

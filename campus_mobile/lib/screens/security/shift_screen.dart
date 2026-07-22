@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 import '../../providers/auth_provider.dart';
 
 class ShiftScreen extends StatefulWidget {
@@ -17,10 +18,26 @@ class _ShiftScreenState extends State<ShiftScreen> {
   bool _loadingHistory = true;
   bool _use12h = false; // false = 24h, true = 12h AM/PM
 
+  final SocketService _socketService = SocketService();
+
   @override
   void initState() {
     super.initState();
     _refresh();
+    _socketService.on('user:shiftUpdated', _onShiftUpdated);
+  }
+
+  @override
+  void dispose() {
+    _socketService.off('user:shiftUpdated', _onShiftUpdated);
+    super.dispose();
+  }
+
+  void _onShiftUpdated(dynamic data) {
+    if (mounted) {
+      _refresh();
+      Provider.of<AuthProvider>(context, listen: false).fetchLatestProfile();
+    }
   }
 
   Future<void> _refresh() async {

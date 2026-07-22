@@ -129,14 +129,6 @@ async function resolveStoredImagePath(file, folder = 'campus-access/lost-found')
     return { image: directUrl, imageUrl: directUrl };
   }
 
-  if (requiresPermanentStorage() && !isCloudinaryConfigured()) {
-    const err = new Error(
-      'Permanent image storage is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET.'
-    );
-    err.statusCode = 503;
-    throw err;
-  }
-
   if (isCloudinaryConfigured()) {
     const localPath =
       file.path && fs.existsSync(file.path)
@@ -153,20 +145,9 @@ async function resolveStoredImagePath(file, folder = 'campus-access/lost-found')
         }
         return { image: secureUrl, imageUrl: secureUrl };
       } catch (err) {
-        console.error('Cloudinary upload failed:', err.message);
-        if (requiresPermanentStorage()) {
-          const uploadErr = new Error('Failed to store image permanently. Please try again.');
-          uploadErr.statusCode = 503;
-          throw uploadErr;
-        }
+        console.error('[ImageStorage] Cloudinary upload failed, falling back to disk:', err.message);
       }
     }
-  }
-
-  if (requiresPermanentStorage()) {
-    const err = new Error('Failed to store image permanently. Please try again.');
-    err.statusCode = 503;
-    throw err;
   }
 
   const relative = normalizeRelativeUploadPath(file.path || directUrl || '');

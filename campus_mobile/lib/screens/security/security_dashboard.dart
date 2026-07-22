@@ -272,11 +272,66 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
     _socketService.on('dashboard:refresh', (data) {
       if (mounted) _fetchLive();
     });
+    _socketService.on('user:shiftUpdated', _handleShiftUpdatedEvent);
+  }
+
+  void _handleShiftUpdatedEvent(dynamic data) {
+    if (!mounted) return;
+    _fetchLive();
+    Provider.of<AuthProvider>(context, listen: false).fetchLatestProfile();
+
+    String msg = 'Your shift schedule has been updated by an administrator.';
+    if (data is Map && data['message'] != null) {
+      msg = data['message'].toString();
+    }
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: const BoxDecoration(
+                color: Colors.white24,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.schedule_rounded, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Shift Time Updated!',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Colors.white),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    msg,
+                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF1B3A6B),
+        duration: const Duration(seconds: 7),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 6,
+      ),
+    );
   }
 
   @override
   void dispose() {
     _socketService.off('dashboard:refresh');
+    _socketService.off('user:shiftUpdated');
     _ticker?.cancel();
     super.dispose();
   }
