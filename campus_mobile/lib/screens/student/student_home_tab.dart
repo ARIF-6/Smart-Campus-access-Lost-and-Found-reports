@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/notification_provider.dart';
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
@@ -15,10 +14,8 @@ import 'claims_screen.dart';
 import 'student_main_screen.dart';
 import 'campus_issues_home_screen.dart';
 import 'class_issues_home_screen.dart';
-import 'package:carousel_slider/carousel_slider.dart';
-import 'package:smooth_page_indicator/smooth_page_indicator.dart';
-import 'dart:ui';
 import 'campus_attendance_flow_screen.dart';
+import '../../widgets/dashboard_hero_header.dart';
 
 // ─────────────────────────────────────────────────────────────────────
 //  Color tokens (banking-app palette)
@@ -43,24 +40,13 @@ class _StudentHomeTabState extends State<StudentHomeTab>
   final SocketService _socketService = SocketService();
   List<FoundItem> _foundItems = [];
   bool _isLoading = true;
+  String _attendanceStatus = 'Outside';
   String _activeFilter = 'All'; // All | Found | Lost
 
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
   bool _isSearchFocused = false;
-  int _carouselIndex = 0;
-  final CarouselSliderController _carouselController =
-      CarouselSliderController();
-
-  final List<String> _sliderImages = [
-    'assets/images/2.jpeg',
-    'assets/images/3.jpeg',
-    'assets/images/4.jpeg',
-    'assets/images/5.jpeg',
-    'assets/images/6.jpeg',
-    'assets/images/7.jpeg',
-  ];
 
   final List<_Feature> _features = const [
     _Feature(Icons.qr_code_scanner_rounded, 'Scan', 'scan'),
@@ -75,6 +61,7 @@ class _StudentHomeTabState extends State<StudentHomeTab>
   void initState() {
     super.initState();
     _fetchRecentFoundItems();
+    _fetchAttendanceStatus();
     _searchFocusNode.addListener(
         () => setState(() => _isSearchFocused = _searchFocusNode.hasFocus));
     _searchController.addListener(() => setState(
@@ -88,6 +75,15 @@ class _StudentHomeTabState extends State<StudentHomeTab>
     _socketService.on('lostItem:created', (_) {
       if (mounted) _fetchRecentFoundItems();
     });
+    _socketService.on('student:attendance:updated', (data) {
+      if (!mounted) return;
+      final status = _parseAttendanceStatus(data);
+      if (status != null) {
+        setState(() => _attendanceStatus = status);
+      } else {
+        _fetchAttendanceStatus();
+      }
+    });
   }
 
   @override
@@ -97,7 +93,31 @@ class _StudentHomeTabState extends State<StudentHomeTab>
     _socketService.off('foundItem:created');
     _socketService.off('foundItem:updated');
     _socketService.off('lostItem:created');
+    _socketService.off('student:attendance:updated');
     super.dispose();
+  }
+
+  String? _parseAttendanceStatus(dynamic data) {
+    if (data is Map) {
+      final displayStatus = data['displayStatus']?.toString();
+      if (displayStatus != null && displayStatus.isNotEmpty) {
+        return displayStatus;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _fetchAttendanceStatus() async {
+    try {
+      final response = await _apiService.get('/student/attendance-status');
+      if (!mounted) return;
+      final status = _parseAttendanceStatus(response.data);
+      if (status != null) {
+        setState(() => _attendanceStatus = status);
+      }
+    } catch (e) {
+      debugPrint('Error fetching attendance status: $e');
+    }
   }
 
   Future<void> _fetchRecentFoundItems() async {
@@ -149,7 +169,12 @@ class _StudentHomeTabState extends State<StudentHomeTab>
     _searchFocusNode.unfocus();
     switch (key) {
       case 'scan':
-        _nav(const CampusAttendanceFlowScreen());
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const CampusAttendanceFlowScreen()),
+        ).then((_) {
+          if (mounted) _fetchAttendanceStatus();
+        });
         break;
       case 'lost':
         _nav(const LostItemsScreen());
@@ -200,8 +225,22 @@ class _StudentHomeTabState extends State<StudentHomeTab>
                 slivers: [
                   // ── DYNAMIC CAROUSEL HEADER ─────────────────────────
                   SliverToBoxAdapter(
-                    child:
-                        _buildDynamicHeroHeader(fullName, studentId, photoUrl),
+                    child: DashboardHeroHeader(
+                      fullName: fullName,
+                      subtitle: _attendanceStatus,
+                      photoUrl: photoUrl,
+                      onAvatarTap: () {
+                        final s = context
+                            .findAncestorStateOfType<StudentMainScreenState>();
+                        if (s != null) s.currentIndex = 3;
+                      },
+                      onNotificationTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const NotificationsScreen(),
+                        ),
+                      ),
+                    ),
                   ),
 
                   // ── WHITE CONTENT SHEET ────────────────────────────
@@ -254,326 +293,6 @@ class _StudentHomeTabState extends State<StudentHomeTab>
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  // ── Dynamic Hero Header ─────────────────────────────────────────────
-  Widget _buildDynamicHeroHeader(
-      String fullName, String studentId, String photoUrl) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF0D2459), Color(0xFF1E3A8A)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(36),
-          bottomRight: Radius.circular(36),
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(20, 56, 20, 26),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Greeting Row
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Avatar on the left (matches image design)
-              GestureDetector(
-                onTap: () {
-                  final s = context.findAncestorStateOfType<StudentMainScreenState>();
-                  if (s != null) s.currentIndex = 3;
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(3.5),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.25),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: CircleAvatar(
-                    radius: 24,
-                    backgroundColor: const Color(0xFF2563EB),
-                    backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
-                    child: photoUrl.isEmpty
-                        ? Text(
-                            fullName.isNotEmpty ? fullName[0].toUpperCase() : 'S',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          )
-                        : null,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              // Greeting + full name
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Good ${_greeting()} 👋',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.75),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      fullName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              // Notification Bell with badge
-              Consumer<NotificationProvider>(
-                builder: (context, provider, child) {
-                  return Stack(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.14),
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 24),
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                          ),
-                        ),
-                      ),
-                      if (provider.unreadCount > 0)
-                        Positioned(
-                          right: 8,
-                          top: 8,
-                          child: Container(
-                            width: 10,
-                            height: 10,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFEF4444), // red dot
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                    ],
-                  );
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          // Carousel Card Widget (matching the screenshot exactly)
-          Container(
-            height: 210,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 16,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Image Carousel Slider
-                  CarouselSlider.builder(
-                    carouselController: _carouselController,
-                    itemCount: _sliderImages.length,
-                    options: CarouselOptions(
-                      height: 210,
-                      viewportFraction: 1.0,
-                      autoPlay: true,
-                      autoPlayInterval: const Duration(seconds: 5),
-                      autoPlayAnimationDuration: const Duration(milliseconds: 800),
-                      autoPlayCurve: Curves.easeInOutCubic,
-                      enableInfiniteScroll: true,
-                      scrollDirection: Axis.horizontal,
-                      onPageChanged: (index, reason) {
-                        setState(() {
-                          _carouselIndex = index;
-                        });
-                      },
-                    ),
-                    itemBuilder: (context, index, realIndex) {
-                      final imagePath = _sliderImages[index];
-                      final isLocal = !imagePath.startsWith('http');
-                      return Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          isLocal
-                              ? Image.asset(imagePath, fit: BoxFit.cover)
-                              : Image.network(
-                                  imagePath,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Image.asset(
-                                    'assets/images/header_bg.jpg',
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                          // Dark gradient overlay to make text highly readable
-                          Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black.withOpacity(0.35),
-                                  Colors.black.withOpacity(0.85),
-                                ],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                  // Welcome text overlays
-                  Positioned(
-                    bottom: 45,
-                    left: 20,
-                    right: 20,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'Welcome to',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Smart Campus',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 26,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Your campus, in your hand.',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Page Pill Indicator ("1 / 6")
-                  Positioned(
-                    bottom: 14,
-                    left: 20,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1B3A6B),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        '${_carouselIndex + 1} / ${_sliderImages.length}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Dots/Dashes indicator at the bottom center
-                  Positioned(
-                    bottom: 18,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: AnimatedSmoothIndicator(
-                        activeIndex: _carouselIndex,
-                        count: _sliderImages.length,
-                        effect: const ExpandingDotsEffect(
-                          dotHeight: 5,
-                          dotWidth: 8,
-                          expansionFactor: 2.5,
-                          spacing: 6,
-                          activeDotColor: const Color(0xFF2563EB),
-                          dotColor: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Left Arrow Button
-                  Positioned(
-                    left: 12,
-                    top: 0,
-                    bottom: 0,
-                    child: Center(
-                      child: GestureDetector(
-                        onTap: () => _carouselController.previousPage(),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF1B3A6B),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.arrow_back_ios_rounded, color: Colors.white, size: 18),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Right Arrow Button
-                  Positioned(
-                    right: 12,
-                    top: 0,
-                    bottom: 0,
-                    child: Center(
-                      child: GestureDetector(
-                        onTap: () => _carouselController.nextPage(),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF1B3A6B),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1210,12 +929,6 @@ class _StudentHomeTabState extends State<StudentHomeTab>
           borderRadius: BorderRadius.circular(12)),
       child: const Icon(Icons.inventory_2_outlined, color: _navy, size: 22));
 
-  String _greeting() {
-    final h = DateTime.now().hour;
-    if (h < 12) return 'Morning';
-    if (h < 18) return 'Afternoon';
-    return 'Evening';
-  }
 }
 
 

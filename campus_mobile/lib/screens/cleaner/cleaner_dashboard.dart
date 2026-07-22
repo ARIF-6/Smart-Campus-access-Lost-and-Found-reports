@@ -10,6 +10,7 @@ import 'found_items_screen.dart';
 import 'cleaner_profile_screen.dart';
 import '../student/notifications_screen.dart';
 import '../../core/app_lifecycle_observer.dart';
+import '../../widgets/dashboard_hero_header.dart';
 
 class CleanerDashboard extends StatefulWidget {
   const CleanerDashboard({super.key});
@@ -269,155 +270,39 @@ class _HomeTabState extends State<_HomeTab> {
         slivers: [
           // ── Navy Header ──────────────────────────────────────────
           SliverToBoxAdapter(
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(20, 56, 20, 26),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Color(0xFF0D1F4E),
-                    Color(0xFF1B3A6B),
-                    Color(0xFF1E4080)
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(36),
-                  bottomRight: Radius.circular(36),
+            child: DashboardHeroHeader(
+              fullName: fullName,
+              subtitle: 'Good ${_greeting()} 👋',
+              photoUrl: photoUrl,
+              onNotificationTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const NotificationsScreen(),
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              badgeRow: Row(
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // Avatar on the left (matches image design)
-                      Container(
-                        padding: const EdgeInsets.all(3.5),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.25),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: CircleAvatar(
-                          radius: 24,
-                          backgroundColor: const Color(0xFF2563EB),
-                          backgroundImage:
-                              photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
-                          child: photoUrl.isEmpty
-                              ? Text(
-                                  fullName.isNotEmpty
-                                      ? fullName[0].toUpperCase()
-                                      : 'C',
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 18),
-                                )
-                              : null,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      // Greeting + full name
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Good ${_greeting()} 👋',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.75),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              fullName,
-                              style: const TextStyle(
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.2)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.circle,
+                            color: Color(0xFF22C55E), size: 7),
+                        SizedBox(width: 6),
+                        Text('Cleaner Active',
+                            style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.3,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Notification Bell with badge
-                      Consumer<NotificationProvider>(
-                        builder: (context, provider, child) {
-                          return Stack(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.14),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: IconButton(
-                                  icon: const Icon(
-                                      Icons.notifications_none_rounded,
-                                      color: Colors.white,
-                                      size: 24),
-                                  onPressed: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (_) =>
-                                            const NotificationsScreen()),
-                                  ),
-                                ),
-                              ),
-                                if (provider.unreadCount > 0)
-                                  Positioned(
-                                    right: 8,
-                                    top: 8,
-                                    child: Container(
-                                      width: 10,
-                                      height: 10,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFFEF4444),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                  ),
-                            ],
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.2)),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.circle,
-                                color: Color(0xFF22C55E), size: 7),
-                            SizedBox(width: 6),
-                            Text('Cleaner Active',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ),
-                    ],
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600)),
+                      ],
+                    ),
                   ),
                 ],
               ),

@@ -11,6 +11,7 @@ const {
   getStudentCrossCampusAttendance,
   getCampusTodayLog,
   getCampusLiveAttendanceStats,
+  emitStudentAttendanceStatusUpdate,
 } = require('../utils/attendanceHelper');
 
 const buildScanResponse = (payload, crossCampusAttendance) => ({
@@ -212,6 +213,7 @@ exports.scanQRCode = async (req, res) => {
       });
       emitDashboardRefresh('security');
       emitDashboardRefresh('admin');
+      await emitStudentAttendanceStatusUpdate(user._id);
 
       return res.status(200).json(buildScanResponse({
         status: 'Exit Recorded',
@@ -240,6 +242,7 @@ exports.scanQRCode = async (req, res) => {
     });
     emitDashboardRefresh('security');
     emitDashboardRefresh('admin');
+    await emitStudentAttendanceStatusUpdate(user._id);
 
     return res.status(200).json(buildScanResponse({
       status: 'Access Granted',

@@ -177,6 +177,58 @@ async function getStudentCrossCampusAttendance(userId, guardCampusId = null) {
   };
 }
 
+/**
+ * Resolves the student's dashboard attendance label from today's latest records.
+ * Inside  — currently inside a campus (has not exited yet)
+ * Exited  — recorded attendance today and latest state is outside
+ * Outside — no attendance recorded for the current day
+ */
+async function getStudentDashboardAttendanceStatus(userId) {
+  const crossCampus = await getStudentCrossCampusAttendance(userId);
+  const records = crossCampus.records || [];
+
+  const insideRecord = records.find((record) => record.status === 'Inside');
+  if (insideRecord) {
+    return {
+      displayStatus: 'Inside',
+      status: 'IN',
+      campusName: insideRecord.campusName || null,
+      campusId: insideRecord.campusId || null,
+      latestRecord: insideRecord,
+    };
+  }
+
+  if (records.length > 0) {
+    const latestRecord = crossCampus.latestRecord;
+    return {
+      displayStatus: 'Exited',
+      status: 'OUT',
+      campusName: latestRecord?.campusName || null,
+      campusId: latestRecord?.campusId || null,
+      latestRecord: latestRecord || null,
+    };
+  }
+
+  return {
+    displayStatus: 'Outside',
+    status: 'OUT',
+    campusName: null,
+    campusId: null,
+    latestRecord: null,
+  };
+}
+
+async function emitStudentAttendanceStatusUpdate(userId) {
+  if (!userId) return;
+  try {
+    const { emitToUser } = require('../socket/events/notificationEvents');
+    const status = await getStudentDashboardAttendanceStatus(userId);
+    emitToUser(String(userId), 'student:attendance:updated', status);
+  } catch (err) {
+    console.error('Failed to emit student attendance status update:', err.message);
+  }
+}
+
 module.exports = {
   getTodayBounds,
   getTodayDateString,
@@ -184,4 +236,6 @@ module.exports = {
   getCampusTodayLog,
   getCampusLiveAttendanceStats,
   getStudentCrossCampusAttendance,
+  getStudentDashboardAttendanceStatus,
+  emitStudentAttendanceStatusUpdate,
 };

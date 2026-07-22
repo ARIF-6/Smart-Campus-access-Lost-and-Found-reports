@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/notification_provider.dart';
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
 import 'scanner_screen.dart';
@@ -13,6 +12,7 @@ import 'blacklist_screen.dart';
 import 'security_reports_screen.dart';
 import '../student/notifications_screen.dart';
 import '../../services/socket_service.dart';
+import '../../widgets/dashboard_hero_header.dart';
 
 /* ─────────────────────────────────────────────
    Tactile Scaling Action Card Widget
@@ -385,136 +385,50 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                 slivers: [
                   // Sliver Navy Header
                   SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 56, 20, 26),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    child: DashboardHeroHeader(
+                      fullName: user?['fullName'] ?? 'Officer',
+                      subtitle: 'Good ${_greeting()} 👋',
+                      photoUrl: photoUrl,
+                      onNotificationTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const NotificationsScreen(),
+                        ),
+                      ),
+                      trailingAction: IconButton(
+                        icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 24),
+                        onPressed: widget.openDrawer,
+                      ),
+                      badgeRow: Row(
                         children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              // Avatar on the left (matches image design)
-                              Container(
-                                padding: const EdgeInsets.all(3.5),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.25),
-                                    width: 1.5,
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: BoxDecoration(
+                                    color: withinWindow ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+                                    shape: BoxShape.circle,
                                   ),
                                 ),
-                                child: CircleAvatar(
-                                  radius: 24,
-                                  backgroundColor: const Color(0xFF2563EB),
-                                  backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
-                                  child: photoUrl.isEmpty
-                                      ? Text(
-                                          user?['fullName']?[0]?.toUpperCase() ?? 'S',
-                                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                                        )
-                                      : null,
+                                const SizedBox(width: 6),
+                                Text(
+                                  withinWindow ? 'IN SHIFT WINDOW' : 'OUTSIDE SHIFT',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 14),
-                              // Greeting + name
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Good ${_greeting()} 👋',
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.75),
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        letterSpacing: 0.3,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      user?['fullName'] ?? 'Officer',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: -0.3,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              // Notification Bell with badge
-                              Consumer<NotificationProvider>(
-                                builder: (context, provider, child) {
-                                  return Stack(
-                                    children: [
-                                      Container(
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.14),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: IconButton(
-                                          icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 24),
-                                          onPressed: () => Navigator.push(
-                                            context,
-                                            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                                          ),
-                                        ),
-                                      ),
-                                      if (provider.unreadCount > 0)
-                                        Positioned(
-                                          right: 8,
-                                          top: 8,
-                                          child: Container(
-                                            width: 10,
-                                            height: 10,
-                                            decoration: const BoxDecoration(
-                                              color: Color(0xFFEF4444),
-                                              shape: BoxShape.circle,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  );
-                                },
-                              ),
-                              // Menu
-                              IconButton(
-                                icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 24),
-                                onPressed: widget.openDrawer,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.14),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 7, height: 7,
-                                      decoration: BoxDecoration(
-                                        color: withinWindow ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      withinWindow ? 'IN SHIFT WINDOW' : 'OUTSIDE SHIFT',
-                                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ],
                       ),

@@ -10,6 +10,7 @@ const { haversineDistance } = require('../utils/haversine');
 const {
   getStudentCrossCampusAttendance,
   getCampusTodayLog,
+  emitStudentAttendanceStatusUpdate,
 } = require('../utils/attendanceHelper');
 const { emitDashboardRefresh } = require('../socket/events/notificationEvents');
 
@@ -462,6 +463,7 @@ exports.submitAttendance = async (req, res) => {
 
       emitDashboardRefresh('security');
       emitDashboardRefresh('admin');
+      await emitStudentAttendanceStatusUpdate(student._id);
 
       return res.status(201).json({
         success: true,
@@ -566,6 +568,7 @@ exports.submitAttendance = async (req, res) => {
 
       emitDashboardRefresh('security');
       emitDashboardRefresh('admin');
+      await emitStudentAttendanceStatusUpdate(student._id);
 
       return res.status(200).json({
         success: true,
