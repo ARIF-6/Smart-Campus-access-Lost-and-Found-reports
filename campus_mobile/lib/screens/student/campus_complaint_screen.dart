@@ -6,6 +6,7 @@ import '../../models/campus_complaint.dart';
 import '../../services/campus_environment_service.dart';
 import '../../services/api_service.dart';
 import '../../core/constants.dart';
+import 'package:dio/dio.dart';
 import '../../core/error_handler.dart';
 
 class CampusComplaintScreen extends StatefulWidget {
@@ -46,7 +47,7 @@ class _CampusComplaintScreenState extends State<CampusComplaintScreen> {
         _api.get('/university/campuses'),
       ]);
       final types = results[0] as List<IssueType>;
-      final campusList = results[1].data as List<dynamic>;
+      final campusList = (results[1] as Response).data as List<dynamic>;
       if (mounted) {
         setState(() {
           _issueTypes = types;
