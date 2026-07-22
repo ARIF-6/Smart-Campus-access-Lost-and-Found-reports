@@ -8,7 +8,7 @@ const generatePassword = () => {
   return String(Math.floor(100000 + Math.random() * 900000));
 };
 
-const CreateUserModal = ({ isOpen, onClose, onSave, availableRoles = [] }) => {
+const CreateUserModal = ({ isOpen, onClose, onSave, availableRoles = [], defaultRole = '', showRoleSelector = true, modalTitle = 'Register New User' }) => {
   const initialState = {
     fullName: '',
     username: '',
@@ -45,7 +45,7 @@ const CreateUserModal = ({ isOpen, onClose, onSave, availableRoles = [] }) => {
 
   React.useEffect(() => {
     if (isOpen) {
-      setFormData({ ...initialState, password: generatePassword() });
+      setFormData({ ...initialState, password: generatePassword(), role: defaultRole || '' });
       setPhotoFile(null);
       setImagePreview(null);
       setPwdCopied(false);
@@ -67,7 +67,7 @@ const CreateUserModal = ({ isOpen, onClose, onSave, availableRoles = [] }) => {
       };
       fetchData();
     }
-  }, [isOpen]);
+  }, [isOpen, defaultRole]);
 
   React.useEffect(() => {
     if (formData.faculty) {
@@ -271,28 +271,29 @@ const CreateUserModal = ({ isOpen, onClose, onSave, availableRoles = [] }) => {
                 </div>
                 <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
                   <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                    Register New User
+                    {modalTitle}
                   </h3>
 
                   <div className="space-y-4">
-                    {/* Role is always selected first */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Account Role *</label>
-                      <select
-                        name="role"
-                        value={formData.role}
-                        onChange={handleChange}
-                        className="mt-1 block w-full border border-gray-300 bg-white rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm animate-none"
-                        required
-                      >
-                        <option value="" disabled>Select Role</option>
-                        {availableRoles.map((role) => (
-                          <option key={role._id} value={role.name}>
-                            {role.displayName}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {showRoleSelector && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Account Role *</label>
+                        <select
+                          name="role"
+                          value={formData.role}
+                          onChange={handleChange}
+                          className="mt-1 block w-full border border-gray-300 bg-white rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm animate-none"
+                          required
+                        >
+                          <option value="" disabled>Select Role</option>
+                          {availableRoles.map((role) => (
+                            <option key={role._id} value={role.name}>
+                              {role.displayName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
 
                     {roleSelected && (
                       <div className="animate-fadeIn space-y-4 pt-2 border-t border-gray-100">

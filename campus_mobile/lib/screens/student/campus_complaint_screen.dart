@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../models/campus_complaint.dart';
 import '../../services/campus_environment_service.dart';
+import '../../services/api_service.dart';
 import '../../core/constants.dart';
 import '../../core/error_handler.dart';
 
@@ -20,11 +21,14 @@ class _CampusComplaintScreenState extends State<CampusComplaintScreen> {
   final _descriptionController = TextEditingController();
 
   final _service = CampusEnvironmentService();
+  final _api = ApiService();
   final _picker = ImagePicker();
 
   String? _selectedIssueTypeId;
   String? _selectedCategory;
+  String? _selectedCampusId;
   List<IssueType> _issueTypes = [];
+  List<Map<String, String>> _campuses = [];
   final List<XFile> _selectedImages = [];
   bool _isLoading = false;
   bool _isFetchingTypes = true;
@@ -32,15 +36,24 @@ class _CampusComplaintScreenState extends State<CampusComplaintScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchIssueTypes();
+    _fetchFormData();
   }
 
-  Future<void> _fetchIssueTypes() async {
+  Future<void> _fetchFormData() async {
     try {
-      final types = await _service.getIssueTypes();
+      final results = await Future.wait([
+        _service.getIssueTypes(),
+        _api.get('/university/campuses'),
+      ]);
+      final types = results[0] as List<IssueType>;
+      final campusList = results[1].data as List<dynamic>;
       if (mounted) {
         setState(() {
           _issueTypes = types;
+          _campuses = campusList.map((c) => {
+            'id': c['_id'].toString(),
+            'name': c['name'].toString(),
+          }).toList();
           _isFetchingTypes = false;
         });
       }
@@ -80,6 +93,7 @@ class _CampusComplaintScreenState extends State<CampusComplaintScreen> {
         issueType: _selectedIssueTypeId ?? '',
         title: (_selectedCategory == 'Other') ? _titleController.text.trim() : (_selectedCategory ?? ''),
         description: _descriptionController.text.trim(),
+        campusId: _selectedCampusId ?? '',
         images: _selectedImages,
       );
 
@@ -171,6 +185,8 @@ class _CampusComplaintScreenState extends State<CampusComplaintScreen> {
                           _buildSectionTitle('Issue Information'),
                           _buildFormCard([
                             _buildDropdownField(themeColor),
+                            const SizedBox(height: 16),
+                            _buildCampusDropdown(themeColor),
                             const SizedBox(height: 16),
                             if (_selectedCategory == 'Other') ...[
                               _buildTextField(
@@ -284,6 +300,37 @@ class _CampusComplaintScreenState extends State<CampusComplaintScreen> {
             });
           },
           validator: (v) => v == null ? 'Please select a category' : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCampusDropdown(Color themeColor) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Campus',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.grey.shade600),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: _selectedCampusId,
+          decoration: InputDecoration(
+            hintText: 'Select campus where the issue occurred',
+            prefixIcon: Icon(Icons.location_city_rounded, size: 20, color: themeColor),
+            filled: true,
+            fillColor: const Color(0xFFF8FAFC),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
+          ),
+          items: _campuses.map((campus) => DropdownMenuItem(
+            value: campus['id'],
+            child: Text(campus['name'] ?? ''),
+          )).toList(),
+          onChanged: (value) => setState(() => _selectedCampusId = value),
+          validator: (v) => v == null || v.isEmpty ? 'Please select a campus' : null,
         ),
       ],
     );

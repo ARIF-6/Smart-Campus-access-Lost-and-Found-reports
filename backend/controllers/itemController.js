@@ -2,6 +2,8 @@ const Item = require('../models/Item');
 const LostItem = require('../models/LostItem');
 const FoundItem = require('../models/FoundItem');
 const { logAction } = require('../utils/auditLogger');
+const { resolveStoredImagePath } = require('../utils/imageStorageHelper');
+const { enrichFoundItemForUser } = require('../utils/itemStatusHelper');
 
 // Helper to find item in any collection
 const findItemInAllCollections = async (id) => {
@@ -29,9 +31,8 @@ exports.createItem = async (req, res) => {
       return res.status(400).json({ message: "All required fields must be filled" });
     }
 
-    const path = require('path');
-    const uploadsRoot = path.join(__dirname, '..', 'uploads');
-    const itemImage = req.file ? path.relative(uploadsRoot, req.file.path).replace(/\\/g, '/') : image;
+    const storedImage = await resolveStoredImagePath(req.file, 'campus-access/items');
+    const itemImage = storedImage.image || image || '';
     const newItem = new Item({
       title,
       description,
@@ -146,7 +147,10 @@ exports.getItem = async (req, res) => {
     // Normalize type for lost/found items
     const itemData = result.item.toObject();
     if (result.source === 'lost') itemData.type = 'lost';
-    if (result.source === 'found') itemData.type = 'found';
+    if (result.source === 'found') {
+      itemData.type = 'found';
+      Object.assign(itemData, enrichFoundItemForUser(itemData, req.user?.id));
+    }
 
     res.json(itemData);
   } catch (err) {
@@ -181,9 +185,9 @@ exports.updateItem = async (req, res) => {
       if (source === 'found') item.locationFound = location;
     }
     if (req.file) {
-      const path = require('path');
-      const uploadsRoot = path.join(__dirname, '..', 'uploads');
-      item.image = path.relative(uploadsRoot, req.file.path).replace(/\\/g, '/');
+      const storedImage = await resolveStoredImagePath(req.file, 'campus-access/items');
+      item.image = storedImage.image;
+      if (item.imageUrl !== undefined) item.imageUrl = storedImage.imageUrl;
     } else if (image) {
       item.image = image;
     }
@@ -230,7 +234,10 @@ exports.getMyItems = async (req, res) => {
     const combined = [
       ...unifiedItems.map(i => ({ ...i, itemSource: 'unified' })),
       ...lostItems.map(i => ({ ...i, type: 'lost', itemSource: 'lost' })),
-      ...foundItems.map(i => ({ ...i, type: 'found', itemSource: 'found' }))
+      ...foundItems.map(i => enrichFoundItemForUser(
+        { ...i, type: 'found', itemSource: 'found' },
+        userId
+      ))
     ];
 
     combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));

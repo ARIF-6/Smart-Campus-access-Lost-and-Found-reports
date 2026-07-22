@@ -20,6 +20,8 @@ const classIssueComplaintSchema = new mongoose.Schema({
   className: { type: String, default: '' },
   classroom: { type: String, required: true },
   building: { type: String, required: true },
+  campus: { type: mongoose.Schema.Types.ObjectId, ref: 'Campus', default: null },
+  campusName: { type: String, default: '' },
   status: {
     type: String,
     enum: ['pending', 'in_review', 'resolved', 'rejected'],
@@ -36,6 +38,7 @@ classIssueComplaintSchema.index({ status: 1 });
 classIssueComplaintSchema.index({ student: 1 });
 classIssueComplaintSchema.index({ faculty: 1 });
 classIssueComplaintSchema.index({ classId: 1 });
+classIssueComplaintSchema.index({ campus: 1 });
 
 const ClassIssueComplaint = mongoose.model('ClassIssueComplaint', classIssueComplaintSchema);
 

@@ -113,7 +113,7 @@ class _AdminClassIssuesListScreenState extends State<AdminClassIssuesListScreen>
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${issue.building} - ${issue.classroom}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text('${issue.campusName ?? issue.building} - ${issue.classroom}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 4),
             Text('From: ${issue.student.fullName}', style: const TextStyle(fontSize: 12, color: AppConstants.primaryColor)),
           ],

@@ -310,6 +310,7 @@ const ClassIssuesPage = () => {
                   <th className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">STUDENT ID</th>
                   <th className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">STUDENT NAME</th>
                   <th className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">CLASS</th>
+                  <th className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">CAMPUS</th>
                   <th className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">ISSUE NAME</th>
                   <th className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">ACTION</th>
                 </tr>
@@ -318,7 +319,7 @@ const ClassIssuesPage = () => {
                 {loading ? (
                   [...Array(6)].map((_, i) => (
                     <tr key={i}>
-                      {[...Array(5)].map((_, j) => (
+                      {[...Array(6)].map((_, j) => (
                         <td key={j} className="px-5 py-4">
                           <div className="h-4 bg-gray-100 rounded animate-pulse" />
                         </td>
@@ -327,7 +328,7 @@ const ClassIssuesPage = () => {
                   ))
                 ) : issues.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-5 py-16 text-center text-gray-400 font-medium">
+                    <td colSpan="6" className="px-5 py-16 text-center text-gray-400 font-medium">
                       No class issues found.
                     </td>
                   </tr>
@@ -342,6 +343,9 @@ const ClassIssuesPage = () => {
                       </td>
                       <td className="px-5 py-3 text-gray-600">
                         {item.classroom || item.building || '—'}
+                      </td>
+                      <td className="px-5 py-3 text-gray-600">
+                        {item.campusName || '—'}
                       </td>
                       <td className="px-5 py-3 text-gray-700">
                         {item.title || item.category?.name || '—'}

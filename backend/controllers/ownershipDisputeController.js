@@ -8,7 +8,7 @@ const { createNotification } = require('./notificationController');
 const asyncHandler = require('../middleware/asyncHandler');
 const { sendSuccess } = require('../utils/responseHandler');
 const { logAction } = require('../utils/auditLogger');
-const { emitDashboardRefresh } = require('../socket/events/notificationEvents');
+const { emitDashboardRefresh, emitGlobalEvent } = require('../socket/events/notificationEvents');
 
 // @desc    Get all ownership disputes
 // @route   GET /api/ownership-disputes
@@ -109,12 +109,11 @@ exports.getDisputeById = asyncHandler(async (req, res) => {
 // @access  Private (Admin)
 exports.resolveDispute = asyncHandler(async (req, res) => {
   const { decision, reason, comment } = req.body;
+  const trimmedReason = reason?.trim() || '';
+  const trimmedComment = comment?.trim() || '';
 
   if (!['original', 'new'].includes(decision)) {
     return res.status(400).json({ success: false, message: 'Invalid decision. Must be original or new.' });
-  }
-  if (!reason || reason.trim() === '') {
-    return res.status(400).json({ success: false, message: 'Reason is required to resolve a dispute.' });
   }
 
   const dispute = await OwnershipDispute.findById(req.params.id);
@@ -134,8 +133,8 @@ exports.resolveDispute = asyncHandler(async (req, res) => {
 
   dispute.status = decision === 'original' ? 'resolved_original' : 'resolved_new';
   dispute.adminDecision = {
-    reason: reason.trim(),
-    comment: comment ? comment.trim() : '',
+    reason: trimmedReason,
+    comment: trimmedComment,
     resolvedBy: req.user.id,
     resolvedAt: new Date()
   };
@@ -145,10 +144,10 @@ exports.resolveDispute = asyncHandler(async (req, res) => {
     // 1. Confirm original owner: Reject the new claim
     if (report) {
       report.status = 'rejected';
-      if (comment) {
+      if (trimmedComment) {
         report.adminComments.push({
           user: req.user.id,
-          comment: comment.trim()
+          comment: trimmedComment
         });
       }
       await report.save();
@@ -169,8 +168,8 @@ exports.resolveDispute = asyncHandler(async (req, res) => {
         claimant: dispute.newClaimant,
         resolvedBy: req.user.id,
         decision: 'Confirmed original recipient',
-        reason: reason.trim(),
-        comments: comment ? comment.trim() : '',
+        reason: trimmedReason,
+        comments: trimmedComment,
         previousStatus: 'under_ownership_review',
         newStatus: 'returned'
       });
@@ -184,7 +183,7 @@ exports.resolveDispute = asyncHandler(async (req, res) => {
       action: 'RESOLVE_DISPUTE_CONFIRM_ORIGINAL',
       targetId: dispute._id,
       targetType: 'OwnershipDispute',
-      details: `Admin confirmed original returned owner for item "${item.title}". Reason: ${reason}`,
+      details: `Admin confirmed original returned owner for item "${item.title}".${trimmedReason ? ` Reason: ${trimmedReason}` : ''}`,
       req
     });
 
@@ -220,10 +219,10 @@ exports.resolveDispute = asyncHandler(async (req, res) => {
     // 1. Confirm new claimant: Approve report, transfer ownership
     if (report) {
       report.status = 'approved';
-      if (comment) {
+      if (trimmedComment) {
         report.adminComments.push({
           user: req.user.id,
-          comment: comment.trim()
+          comment: trimmedComment
         });
       }
       await report.save();
@@ -247,7 +246,9 @@ exports.resolveDispute = asyncHandler(async (req, res) => {
         user: dispute.newClaimant,
         item: item._id,
         itemType: 'found',
-        message: `Approved via dispute resolution: ${reason.trim()}`,
+        message: trimmedReason
+          ? `Approved via dispute resolution: ${trimmedReason}`
+          : 'Approved via dispute resolution.',
         status: 'approved'
       });
       await newClaim.save();
@@ -271,8 +272,8 @@ exports.resolveDispute = asyncHandler(async (req, res) => {
         claimant: dispute.newClaimant,
         resolvedBy: req.user.id,
         decision: 'Transferred ownership to claimant',
-        reason: reason.trim(),
-        comments: comment ? comment.trim() : '',
+        reason: trimmedReason,
+        comments: trimmedComment,
         previousStatus: 'under_ownership_review',
         newStatus: 'returned'
       });
@@ -286,7 +287,7 @@ exports.resolveDispute = asyncHandler(async (req, res) => {
       action: 'RESOLVE_DISPUTE_TRANSFER_OWNERSHIP',
       targetId: dispute._id,
       targetType: 'OwnershipDispute',
-      details: `Admin transferred ownership of item "${item.title}" to student ID: ${dispute.newClaimant}. Reason: ${reason}`,
+      details: `Admin transferred ownership of item "${item.title}" to student ID: ${dispute.newClaimant}.${trimmedReason ? ` Reason: ${trimmedReason}` : ''}`,
       req
     });
 
@@ -320,6 +321,20 @@ exports.resolveDispute = asyncHandler(async (req, res) => {
   }
 
   emitDashboardRefresh('admin');
+
+  try {
+    const refreshedItem = await FoundItem.findById(item._id)
+      .populate({
+        path: 'currentReturnedStudent',
+        select: 'fullName studentId faculty department class returnedAt'
+      })
+      .lean();
+    if (refreshedItem) {
+      emitGlobalEvent('foundItem:updated', refreshedItem);
+    }
+  } catch (err) {
+    console.error('Failed to emit foundItem:updated after dispute resolution:', err);
+  }
 
   return sendSuccess(res, 'Dispute resolved successfully', dispute);
 });

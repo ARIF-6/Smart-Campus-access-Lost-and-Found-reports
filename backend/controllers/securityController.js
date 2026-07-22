@@ -7,6 +7,7 @@ const User = require('../models/User');
 const { getIO } = require('../socket');
 const { emitDashboardRefresh, emitNotification } = require('../socket/events/notificationEvents');
 const { createNotification } = require('./notificationController');
+const { getCampusLiveAttendanceStats } = require('../utils/attendanceHelper');
 const asyncHandler = require('../middleware/asyncHandler');
 const { sendSuccess } = require('../utils/responseHandler');
 
@@ -513,30 +514,42 @@ exports.getSecurityReports = asyncHandler(async (req, res) => {
 // @route   GET /api/security/live
 exports.getLiveStatus = asyncHandler(async (req, res) => {
   const now = new Date();
-  const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
 
-  // 1. Calculate REAL "Inside" count (users whose last log is "IN")
-  const insideResult = await AccessLog.aggregate([
-    { $sort: { createdAt: -1 } },
-    { $group: { _id: "$userId", lastStatus: { $first: "$status" } } },
-    { $match: { lastStatus: "IN" } },
-    { $count: "count" }
+  const campusId =
+    req.user.role === 'security' || req.user.role === 'staff'
+      ? req.user.campus || null
+      : null;
+
+  const attendanceStats = await getCampusLiveAttendanceStats(campusId);
+
+  let incidentFilter = { createdAt: { $gte: startOfDay } };
+  let visitorFilter = { createdAt: { $gte: startOfDay } };
+
+  if (req.user.role === 'security') {
+    incidentFilter.reportedBy = req.user.id;
+    visitorFilter.registeredBy = req.user.id;
+  } else if (req.user.role === 'staff') {
+    if (campusId) {
+      const guards = await User.find({ role: 'security', campus: campusId, isDeleted: false }).select('_id');
+      const guardIds = guards.map((g) => g._id);
+      incidentFilter.reportedBy = { $in: guardIds };
+      visitorFilter.registeredBy = { $in: guardIds };
+    } else {
+      incidentFilter.reportedBy = { $in: [] };
+      visitorFilter.registeredBy = { $in: [] };
+    }
+  }
+
+  const [todayIncidents, todayVisitors] = await Promise.all([
+    Incident.countDocuments(incidentFilter),
+    Visitor.countDocuments(visitorFilter),
   ]);
-  const inside = insideResult.length > 0 ? insideResult[0].count : 0;
 
-  // 2. Fetch daily totals from database for other stats (refreshed/reset every 24 hours)
-  const [entries, exits, todayIncidents, todayVisitors] = await Promise.all([
-    AccessLog.countDocuments({ status: "IN", entryTime: { $gte: startOfDay } }),
-    AccessLog.countDocuments({ status: "OUT", exitTime: { $gte: startOfDay } }),
-    Incident.countDocuments({ createdAt: { $gte: startOfDay } }),
-    Visitor.countDocuments({ createdAt: { $gte: startOfDay } })
-  ]);
-
-  return sendSuccess(res, 'Live status fetched successfully', { 
-    entries, 
-    exits, 
-    inside, 
-    todayIncidents, 
-    todayVisitors 
+  return sendSuccess(res, 'Live status fetched successfully', {
+    ...attendanceStats,
+    todayIncidents,
+    todayVisitors,
   });
 });

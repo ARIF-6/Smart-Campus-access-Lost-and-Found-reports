@@ -194,8 +194,8 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                         badgeLabel = 'Claimed';
                         break;
                       case 'returned':
-                        badgeColor = Colors.purple;
-                        badgeLabel = 'Returned';
+                        badgeColor = item.statusLabel == 'Returned to You' ? Colors.green : Colors.purple;
+                        badgeLabel = item.statusLabel;
                         break;
                       case 'approved':
                         badgeColor = Colors.teal;
@@ -252,10 +252,11 @@ class _FoundItemsScreenState extends State<FoundItemsScreen> {
                         color: const Color(0xFFF59E0B),
                       );
                     } else if (isReturned) {
+                      final bool returnedToMe = item.statusLabel == 'Returned to You';
                       actionWidget = _infoLabel(
                         icon: Icons.check_circle_outline,
-                        text: 'Returned to Owner',
-                        color: Colors.purple,
+                        text: returnedToMe ? 'Returned to You' : 'Returned',
+                        color: returnedToMe ? Colors.green : Colors.purple,
                       );
                     } else if (isRejected) {
                       actionWidget = _infoLabel(

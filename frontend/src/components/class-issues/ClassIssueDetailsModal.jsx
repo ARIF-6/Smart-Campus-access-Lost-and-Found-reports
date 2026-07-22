@@ -224,6 +224,7 @@ const ClassIssueDetailsModal = ({ issueId, staffUsers, onClose, onUpdate }) => {
                   <Field label="Department"   value={issue?.student?.departmentName || issue?.departmentName}    />
                   <Field label="Class"        value={issue?.className}              />
                   <Field label="Hall"         value={issue?.hallName || issue?.building} />
+                  <Field label="Campus"       value={issue?.campusName}             />
                 </div>
               </div>
 
@@ -292,6 +293,7 @@ const ClassIssueDetailsModal = ({ issueId, staffUsers, onClose, onUpdate }) => {
 
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 divide-y divide-slate-50">
                   <Field label="Support Count"     value={`${issue?.supportCount ?? 0} students supported this issue`} />
+                  <Field label="Campus"            value={issue?.campusName} />
                   <Field label="Hall / Location"   value={issue?.hallName || issue?.building} />
                   <Field label="Classroom / Room"  value={issue?.classroom}  />
                   <Field label="Date Submitted"    value={fmt(issue?.createdAt)} />

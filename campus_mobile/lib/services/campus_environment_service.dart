@@ -61,6 +61,7 @@ Future<void> submitComplaint({
   required String issueType,
   required String title,
   required String description,
+  required String campusId,
   List<XFile>? images,
 }) async {
   try {
@@ -90,8 +91,8 @@ Future<void> submitComplaint({
       'issueType': resolvedIssueTypeId,
       'title': title,
       'description': description,
+      'campusId': campusId,
     });
-    // Note: location field omitted as per requirements
     if (images != null && images.isNotEmpty) {
       for (var image in images) {
         if (kIsWeb) {

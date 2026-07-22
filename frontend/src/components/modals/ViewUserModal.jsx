@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { getImageUrl } from '../../utils/imageUtils';
-import { resetDeviceRegistration, changeDeviceRegistrationStatus } from '../../services/api';
+import { resetDeviceRegistration } from '../../services/api';
 import toast from 'react-hot-toast';
 
 // Helper: convert "HH:mm" to 12-hour AM/PM format
@@ -18,7 +18,6 @@ const ViewUserModal = ({ isOpen, onClose, user, allRoles = [], availableRoles = 
   const [showPassword, setShowPassword] = useState(false);
   const [use12h, setUse12h] = useState(false);
   const [resetting, setResetting] = useState(false);
-  const [updatingDeviceStatus, setUpdatingDeviceStatus] = useState(false);
 
   const [localUser, setLocalUser] = useState(user);
   if (isOpen && localUser !== user) {
@@ -46,33 +45,6 @@ const ViewUserModal = ({ isOpen, onClose, user, allRoles = [], availableRoles = 
       toast.error(err.response?.data?.message || 'Failed to reset device registration.');
     } finally {
       setResetting(false);
-    }
-  };
-
-  const handleDeviceStatusChange = async (nextStatus) => {
-    if (nextStatus === deviceRegistrationStatus) return;
-
-    const confirmMessage = nextStatus === 'Inactive'
-      ? "Setting device registration to Inactive will clear the student's registered device. Continue?"
-      : "Setting device registration to Active will allow the student to register a new device on their next login. Continue?";
-
-    if (!window.confirm(confirmMessage)) return;
-
-    setUpdatingDeviceStatus(true);
-    try {
-      const res = await changeDeviceRegistrationStatus(localUser._id, nextStatus);
-      toast.success(`Device registration status updated to ${nextStatus}.`);
-      setLocalUser(prev => ({
-        ...prev,
-        ...res,
-        deviceRegistrationStatus: nextStatus,
-        isActivated: res.isActivated ?? (nextStatus === 'Active' && prev.deviceId ? prev.isActivated : false),
-        deviceId: res.deviceId ?? (nextStatus === 'Inactive' ? null : prev.deviceId)
-      }));
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to update device registration status.');
-    } finally {
-      setUpdatingDeviceStatus(false);
     }
   };
 
@@ -220,49 +192,10 @@ const ViewUserModal = ({ isOpen, onClose, user, allRoles = [], availableRoles = 
                       {isDeviceRegistered ? 'Registered' : 'Not Registered'}
                     </span>
                   </div>
-                  <div className="col-span-2">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-0.5">Registered Device ID</span>
-                    <span className="font-mono font-semibold text-gray-650 break-all bg-gray-50 px-2 py-1 rounded block border border-gray-100">
-                      {localUser.deviceId || 'No device registered yet'}
-                    </span>
-                  </div>
                 </div>
 
                 {viewerRole === 'admin' && (
                   <div className="space-y-3 border-t border-gray-50 pt-3">
-                    <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-2">Device Registration Status</span>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleDeviceStatusChange('Active')}
-                          disabled={updatingDeviceStatus || deviceRegistrationStatus === 'Active'}
-                          className={`flex-1 px-3 py-2 font-bold text-xs rounded-lg transition-all border flex items-center justify-center gap-1.5 disabled:opacity-50 ${
-                            deviceRegistrationStatus === 'Active'
-                              ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                              : 'bg-white text-gray-700 border-gray-200 hover:bg-emerald-50'
-                          }`}
-                        >
-                          Active
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeviceStatusChange('Inactive')}
-                          disabled={updatingDeviceStatus || deviceRegistrationStatus === 'Inactive'}
-                          className={`flex-1 px-3 py-2 font-bold text-xs rounded-lg transition-all border flex items-center justify-center gap-1.5 disabled:opacity-50 ${
-                            deviceRegistrationStatus === 'Inactive'
-                              ? 'bg-gray-200 text-gray-700 border-gray-300'
-                              : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                          }`}
-                        >
-                          Inactive
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-gray-500 mt-2">
-                        Set to Inactive to clear the registered device. Set back to Active to allow the student to register a new device on next login.
-                      </p>
-                    </div>
-
                     <button
                       type="button"
                       onClick={handleResetDevice}

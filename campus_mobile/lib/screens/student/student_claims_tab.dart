@@ -172,8 +172,8 @@ class _StudentClaimsTabState extends State<StudentClaimsTab> {
     final String location = item['location'] ?? 'Not Specified';
     
     String? imageUrl = item['image'] ?? item['imageUrl'];
-    if (imageUrl != null && !imageUrl.startsWith('http')) {
-      imageUrl = '${AppConstants.serverUrl}/${imageUrl.replaceAll('\\', '/')}';
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      imageUrl = AppConstants.getImageUrl(imageUrl);
     }
 
     Color statusColor;

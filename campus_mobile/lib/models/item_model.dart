@@ -10,6 +10,7 @@ class ItemModel {
   final String location;
   final String? image;
   final String status;
+  final String? displayStatus;
   final DateTime createdAt;
   final String? itemSource;
   final ReturnedStudent? currentReturnedStudent;
@@ -23,6 +24,7 @@ class ItemModel {
     required this.location,
     this.image,
     required this.status,
+    this.displayStatus,
     required this.createdAt,
     this.itemSource,
     this.currentReturnedStudent,
@@ -38,6 +40,7 @@ class ItemModel {
       location: json['location'] ?? 'Unknown',
       image: json['image'] ?? json['imageUrl'],
       status: json['status'] ?? 'pending',
+      displayStatus: json['displayStatus']?.toString(),
       createdAt: json['createdAt'] != null 
           ? DateTime.parse(json['createdAt']) 
           : DateTime.now(),
@@ -47,6 +50,8 @@ class ItemModel {
           : null,
     );
   }
+
+  String get statusLabel => displayStatus ?? status;
 
   String get getImageUrl {
     // Use the centralized helper to construct a proper URL.
@@ -65,6 +70,7 @@ class ItemModel {
       'location': location,
       'image': image,
       'status': status,
+      'displayStatus': displayStatus,
       'createdAt': createdAt.toIso8601String(),
       'currentReturnedStudent': currentReturnedStudent?.toJson(),
     };

@@ -7,7 +7,11 @@ const { createNotification } = require('./notificationController');
 const { getIO } = require('../socket');
 const { emitDashboardRefresh, emitNotification } = require('../socket/events/notificationEvents');
 const { checkAndGenerateDailyNoExitReports } = require('../utils/reportHelper');
-const { getStudentCrossCampusAttendance } = require('../utils/attendanceHelper');
+const {
+  getStudentCrossCampusAttendance,
+  getCampusTodayLog,
+  getCampusLiveAttendanceStats,
+} = require('../utils/attendanceHelper');
 
 const buildScanResponse = (payload, crossCampusAttendance) => ({
   ...payload,
@@ -105,24 +109,32 @@ exports.scanQRCode = async (req, res) => {
       photoUrl: user.photoUrl || '',
     };
 
+    if (user.role !== 'student') {
+      return res.status(400).json(buildScanResponse({
+        status: 'Access Denied',
+        color: 'red',
+        message: 'Only student QR codes or Student IDs can be scanned here.',
+        student: studentPayload,
+      }, crossCampusAttendance));
+    }
+
+    if (req.user.role === 'security' && !guardCampusId) {
+      return res.status(400).json(buildScanResponse({
+        status: 'Access Denied',
+        color: 'red',
+        message: 'Your security account is not assigned to a campus. Contact an administrator.',
+        student: studentPayload,
+      }, crossCampusAttendance));
+    }
+
     const now = new Date();
 
-    // Enforce one entry and one exit per day — work exclusively with today's log
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
+    const campusTodayLog = guardCampusId
+      ? await getCampusTodayLog(user._id, guardCampusId)
+      : null;
 
-    const todayLog = await AccessLog.findOne({
-      userId: user._id,
-      $or: [
-        { entryTime: { $gte: startOfToday, $lte: endOfToday } },
-        { createdAt: { $gte: startOfToday, $lte: endOfToday } }
-      ]
-    }).sort({ createdAt: -1 });
-
-    // Student already completed their daily cycle (IN → OUT)
-    if (todayLog && todayLog.status === 'OUT') {
+    // Student already completed entry/exit cycle at this campus today
+    if (campusTodayLog && campusTodayLog.status === 'OUT') {
       return res.status(400).json(buildScanResponse({
         status: 'Limit Reached',
         color: 'red',
@@ -131,11 +143,29 @@ exports.scanQRCode = async (req, res) => {
       }, crossCampusAttendance));
     }
 
-    if (user.role !== 'student') {
+    const isInsideThisCampus = campusTodayLog?.status === 'IN';
+    const attemptingEntry = requestedStatus === 'IN' || (!requestedStatus && !isInsideThisCampus);
+    const attemptingExit = requestedStatus === 'OUT' || (!requestedStatus && isInsideThisCampus);
+
+    // Cross-campus entry block: student is inside another campus and has not exited
+    if (attemptingEntry && crossCampusAttendance.isInsideOtherCampus) {
+      const alertMessage = crossCampusAttendance.otherCampusAlert
+        || 'This student is currently inside another campus and has not yet exited.';
+      return res.status(409).json(buildScanResponse({
+        status: 'Cross-Campus Alert',
+        color: 'orange',
+        message: alertMessage,
+        student: studentPayload,
+      }, crossCampusAttendance));
+    }
+
+    if (attemptingExit && !isInsideThisCampus) {
       return res.status(400).json(buildScanResponse({
-        status: 'Access Denied',
+        status: 'Not Inside Campus',
         color: 'red',
-        message: 'Only student QR codes or Student IDs can be scanned here.',
+        message: crossCampusAttendance.isInsideOtherCampus
+          ? crossCampusAttendance.otherCampusAlert
+          : 'This student has not entered this campus today.',
         student: studentPayload,
       }, crossCampusAttendance));
     }
@@ -155,13 +185,23 @@ exports.scanQRCode = async (req, res) => {
       });
     };
 
-    // Student already entered today — record exit
-    if (todayLog && todayLog.status === 'IN') {
-      todayLog.exitTime = now;
-      todayLog.status = 'OUT';
-      todayLog.exitSource = 'Security Guard';
-      await todayLog.save();
-      await notifyAccess(todayLog, 'OUT');
+    // Record exit at this campus
+    if (attemptingExit && isInsideThisCampus && campusTodayLog) {
+      const activeLog = await AccessLog.findById(campusTodayLog._id);
+      if (!activeLog) {
+        return res.status(400).json(buildScanResponse({
+          status: 'Error',
+          color: 'red',
+          message: 'Unable to locate the active campus entry record.',
+          student: studentPayload,
+        }, crossCampusAttendance));
+      }
+
+      activeLog.exitTime = now;
+      activeLog.status = 'OUT';
+      activeLog.exitSource = 'Security Guard';
+      await activeLog.save();
+      await notifyAccess(activeLog, 'OUT');
       await logAction({
         userId: req.user.id,
         action: 'SCAN_QR',
@@ -173,19 +213,15 @@ exports.scanQRCode = async (req, res) => {
       emitDashboardRefresh('security');
       emitDashboardRefresh('admin');
 
-      const exitMessage = crossCampusAttendance.isInsideOtherCampus
-        ? `Exit recorded for ${studentPayload.name}. Prior status: ${crossCampusAttendance.otherCampusAlert}`
-        : `Exit recorded for ${studentPayload.name}`;
-
       return res.status(200).json(buildScanResponse({
         status: 'Exit Recorded',
-        color: crossCampusAttendance.isInsideOtherCampus ? 'orange' : 'yellow',
-        message: exitMessage,
+        color: 'yellow',
+        message: `Exit recorded for ${studentPayload.name}`,
         student: studentPayload,
       }, crossCampusAttendance));
     }
 
-    // No log today — record first entry
+    // Record first entry at this campus today
     const newLog = await AccessLog.create({
       userId: user._id,
       entryTime: now,
@@ -205,14 +241,10 @@ exports.scanQRCode = async (req, res) => {
     emitDashboardRefresh('security');
     emitDashboardRefresh('admin');
 
-    const entryMessage = crossCampusAttendance.isInsideOtherCampus
-      ? `Entry recorded for ${studentPayload.name}. Note: ${crossCampusAttendance.otherCampusAlert}`
-      : `Entry recorded for ${studentPayload.name}`;
-
     return res.status(200).json(buildScanResponse({
       status: 'Access Granted',
-      color: crossCampusAttendance.isInsideOtherCampus ? 'orange' : 'green',
-      message: entryMessage,
+      color: 'green',
+      message: `Entry recorded for ${studentPayload.name}`,
       student: studentPayload,
     }, crossCampusAttendance));
 
@@ -251,21 +283,23 @@ exports.getLogs = async (req, res) => {
       });
     }
 
-    // 2. Campus-scoping: staff see logs either:
-    //    a) scanned by a security guard assigned to the same campus (Security Guard flow), or
-    //    b) campus field matches their campus directly (Campus QR Code flow, scannedBy is null)
-    if (req.user.role === 'staff') {
+    // 2. Campus-scoping: staff and security see logs for their assigned campus
+    if (req.user.role === 'staff' || req.user.role === 'security') {
       if (req.user.campus) {
-        const guards = await User.find({ role: 'security', campus: req.user.campus, isDeleted: false }).select('_id');
-        const guardIds = guards.map(g => g._id);
-        andClauses.push({
-          $or: [
-            { scannedBy: { $in: guardIds } },
-            { campus: req.user.campus, scannedBy: null },
-          ]
-        });
+        if (req.user.role === 'staff') {
+          const guards = await User.find({ role: 'security', campus: req.user.campus, isDeleted: false }).select('_id');
+          const guardIds = guards.map(g => g._id);
+          andClauses.push({
+            $or: [
+              { scannedBy: { $in: guardIds } },
+              { campus: req.user.campus, scannedBy: null },
+            ]
+          });
+        } else {
+          andClauses.push({ campus: req.user.campus });
+        }
       } else {
-        query._id = { $in: [] }; // No campus assigned → see nothing
+        query._id = { $in: [] };
       }
     }
 
@@ -315,39 +349,17 @@ exports.getLogs = async (req, res) => {
 exports.getLiveStatus = async (req, res) => {
   try {
     await checkAndGenerateDailyNoExitReports();
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const campusId =
+      req.user.role === 'security' || req.user.role === 'staff'
+        ? req.user.campus || null
+        : null;
 
-    const query = { createdAt: { $gte: startOfDay } };
-    if (req.user.role === 'staff') {
-      if (req.user.campus) {
-        const guards = await User.find({ role: 'security', campus: req.user.campus, isDeleted: false }).select('_id');
-        const guardIds = guards.map(g => g._id);
-        query.scannedBy = { $in: guardIds };
-      } else {
-        query.scannedBy = { $in: [] };
-      }
+    if ((req.user.role === 'security' || req.user.role === 'staff') && !campusId) {
+      return res.status(200).json({ entries: 0, exits: 0, inside: 0, enteredToday: 0, exitedToday: 0 });
     }
 
-    const todayLogs = await AccessLog.find(query);
-
-    let entries = 0;
-    let exits = 0;
-    // Track last status per user to compute who's inside
-    const lastStatus = {};
-
-    for (const log of todayLogs) {
-      if (log.userId) {
-        const uid = log.userId.toString();
-        if (log.entryTime) entries++;
-        if (log.exitTime) exits++;
-        lastStatus[uid] = log.status;
-      }
-    }
-
-    const inside = Object.values(lastStatus).filter((s) => s === 'IN').length;
-
-    res.status(200).json({ entries, exits, inside });
+    const stats = await getCampusLiveAttendanceStats(campusId);
+    res.status(200).json(stats);
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
   }

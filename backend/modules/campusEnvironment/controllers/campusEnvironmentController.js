@@ -6,8 +6,11 @@ const Category = require('../../../models/Category');
 const User = require('../../../models/User');
 const Class = require('../../../models/Class');
 const Hall = require('../../../models/Hall');
+const Campus = require('../../../models/Campus');
 const { createNotification } = require('../../../controllers/notificationController');
 const { emitDashboardRefresh } = require('../../../socket/events/notificationEvents');
+const { logAction } = require('../../../utils/auditLogger');
+const { applyStaffCampusRecordFilter, staffCanViewCampusRecord } = require('../../../utils/campusScopeHelper');
 const asyncHandler = require('../../../middleware/asyncHandler');
 const { sendSuccess } = require('../../../utils/responseHandler');
 const mongoose = require('mongoose');
@@ -33,7 +36,19 @@ async function resolveEnvIssueTypeFromCategory(categoryId) {
 // @route   POST /api/campus-environment
 // @access  Private (Student)
 exports.createComplaint = asyncHandler(async (req, res) => {
-  const { title, issueType, description, location, faculty, department, class: className, hall: hallName } = req.body;
+  const { title, issueType, description, location, faculty, department, class: className, hall: hallName, campusId, campus: campusBody } = req.body;
+  const selectedCampusId = campusId || campusBody;
+
+  if (!selectedCampusId || !mongoose.Types.ObjectId.isValid(selectedCampusId)) {
+    return res.status(400).json({ success: false, message: 'Campus is required. Please select the campus where the issue occurred.' });
+  }
+
+  const campusRecord = await Campus.findById(selectedCampusId).select('name').lean();
+  if (!campusRecord) {
+    return res.status(400).json({ success: false, message: 'Invalid campus selected.' });
+  }
+
+  const campusName = campusRecord.name;
 
   // Resolve the issue type:
   //  - 'other' / empty / invalid   → fall back to a generic type
@@ -72,7 +87,7 @@ exports.createComplaint = asyncHandler(async (req, res) => {
     // Duplicate detection: prevent identical pending complaints
     const duplicate = await CampusEnvironmentComplaint.findOne({
       title: title && title.trim() !== '' ? title.trim() : issue.issueName,
-      location: location && location.trim() !== '' ? location.trim() : 'Unknown Location',
+      campus: selectedCampusId,
       status: { $in: ['pending', 'in_review'] }
     });
     if (duplicate) {
@@ -89,10 +104,10 @@ exports.createComplaint = asyncHandler(async (req, res) => {
       student: req.user.id,
       description: description && description.trim() !== '' ? description : 'No description provided',
       images,
-      location: location && location.trim() !== '' ? location : 'Unknown Location',
+      location: campusName,
+      campus: selectedCampusId,
       faculty: faculty || req.user.faculty,
       department: department || req.user.department,
-      // class/hall may not be valid ObjectIds in the JWT — always default to null
       class: null,
       hall: null,
       status: 'pending'
@@ -110,21 +125,28 @@ exports.createComplaint = asyncHandler(async (req, res) => {
     await createNotification({
       recipientRole: 'admin',
       title: 'New Campus Complaint',
-      message: `A new ${issue.issueName} has been reported at ${location}.`,
+      message: `A new ${issue.issueName} has been reported at ${campusName}.`,
+      type: 'GENERAL',
+      module: 'Campus Environment',
+      relatedId: complaint._id
+    });
+    await createNotification({
+      recipientRole: 'staff',
+      title: 'New Campus Complaint',
+      message: `A new ${issue.issueName} has been reported at ${campusName}.`,
       type: 'GENERAL',
       module: 'Campus Environment',
       relatedId: complaint._id
     });
   } catch (err) {
-    console.error('Notification Error (admin):', err);
+    console.error('Notification Error (admin/staff):', err);
   }
 
-  // Broadcast to ALL students across the university
   try {
     await createNotification({
       recipientRole: 'student',
       title: '📢 Campus Issue Reported',
-      message: `A ${issue.issueName} issue has been reported at ${location}. Campus management has been notified.`,
+      message: `A ${issue.issueName} issue has been reported at ${campusName}. Campus management has been notified.`,
       type: 'GENERAL',
       module: 'Campus Environment',
       relatedId: complaint._id
@@ -132,6 +154,15 @@ exports.createComplaint = asyncHandler(async (req, res) => {
   } catch (err) {
     console.error('Notification Error (students):', err);
   }
+
+  await logAction({
+    userId: req.user.id,
+    action: 'CREATE_CAMPUS_ISSUE',
+    targetId: complaint._id,
+    targetType: 'Other',
+    details: `Campus issue reported at ${campusName}: ${complaint.title}`,
+    req
+  }).catch(() => {});
 
   // Trigger dashboard refreshes
   emitDashboardRefresh('admin');
@@ -154,7 +185,8 @@ exports.getAllComplaints = asyncHandler(async (req, res) => {
   const { 
     status, 
     issueType, 
-    faculty, 
+    faculty,
+    campus,
     search, 
     startDate, 
     endDate, 
@@ -170,6 +202,9 @@ exports.getAllComplaints = asyncHandler(async (req, res) => {
   if (status) query.status = status;
   if (issueType) query.issueType = issueType;
   if (faculty) query.faculty = faculty;
+  if (campus && mongoose.Types.ObjectId.isValid(campus)) query.campus = campus;
+
+  await applyStaffCampusRecordFilter(req, query, 'campus');
   
   // Date Range
   if (startDate || endDate) {
@@ -201,6 +236,7 @@ exports.getAllComplaints = asyncHandler(async (req, res) => {
     })
     .populate('issueType')
     .populate('assignedTo', 'fullName')
+    .populate('campus', 'name')
     .sort({ [sortBy]: order === 'desc' ? -1 : 1 })
     .skip((page - 1) * limit)
     .limit(Number(limit))
@@ -228,6 +264,7 @@ exports.getMyComplaints = asyncHandler(async (req, res) => {
       populate: { path: 'class', select: 'name' }
     })
     .populate('issueType')
+    .populate('campus', 'name')
     .sort({ createdAt: -1 })
     .lean();
 
@@ -255,6 +292,7 @@ exports.getComplaintById = asyncHandler(async (req, res) => {
   // Fetch complaint with nested population for reporter details (class only)
   const complaint = await CampusEnvironmentComplaint.findById(req.params.id)
     .populate('hall', 'name')
+    .populate('campus', 'name')
     .populate({
       path: 'student',
       select: 'fullName email studentId phone faculty department class',
@@ -266,6 +304,10 @@ exports.getComplaintById = asyncHandler(async (req, res) => {
 
   if (!complaint) {
     return res.status(404).json({ success: false, message: 'Complaint not found' });
+  }
+
+  if (!staffCanViewCampusRecord(req, complaint.campus?._id || complaint.campus)) {
+    return res.status(403).json({ success: false, message: 'Not authorized to view this complaint' });
   }
 
   // Build reporter object with real values (no fallbacks)
@@ -301,6 +343,7 @@ exports.getComplaintById = asyncHandler(async (req, res) => {
     departmentName: departmentName,
     className: complaint.student?.class?.name || null,
     hallName: hallName,
+    campusName: complaint.campus?.name || complaint.location || null,
     email: complaint.student?.email || null,
     phoneNumber: complaint.student?.phone || null
   };
@@ -403,6 +446,10 @@ exports.assignComplaint = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Complaint not found' });
   }
 
+  if (!staffCanViewCampusRecord(req, complaint.campus)) {
+    return res.status(403).json({ success: false, message: 'Not authorized to assign this complaint' });
+  }
+
   const assignee = await User.findById(assignedTo);
   if (!assignee) {
     return res.status(404).json({ success: false, message: 'Assignee user not found' });
@@ -440,6 +487,10 @@ exports.updateStatus = asyncHandler(async (req, res) => {
 
   if (!complaint) {
     return res.status(404).json({ success: false, message: 'Complaint not found' });
+  }
+
+  if (!staffCanViewCampusRecord(req, complaint.campus)) {
+    return res.status(403).json({ success: false, message: 'Not authorized to update this complaint' });
   }
 
   const allowedStatuses = ['pending', 'in_review', 'resolved', 'completed', 'rejected'];
@@ -505,7 +556,12 @@ exports.updateStatus = asyncHandler(async (req, res) => {
 // @route   GET /api/campus-environment/dashboard/stats
 // @access  Private (Admin/Staff)
 exports.getStats = asyncHandler(async (req, res) => {
+  const matchStage = {};
+  await applyStaffCampusRecordFilter(req, matchStage, 'campus');
+  const pipelineMatch = Object.keys(matchStage).length ? [{ $match: matchStage }] : [];
+
   const stats = await CampusEnvironmentComplaint.aggregate([
+    ...pipelineMatch,
     {
       $facet: {
         statusCounts: [
@@ -545,8 +601,11 @@ exports.getStats = asyncHandler(async (req, res) => {
   };
 
   // Get highest supported complaints
-  formattedStats.hotComplaints = await CampusEnvironmentComplaint.find()
+  const hotQuery = {};
+  await applyStaffCampusRecordFilter(req, hotQuery, 'campus');
+  formattedStats.hotComplaints = await CampusEnvironmentComplaint.find(hotQuery)
     .populate('issueType')
+    .populate('campus', 'name')
     .populate({
       path: 'student',
       select: 'fullName class',

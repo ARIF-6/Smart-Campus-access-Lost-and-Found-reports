@@ -7,6 +7,11 @@ const { logAction } = require('../utils/auditLogger');
 const { createNotification } = require('./notificationController');
 const { getIO } = require('../socket');
 const { haversineDistance } = require('../utils/haversine');
+const {
+  getStudentCrossCampusAttendance,
+  getCampusTodayLog,
+} = require('../utils/attendanceHelper');
+const { emitDashboardRefresh } = require('../socket/events/notificationEvents');
 
 // Helper: Get today's date string YYYY-MM-DD (UTC)
 const getTodayDate = () => new Date().toISOString().slice(0, 10);
@@ -187,30 +192,20 @@ exports.verifyStudentId = async (req, res) => {
       });
     }
 
-    // 6. Prevent Duplicate Entry and Exit (check latest AccessLog status)
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
+    const campusTodayLog = await getCampusTodayLog(student._id, campusId);
+    const crossCampusAttendance = await getStudentCrossCampusAttendance(student._id, campusId);
 
-    const todayLog = await AccessLog.findOne({
-      userId: student._id,
-      $or: [
-        { entryTime: { $gte: startOfToday, $lte: endOfToday } },
-        { createdAt: { $gte: startOfToday, $lte: endOfToday } }
-      ]
-    }).sort({ createdAt: -1 }).lean();
-
-    if (todayLog && todayLog.status === 'OUT') {
+    if (campusTodayLog && campusTodayLog.status === 'OUT') {
       return res.status(403).json({
         success: false,
         message: 'sorry you have reached the limit of entry/exit of this day',
         code: 'LIMIT_REACHED',
+        crossCampusAttendance,
       });
     }
 
-    const currentStatus = todayLog?.status || null; // 'IN' or 'OUT'
-    const nextAction = (!currentStatus || currentStatus === 'OUT') ? 'ENTER' : 'EXIT';
+    const currentStatus = campusTodayLog?.status || null;
+    const nextAction = currentStatus === 'IN' ? 'EXIT' : 'ENTER';
 
     return res.status(200).json({
       success: true,
@@ -222,6 +217,7 @@ exports.verifyStudentId = async (req, res) => {
         currentStatus,
         nextAction,
         today: getTodayDate(),
+        crossCampusAttendance,
       },
     });
   } catch (err) {
@@ -381,43 +377,43 @@ exports.submitAttendance = async (req, res) => {
       });
     }
 
-    // 6. Prevent Duplicate Entry and Exit (check latest AccessLog status today)
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
+    const campusTodayLog = await getCampusTodayLog(student._id, campusId);
+    const crossCampusAttendance = await getStudentCrossCampusAttendance(student._id, campusId);
 
-    const todayLog = await AccessLog.findOne({
-      userId: student._id,
-      $or: [
-        { entryTime: { $gte: startOfToday, $lte: endOfToday } },
-        { createdAt: { $gte: startOfToday, $lte: endOfToday } }
-      ]
-    }).sort({ createdAt: -1 });
-
-    if (todayLog && todayLog.status === 'OUT') {
+    if (campusTodayLog && campusTodayLog.status === 'OUT') {
       return res.status(400).json({
         success: false,
         message: 'sorry you have reached the limit of entry/exit of this day',
+        crossCampusAttendance,
       });
     }
 
-    const currentStatus = todayLog?.status || null;
+    const currentStatus = campusTodayLog?.status || null;
 
     if (action === 'ENTER') {
+      if (crossCampusAttendance.isInsideOtherCampus) {
+        return res.status(409).json({
+          success: false,
+          message: crossCampusAttendance.otherCampusAlert,
+          code: 'CROSS_CAMPUS_ACTIVE',
+          crossCampusAttendance,
+        });
+      }
+
       if (currentStatus === 'IN') {
         return res.status(400).json({
           success: false,
           message: 'This student has already entered the campus.',
+          crossCampusAttendance,
         });
       }
 
       const today = getTodayDate();
-      // Check if student already has an entry record today
       const existingEntry = await CampusAttendance.findOne({
         userId: student._id,
+        campusId,
         date: today,
-        entryTime: { $ne: null }
+        status: 'IN',
       });
       if (existingEntry) {
         return res.status(400).json({
@@ -464,33 +460,34 @@ exports.submitAttendance = async (req, res) => {
         details: `Student ${student.studentId} entered campus via Campus QR Code.`,
       }).catch(() => {});
 
-      // Send Socket to refresh Admin and Security dashboards
-      const io = getIO();
-      if (io) {
-        io.to('role:security').to('role:admin').emit('dashboard:refresh', {});
-      }
+      emitDashboardRefresh('security');
+      emitDashboardRefresh('admin');
 
       return res.status(201).json({
         success: true,
         message: 'Campus entry recorded successfully.',
         data: { attendanceId: attendanceRecord._id, status: 'IN', entryTime: now },
       });
-    } else {
-      // EXIT
-      if (!currentStatus || currentStatus === 'OUT') {
-        return res.status(400).json({
-          success: false,
-          message: 'This student has already exited the campus.',
-        });
-      }
+    }
 
-      const today = getTodayDate();
-      // Check if student already has an exit record today
-      const existingExit = await CampusAttendance.findOne({
-        userId: student._id,
-        date: today,
-        exitTime: { $ne: null }
+    // EXIT
+    if (!currentStatus || currentStatus === 'OUT') {
+      return res.status(400).json({
+        success: false,
+        message: crossCampusAttendance.isInsideOtherCampus
+          ? crossCampusAttendance.otherCampusAlert
+          : 'This student has already exited the campus.',
+        crossCampusAttendance,
       });
+    }
+
+    const today = getTodayDate();
+    const existingExit = await CampusAttendance.findOne({
+      userId: student._id,
+      campusId,
+      date: today,
+      status: 'OUT',
+    });
       if (existingExit) {
         return res.status(400).json({
           success: false,
@@ -531,8 +528,9 @@ exports.submitAttendance = async (req, res) => {
         });
       }
 
-      // Synchronize by updating latest IN AccessLog record to OUT
-      const lastLog = todayLog; // use the todayLog
+      const lastLog = campusTodayLog
+        ? await AccessLog.findById(campusTodayLog._id)
+        : null;
       if (lastLog && lastLog.status === 'IN') {
         lastLog.exitTime = now;
         lastLog.status = 'OUT';
@@ -566,18 +564,14 @@ exports.submitAttendance = async (req, res) => {
         details: `Student ${student.studentId} exited campus via Campus QR Code.`,
       }).catch(() => {});
 
-      // Send Socket to refresh Admin and Security dashboards
-      const io = getIO();
-      if (io) {
-        io.to('role:security').to('role:admin').emit('dashboard:refresh', {});
-      }
+      emitDashboardRefresh('security');
+      emitDashboardRefresh('admin');
 
       return res.status(200).json({
         success: true,
         message: 'Campus exit recorded successfully.',
         data: { status: 'OUT', exitTime: now },
       });
-    }
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
   }

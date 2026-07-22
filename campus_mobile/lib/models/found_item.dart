@@ -8,6 +8,7 @@ class FoundItem {
   final String location;
   final String? imageUrl;
   final String status;
+  final String? displayStatus;
   final DateTime dateFound;
   final String foundBy;
   final DateTime? returnedAt;
@@ -24,6 +25,7 @@ class FoundItem {
     required this.location,
     this.imageUrl,
     required this.status,
+    this.displayStatus,
     required this.dateFound,
     required this.foundBy,
     this.returnedAt,
@@ -34,6 +36,8 @@ class FoundItem {
   });
 
   String get fullImageUrl => AppConstants.getImageUrl(imageUrl);
+
+  String get statusLabel => displayStatus ?? status;
 
   factory FoundItem.fromJson(Map<String, dynamic> json) {
     DateTime parseDate(dynamic date) {
@@ -62,6 +66,7 @@ class FoundItem {
       location: (json['location'] ?? json['locationFound'] ?? 'Campus').toString(),
       imageUrl: (json['imageUrl'] ?? json['image'] ?? '').toString(),
       status: (json['status'] ?? 'pending').toString(),
+      displayStatus: json['displayStatus']?.toString(),
       dateFound: parseDate(json['dateFound']),
       foundBy: (json['foundBy'] is Map 
           ? json['foundBy']['_id'] ?? json['foundBy']['id'] 
@@ -87,6 +92,7 @@ class FoundItem {
       'location': location,
       'imageUrl': imageUrl,
       'status': status,
+      'displayStatus': displayStatus,
       'dateFound': dateFound.toIso8601String(),
       'foundBy': foundBy,
       'returnedAt': returnedAt?.toIso8601String(),

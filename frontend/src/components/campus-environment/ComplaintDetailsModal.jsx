@@ -134,6 +134,10 @@ const ComplaintDetailsModal = ({ complaintId, staffUsers, onClose, onUpdate }) =
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Campus</span>
+                        <p className="text-sm font-medium text-slate-800">{complaint.campus?.name || complaint.reporter?.campusName || complaint.location || '—'}</p>
+                      </div>
+                      <div>
                         <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Class</span>
                         <p className="text-sm font-medium text-slate-800">{complaint.reporter?.className || '—'}</p>
                       </div>
@@ -194,6 +198,7 @@ const ComplaintDetailsModal = ({ complaintId, staffUsers, onClose, onUpdate }) =
                       { label: 'Department', value: complaint.reporter?.departmentName || '' },
                       { label: 'Class', value: complaint.reporter?.className || '' },
                       { label: 'Hall', value: complaint.reporter?.hallName || '' },
+                      { label: 'Campus', value: complaint.reporter?.campusName || complaint.campus?.name || complaint.location || '' },
                     ].map((info, idx) => (
                       <div key={idx} className="flex justify-between items-center py-2.5 border-b border-slate-200/60 last:border-0">
                         <span className="text-xs font-bold text-slate-500">{info.label}</span>

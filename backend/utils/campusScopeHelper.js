@@ -169,6 +169,27 @@ async function applyStaffUserListFilter(req, query, roleParam) {
   return query;
 }
 
+async function applyStaffCampusRecordFilter(req, query, campusField = 'campus') {
+  if (!isStaffUser(req)) return query;
+
+  const scope = await getStaffCampusScope(req);
+  if (!scope.campusId) {
+    query._id = { $in: [] };
+    return query;
+  }
+
+  query[campusField] = scope.campusId;
+  return query;
+}
+
+function staffCanViewCampusRecord(req, recordCampusId) {
+  if (!isStaffUser(req)) return true;
+
+  const campusId = getStaffCampusId(req);
+  if (!campusId || !recordCampusId) return false;
+  return String(recordCampusId) === campusId;
+}
+
 module.exports = {
   isStaffUser,
   getStaffCampusId,
@@ -180,4 +201,6 @@ module.exports = {
   isCampusAssignedUserInStaffCampus,
   staffCanViewUser,
   applyStaffUserListFilter,
+  applyStaffCampusRecordFilter,
+  staffCanViewCampusRecord,
 };

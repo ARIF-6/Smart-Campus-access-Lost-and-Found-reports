@@ -82,6 +82,9 @@ class _StudentHomeTabState extends State<StudentHomeTab>
     _socketService.on('foundItem:created', (_) {
       if (mounted) _fetchRecentFoundItems();
     });
+    _socketService.on('foundItem:updated', (_) {
+      if (mounted) _fetchRecentFoundItems();
+    });
     _socketService.on('lostItem:created', (_) {
       if (mounted) _fetchRecentFoundItems();
     });
@@ -92,6 +95,7 @@ class _StudentHomeTabState extends State<StudentHomeTab>
     _searchController.dispose();
     _searchFocusNode.dispose();
     _socketService.off('foundItem:created');
+    _socketService.off('foundItem:updated');
     _socketService.off('lostItem:created');
     super.dispose();
   }
@@ -1079,9 +1083,10 @@ class _StudentHomeTabState extends State<StudentHomeTab>
     String statusLabel = 'Available';
 
     if (isReturned) {
-      statusColor = const Color(0xFF22C55E);
-      statusBg = const Color(0xFFDCFCE7);
-      statusLabel = 'Returned';
+      final bool returnedToMe = item.statusLabel == 'Returned to You';
+      statusColor = returnedToMe ? const Color(0xFF22C55E) : const Color(0xFF22C55E);
+      statusBg = returnedToMe ? const Color(0xFFDCFCE7) : const Color(0xFFDCFCE7);
+      statusLabel = item.statusLabel;
     } else if (isClaimed) {
       statusColor = Colors.orange;
       statusBg = const Color(0xFFFEF3C7);

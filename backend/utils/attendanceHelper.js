@@ -9,6 +9,70 @@ const getTodayBounds = () => {
   return { startOfToday, endOfToday };
 };
 
+const getTodayDateString = () => getTodayBounds().startOfToday.toISOString().slice(0, 10);
+
+const buildTodayTimeFilter = () => {
+  const { startOfToday, endOfToday } = getTodayBounds();
+  return {
+    $or: [
+      { entryTime: { $gte: startOfToday, $lte: endOfToday } },
+      { createdAt: { $gte: startOfToday, $lte: endOfToday } },
+    ],
+  };
+};
+
+/**
+ * Latest access log for a student at a specific campus today.
+ */
+async function getCampusTodayLog(userId, campusId) {
+  if (!userId || !campusId) return null;
+  return AccessLog.findOne({
+    userId,
+    campus: campusId,
+    ...buildTodayTimeFilter(),
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+}
+
+/**
+ * Live attendance counters scoped to one campus (today only).
+ */
+async function getCampusLiveAttendanceStats(campusId) {
+  if (!campusId) {
+    return { inside: 0, entries: 0, exits: 0, enteredToday: 0, exitedToday: 0 };
+  }
+
+  const logs = await AccessLog.find({
+    campus: campusId,
+    ...buildTodayTimeFilter(),
+  })
+    .sort({ createdAt: 1 })
+    .lean();
+
+  let entries = 0;
+  let exits = 0;
+  const lastStatusByUser = {};
+
+  for (const log of logs) {
+    if (log.entryTime) entries += 1;
+    if (log.exitTime) exits += 1;
+    if (log.userId) {
+      lastStatusByUser[log.userId.toString()] = log.status;
+    }
+  }
+
+  const inside = Object.values(lastStatusByUser).filter((s) => s === 'IN').length;
+
+  return {
+    inside,
+    entries,
+    exits,
+    enteredToday: entries,
+    exitedToday: exits,
+  };
+};
+
 const formatAttendanceTime = (date) => {
   if (!date) return null;
   return new Date(date).toLocaleString('en-US', {
@@ -101,22 +165,23 @@ async function getStudentCrossCampusAttendance(userId, guardCampusId = null) {
 
   let otherCampusAlert = null;
   if (insideElsewhere) {
-    otherCampusAlert =
-      `Student is currently INSIDE ${insideElsewhere.campusName}` +
-      (insideElsewhere.entryTimeFormatted
-        ? ` (entered at ${insideElsewhere.entryTimeFormatted} via ${insideElsewhere.method})`
-        : ` (via ${insideElsewhere.method})`) +
-      '.';
+    otherCampusAlert = `This student has already entered ${insideElsewhere.campusName} and has not yet exited.`;
   }
 
   return {
     records,
     isInsideOtherCampus: Boolean(insideElsewhere),
     otherCampusAlert,
+    activeOtherCampusRecord: insideElsewhere || null,
     latestRecord: records.length ? records[records.length - 1] : null,
   };
 }
 
 module.exports = {
+  getTodayBounds,
+  getTodayDateString,
+  buildTodayTimeFilter,
+  getCampusTodayLog,
+  getCampusLiveAttendanceStats,
   getStudentCrossCampusAttendance,
 };

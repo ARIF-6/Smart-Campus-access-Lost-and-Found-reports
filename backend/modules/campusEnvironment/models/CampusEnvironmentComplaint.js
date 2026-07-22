@@ -28,6 +28,11 @@ const campusEnvironmentComplaintSchema = new mongoose.Schema({
   department: String,
   class: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', default: null },
   hall: { type: mongoose.Schema.Types.ObjectId, ref: 'Hall', default: null },
+  campus: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Campus',
+    default: null
+  },
   location: {
     type: String,
     required: true
@@ -54,5 +59,6 @@ const campusEnvironmentComplaintSchema = new mongoose.Schema({
 // Index for performance
 campusEnvironmentComplaintSchema.index({ status: 1, title: 1, location: 1 });
 campusEnvironmentComplaintSchema.index({ student: 1 });
+campusEnvironmentComplaintSchema.index({ campus: 1 });
 
 module.exports = mongoose.model('CampusEnvironmentComplaint', campusEnvironmentComplaintSchema);

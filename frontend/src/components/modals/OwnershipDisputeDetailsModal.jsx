@@ -10,7 +10,6 @@ const OwnershipDisputeDetailsModal = ({ isOpen, onClose, disputeId, onSuccess })
   const [loading, setLoading] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [reason, setReason] = useState('');
-  const [comment, setComment] = useState('');
   const [selectedRecipient, setSelectedRecipient] = useState(null); // 'original' | 'new'
   const modalRef = useRef(null);
 
@@ -30,7 +29,6 @@ const OwnershipDisputeDetailsModal = ({ isOpen, onClose, disputeId, onSuccess })
     if (isOpen && disputeId) {
       fetchDisputeDetails();
       setReason('');
-      setComment('');
       setSelectedRecipient(null);
     }
   }, [isOpen, disputeId]);
@@ -51,11 +49,6 @@ const OwnershipDisputeDetailsModal = ({ isOpen, onClose, disputeId, onSuccess })
   };
 
   const handleResolve = async (decision) => {
-    if (!reason.trim()) {
-      toast.error('Please enter a reason for your decision');
-      return;
-    }
-
     const decisionText = decision === 'original' 
       ? 'confirm the original student as the owner' 
       : 'transfer ownership to the new claimant';
@@ -66,7 +59,10 @@ const OwnershipDisputeDetailsModal = ({ isOpen, onClose, disputeId, onSuccess })
 
     try {
       setResolving(true);
-      await resolveOwnershipDispute(disputeId, { decision, reason: reason.trim(), comment: comment.trim() });
+      await resolveOwnershipDispute(disputeId, {
+        decision,
+        ...(reason.trim() ? { reason: reason.trim() } : {}),
+      });
       toast.success(`Dispute successfully resolved`);
       onSuccess();
       onClose();
@@ -80,8 +76,6 @@ const OwnershipDisputeDetailsModal = ({ isOpen, onClose, disputeId, onSuccess })
   if (!isOpen) return null;
 
   const dispute = data?.dispute;
-  const claims = data?.claims || [];
-  const history = data?.history || [];
 
   return (
     <div 
@@ -260,69 +254,31 @@ const OwnershipDisputeDetailsModal = ({ isOpen, onClose, disputeId, onSuccess })
               )}
             </div>
 
-            {/* Claim History Timeline */}
-            <div>
-              <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-3">Claim History for this Item</h4>
-              {claims.length === 0 ? (
-                <p className="text-xs text-slate-400 italic">No other claims registered.</p>
-              ) : (
-                <div className="space-y-2">
-                  {claims.map((claim) => (
-                    <div key={claim._id} className="flex justify-between items-center text-xs p-2.5 bg-slate-50 rounded-lg border border-slate-100">
-                      <div>
-                        <span className="font-bold text-slate-800">{claim.user?.fullName}</span>
-                        <span className="text-slate-400 font-mono ml-2">({claim.user?.studentId || 'N/A'})</span>
-                        <p className="text-slate-500 mt-0.5">Message: "{claim.message}"</p>
-                      </div>
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
-                        claim.status === 'approved' ? 'bg-green-50 text-green-700 border border-green-200' :
-                        claim.status === 'rejected' ? 'bg-red-50 text-red-700 border border-red-200' :
-                        'bg-yellow-50 text-yellow-700 border border-yellow-200'
-                      }`}>
-                        {claim.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-
-
-            {/* Resolution Input Form */}
             {dispute.status === 'pending' && (
               <div className="border-t border-slate-100 pt-5 space-y-4">
                 <h4 className="text-[10px] font-black uppercase text-red-650 tracking-wider">Resolution Verification Details</h4>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Decision Reason (Required, displayed to students)</label>
-                    <input 
-                      type="text"
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      placeholder="e.g. Claimant provided corresponding invoice / original student confirmed they collected in error..."
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-slate-850 focus:ring-1 focus:ring-slate-850"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Internal Admin Comment / Notes (Optional)</label>
-                    <textarea 
-                      value={comment}
-                      onChange={(e) => setComment(e.target.value)}
-                      placeholder="Enter internal details, verification comments, or admin remarks..."
-                      rows={2}
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-slate-850 focus:ring-1 focus:ring-slate-850"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                    Decision Reason (Optional, displayed to students)
+                  </label>
+                  <input
+                    type="text"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="e.g. Claimant provided corresponding invoice / original student confirmed they collected in error..."
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-slate-850 focus:ring-1 focus:ring-slate-850"
+                  />
                 </div>
               </div>
             )}
-            
+
             {dispute.status !== 'pending' && (
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
                 <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Admin Resolution Record</h4>
                 <p className="text-xs text-slate-700"><span className="font-bold">Decision:</span> {dispute.status.replace('_', ' ').toUpperCase()}</p>
-                <p className="text-xs text-slate-700"><span className="font-bold">Reason:</span> {dispute.adminDecision?.reason}</p>
+                {dispute.adminDecision?.reason && (
+                  <p className="text-xs text-slate-700"><span className="font-bold">Reason:</span> {dispute.adminDecision.reason}</p>
+                )}
                 {dispute.adminDecision?.comment && (
                   <p className="text-xs text-slate-500"><span className="font-bold">Comment:</span> {dispute.adminDecision.comment}</p>
                 )}
@@ -345,7 +301,7 @@ const OwnershipDisputeDetailsModal = ({ isOpen, onClose, disputeId, onSuccess })
             </span>
             <button
               onClick={() => handleResolve(selectedRecipient)}
-              disabled={resolving || !reason.trim() || !selectedRecipient}
+              disabled={resolving || !selectedRecipient}
               className="px-6 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-md transition-all disabled:opacity-50"
             >
               Give Item

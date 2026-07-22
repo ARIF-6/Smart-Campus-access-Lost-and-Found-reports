@@ -5,7 +5,7 @@ const APIFeatures = require('../utils/apiFeatures');
 const { createNotification } = require('./notificationController');
 const { emitGlobalEvent } = require('../socket/events/notificationEvents');
 const asyncHandler = require('../middleware/asyncHandler');
-const { sendSuccess } = require('../utils/responseHandler');
+const { resolveStoredImagePath } = require('../utils/imageStorageHelper');
 
 // @desc    Create lost item report
 // @route   POST /api/lost-items
@@ -13,9 +13,7 @@ const { sendSuccess } = require('../utils/responseHandler');
 exports.reportLostItem = asyncHandler(async (req, res) => {
   const { title, description, category, locationLost, dateLost } = req.body;
   
-  const path = require('path');
-  const uploadsRoot = path.join(__dirname, '..', 'uploads');
-  const imagePath = req.file ? path.relative(uploadsRoot, req.file.path).replace(/\\/g, '/') : '';
+  const storedImage = await resolveStoredImagePath(req.file, 'campus-access/lost-items');
   
   const newItem = new LostItem({
     title,
@@ -23,8 +21,8 @@ exports.reportLostItem = asyncHandler(async (req, res) => {
     category,
     location: locationLost,
     dateLost: dateLost || Date.now(),
-    image: imagePath,
-    imageUrl: imagePath,
+    image: storedImage.image,
+    imageUrl: storedImage.imageUrl,
     createdBy: req.user.id,
     user: req.user.id
   });

@@ -2,14 +2,17 @@ const fs = require('fs');
 const path = require('path');
 const FoundItem = require('../models/FoundItem');
 const Claim = require('../models/Claim');
+const OwnershipDispute = require('../models/OwnershipDispute');
 const OwnershipHistory = require('../models/OwnershipHistory');
+const { sendSuccess } = require('../utils/responseHandler');
 const { findMatchesForFoundItem } = require('../services/matchService');
 const { logAction } = require('../utils/auditLogger');
 const APIFeatures = require('../utils/apiFeatures');
 const { createNotification } = require('./notificationController');
 const { emitGlobalEvent } = require('../socket/events/notificationEvents');
 const asyncHandler = require('../middleware/asyncHandler');
-const { sendSuccess } = require('../utils/responseHandler');
+const { resolveStoredImagePath } = require('../utils/imageStorageHelper');
+const { enrichFoundItemForUser, enrichFoundItemsForUser } = require('../utils/itemStatusHelper');
 
 /**
  * Deletes the physical image of a found item (local disk or Cloudinary)
@@ -59,17 +62,15 @@ exports.reportFoundItem = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Title, category, and location are required' });
   }
 
-    const path = require('path');
-    const uploadsRoot = path.join(__dirname, '..', 'uploads');
-    const imagePath = req.file ? path.relative(uploadsRoot, req.file.path).replace(/\\/g, '/') : '';
-    const newItem = new FoundItem({
-      title,
-      description,
-      category,
-      location: locationFound,
-      dateFound: dateFound || Date.now(),
-      image: imagePath,
-      imageUrl: imagePath,
+  const storedImage = await resolveStoredImagePath(req.file, 'campus-access/found-items');
+  const newItem = new FoundItem({
+    title,
+    description,
+    category,
+    location: locationFound,
+    dateFound: dateFound || Date.now(),
+    image: storedImage.image,
+    imageUrl: storedImage.imageUrl,
       storageLocation: storageLocation || '',
       priority: priority || 'low',
       notes: notes || '',
@@ -152,11 +153,14 @@ exports.getAllFoundItems = asyncHandler(async (req, res) => {
       .map(c => c.item.toString());
   }
 
-  const itemsWithClaimStatus = items.map(item => ({
-    ...item,
-    isClaimedByUser: claimedItemIds.includes(item._id.toString()),
-    isRejectedByUser: rejectedItemIds.includes(item._id.toString())
-  }));
+  const itemsWithClaimStatus = enrichFoundItemsForUser(
+    items.map(item => ({
+      ...item,
+      isClaimedByUser: claimedItemIds.includes(item._id.toString()),
+      isRejectedByUser: rejectedItemIds.includes(item._id.toString())
+    })),
+    req.user?.id
+  );
 
   return sendSuccess(res, 'Found items fetched successfully', {
     items: itemsWithClaimStatus,
@@ -217,7 +221,7 @@ exports.getFoundItemById = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Item not found' });
   }
 
-  return sendSuccess(res, 'Found item fetched successfully', item);
+  return sendSuccess(res, 'Found item fetched successfully', enrichFoundItemForUser(item, req.user?.id));
 });
 
 // @desc    Update found item
@@ -423,8 +427,16 @@ exports.markItemReturned = asyncHandler(async (req, res) => {
   } catch (err) {
     console.error('Notification Error:', err);
   }
+
+  try {
+    emitGlobalEvent('foundItem:updated', updatedItem);
+  } catch (_) {}
   
-  return sendSuccess(res, 'Item marked as returned', updatedItem);
+  return sendSuccess(
+    res,
+    'Item marked as returned',
+    enrichFoundItemForUser(updatedItem.toObject ? updatedItem.toObject() : updatedItem, req.user?.id)
+  );
 });
 
 

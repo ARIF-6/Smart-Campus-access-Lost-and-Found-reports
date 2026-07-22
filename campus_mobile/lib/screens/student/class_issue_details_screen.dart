@@ -149,6 +149,10 @@ class _ClassIssueDetailsScreenState extends State<ClassIssueDetailsScreen> {
                       const SizedBox(height: 8),
                       Row(
                         children: [
+                          if (issue.campusName != null && issue.campusName!.isNotEmpty) ...[
+                            _buildInfoChip(Icons.location_city_outlined, issue.campusName!),
+                            const SizedBox(width: 12),
+                          ],
                           _buildInfoChip(Icons.business_outlined, issue.building),
                           const SizedBox(width: 12),
                           _buildInfoChip(Icons.room_outlined, issue.classroom),

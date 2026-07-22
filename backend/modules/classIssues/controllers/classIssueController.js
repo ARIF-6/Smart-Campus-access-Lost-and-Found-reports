@@ -8,6 +8,8 @@ const Faculty = require('../../../models/Faculty');
 const Department = require('../../../models/Department');
 const { createNotification } = require('../../../controllers/notificationController');
 const { emitDashboardRefresh } = require('../../../socket/events/notificationEvents');
+const { logAction } = require('../../../utils/auditLogger');
+const { applyStaffCampusRecordFilter, staffCanViewCampusRecord } = require('../../../utils/campusScopeHelper');
 const asyncHandler = require('../../../middleware/asyncHandler');
 const { sendSuccess } = require('../../../utils/responseHandler');
 
@@ -77,6 +79,7 @@ async function attachNames(issues) {
       faculty: facultyMap[issue.faculty] || issue.faculty,
       department: deptMap[issue.department] || issue.department,
       hallName: issue.classId ? (hallMap[issue.classId] || issue.building || null) : (issue.building || null),
+      campusName: issue.campusName || null,
     };
   });
 }
@@ -103,10 +106,12 @@ exports.createIssue = asyncHandler(async (req, res) => {
     });
   }
 
-  // Find the associated Hall
-  const assignedHall = await Hall.findOne({ classes: assignedClass._id });
+  // Find the associated Hall and Campus (Student → Class → Hall → Campus)
+  const assignedHall = await Hall.findOne({ classes: assignedClass._id }).populate('campus', 'name');
   const actualClassroom = assignedClass.name;
   const actualBuilding = assignedHall ? assignedHall.name : 'Unknown Building';
+  const resolvedCampusId = assignedHall?.campus?._id || assignedHall?.campus || null;
+  const resolvedCampusName = assignedHall?.campus?.name || '';
 
   // Resolve issue type:
   //  - 'other' / empty  → create/find a ClassIssueType from the custom title
@@ -170,11 +175,13 @@ exports.createIssue = asyncHandler(async (req, res) => {
       description: description && description.trim() !== '' ? description : 'No description provided',
       classroom: actualClassroom,
       building: actualBuilding,
+      campus: resolvedCampusId,
+      campusName: resolvedCampusName,
       images,
       faculty: student?.faculty || 'Unknown',
       department: student?.department || 'Unknown',
-      classId: student?.class?.toString() || null,
-      className: student?.class ? (await Class.findById(student.class).select('name')).name : ''
+      classId: assignedClass._id.toString(),
+      className: assignedClass.name
     });
   } catch (err) {
     console.error('Validation error when creating issue:', err);
@@ -189,7 +196,16 @@ exports.createIssue = asyncHandler(async (req, res) => {
     await createNotification({
       recipientRole: 'admin',
       title: 'New Class Issue Reported',
-      message: `Class Monitor ${student.fullName} reported a ${title} issue in ${classroom}.`,
+      message: `Class Monitor ${student.fullName} reported a ${title} issue in ${actualClassroom} (${resolvedCampusName || actualBuilding}).`,
+      type: 'CLASS_ISSUE_CREATED',
+      module: 'Class Issues',
+      relatedId: complaint._id
+    });
+
+    await createNotification({
+      recipientRole: 'staff',
+      title: 'New Class Issue Reported',
+      message: `Class Monitor ${student.fullName} reported a ${title} issue in ${actualClassroom} (${resolvedCampusName || actualBuilding}).`,
       type: 'CLASS_ISSUE_CREATED',
       module: 'Class Issues',
       relatedId: complaint._id
@@ -201,22 +217,35 @@ exports.createIssue = asyncHandler(async (req, res) => {
     console.error('Notification failed:', err);
   }
 
+  await logAction({
+    userId: req.user.id,
+    action: 'CREATE_CLASS_ISSUE',
+    targetId: complaint._id,
+    targetType: 'Other',
+    details: `Class issue reported at ${resolvedCampusName || actualBuilding}: ${complaint.title}`,
+    req
+  }).catch(() => {});
+
   return sendSuccess(res, 'Class issue submitted successfully.', complaint, 201);
 });
 
 exports.getAllIssues = asyncHandler(async (req, res) => {
-  const { status, faculty, classroom, search, page = 1, limit = 50 } = req.query;
+  const { status, faculty, classroom, campus, search, page = 1, limit = 50 } = req.query;
   const query = {};
 
   if (status) query.status = status;
   if (faculty) query.faculty = faculty;
   if (classroom) query.classroom = { $regex: classroom, $options: 'i' };
+  if (campus && mongoose.Types.ObjectId.isValid(campus)) query.campus = campus;
   if (search) {
     query.$or = [
       { title: { $regex: search, $options: 'i' } },
-      { description: { $regex: search, $options: 'i' } }
+      { description: { $regex: search, $options: 'i' } },
+      { campusName: { $regex: search, $options: 'i' } }
     ];
   }
+
+  await applyStaffCampusRecordFilter(req, query, 'campus');
 
   const rawIssues = await ClassIssueComplaint.find(query)
     .populate('student', 'fullName studentId email phone faculty department')
@@ -262,11 +291,13 @@ exports.getMyLocation = asyncHandler(async (req, res) => {
     });
   }
 
-  const assignedHall = await Hall.findOne({ classes: assignedClass._id });
+  const assignedHall = await Hall.findOne({ classes: assignedClass._id }).populate('campus', 'name');
 
   return sendSuccess(res, 'Location fetched successfully', {
     className: assignedClass.name,
-    hallName: assignedHall ? assignedHall.name : 'Unknown Hall'
+    hallName: assignedHall ? assignedHall.name : 'Unknown Hall',
+    campusId: assignedHall?.campus?._id || assignedHall?.campus || null,
+    campusName: assignedHall?.campus?.name || ''
   });
 });
 
@@ -291,6 +322,10 @@ exports.getIssueDetails = asyncHandler(async (req, res) => {
 
   if (!issue) {
     return res.status(404).json({ success: false, message: 'Issue not found' });
+  }
+
+  if (!staffCanViewCampusRecord(req, issue.campus)) {
+    return res.status(403).json({ success: false, message: 'Not authorized to view this issue' });
   }
 
   // Resolve Hall from the Hall collection using classId
@@ -362,6 +397,7 @@ exports.getIssueDetails = asyncHandler(async (req, res) => {
     facultyName: resolvedFaculty || 'Not Available',
     departmentName: resolvedDepartment || 'Not Available',
     hallName: hallName || issue.building || 'Not Available',
+    campusName: issue.campusName || 'Not Available',
     className: resolvedClassName || issue.className || 'Not Available',
     classStudentCount,
     tracking
@@ -370,15 +406,21 @@ exports.getIssueDetails = asyncHandler(async (req, res) => {
 
 exports.assignIssue = asyncHandler(async (req, res) => {
   const { assignedTo } = req.body;
+  const existingIssue = await ClassIssueComplaint.findById(req.params.id);
+
+  if (!existingIssue) {
+    return res.status(404).json({ success: false, message: 'Issue not found' });
+  }
+
+  if (!staffCanViewCampusRecord(req, existingIssue.campus)) {
+    return res.status(403).json({ success: false, message: 'Not authorized to assign this issue' });
+  }
+
   const issue = await ClassIssueComplaint.findByIdAndUpdate(
     req.params.id,
     { assignedTo, status: 'in_review' },
     { new: true }
   );
-
-  if (!issue) {
-    return res.status(404).json({ success: false, message: 'Issue not found' });
-  }
 
   await ClassIssueTracking.create({
     complaint: issue._id,
@@ -400,6 +442,10 @@ exports.updateStatus = asyncHandler(async (req, res) => {
 
   if (!oldIssue) {
     return res.status(404).json({ success: false, message: 'Issue not found' });
+  }
+
+  if (!staffCanViewCampusRecord(req, oldIssue.campus)) {
+    return res.status(403).json({ success: false, message: 'Not authorized to update this issue' });
   }
 
   // ── Support threshold gate ──────────────────────────────────────────
@@ -472,11 +518,14 @@ exports.getIssueTypes = asyncHandler(async (req, res) => {
 });
 
 exports.getAnalytics = asyncHandler(async (req, res) => {
-  const total = await ClassIssueComplaint.countDocuments();
-  const pending = await ClassIssueComplaint.countDocuments({ status: 'pending' });
-  const resolved = await ClassIssueComplaint.countDocuments({ status: 'resolved' });
-  const rejected = await ClassIssueComplaint.countDocuments({ status: 'rejected' });
-  const inReview = await ClassIssueComplaint.countDocuments({ status: 'in_review' });
+  const baseQuery = {};
+  await applyStaffCampusRecordFilter(req, baseQuery, 'campus');
+
+  const total = await ClassIssueComplaint.countDocuments(baseQuery);
+  const pending = await ClassIssueComplaint.countDocuments({ ...baseQuery, status: 'pending' });
+  const resolved = await ClassIssueComplaint.countDocuments({ ...baseQuery, status: 'resolved' });
+  const rejected = await ClassIssueComplaint.countDocuments({ ...baseQuery, status: 'rejected' });
+  const inReview = await ClassIssueComplaint.countDocuments({ ...baseQuery, status: 'in_review' });
 
   const statusData = [
     { name: 'Pending', value: pending },
@@ -486,6 +535,7 @@ exports.getAnalytics = asyncHandler(async (req, res) => {
   ];
 
   const buildingTrends = await ClassIssueComplaint.aggregate([
+    { $match: baseQuery },
     { $group: { _id: '$building', count: { $sum: 1 } } },
     { $sort: { count: -1 } },
     { $limit: 5 }

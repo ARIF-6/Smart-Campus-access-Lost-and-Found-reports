@@ -37,6 +37,7 @@ class ClassIssue {
   final String classId; // NEW
   final String classroom;
   final String building;
+  final String? campusName;
   final String status;
   final int supportCount;
   final String? assignedTo;
@@ -56,6 +57,7 @@ class ClassIssue {
     required this.classId,
     required this.classroom,
     required this.building,
+    this.campusName,
     required this.status,
     required this.supportCount,
     this.assignedTo,
@@ -82,7 +84,8 @@ class ClassIssue {
         }).where((e) => e.isNotEmpty).cast<String>().toList() ?? [],
       classId: json['classId']?.toString() ?? (json['class'] is Map ? json['class']['id']?.toString() ?? '' : json['class']?.toString() ?? ''),
       classroom: json['classroom'] ?? '',
-      building: json['building'] ?? '',
+      building: json['building'] ?? json['hallName'] ?? '',
+      campusName: json['campusName'] ?? (json['campus'] is Map ? json['campus']['name'] : null),
       status: json['status'] ?? 'pending',
       supportCount: json['supportCount'] ?? 0,
       assignedTo: json['assignedTo'] is Map ? json['assignedTo']['fullName'] : null,

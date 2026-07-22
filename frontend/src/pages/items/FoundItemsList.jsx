@@ -104,6 +104,8 @@ const FoundItemsList = () => {
         return <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-200">In Review</span>;
       case 'returned':
         return <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-[10px] font-black uppercase tracking-widest border border-purple-200">Returned</span>;
+      case 'returned to you':
+        return <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-[10px] font-black uppercase tracking-widest border border-green-200">Returned to You</span>;
       case 'approved':
         return <span className="px-3 py-1 bg-teal-100 text-teal-800 rounded-full text-[10px] font-black uppercase tracking-widest border border-teal-200">Approved</span>;
       case 'rejected':
@@ -223,7 +225,7 @@ const FoundItemsList = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">{item.location}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(item.status)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(item.displayStatus || item.status)}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-400 font-mono">
                         {item.dateFound ? new Date(item.dateFound).toLocaleDateString() : new Date(item.createdAt).toLocaleDateString()}
                       </td>

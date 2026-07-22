@@ -141,6 +141,7 @@ const CampusEnvironmentAnalytics = () => {
                   <div>
                     <p className="text-sm font-black text-slate-700">{complaint.issueType?.issueName}</p>
                     <p className="text-xs text-slate-400 font-medium line-clamp-1">{complaint.description}</p>
+                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{complaint.campus?.name || complaint.location || '—'}</p>
                   </div>
                 </div>
                 <div className="text-right">

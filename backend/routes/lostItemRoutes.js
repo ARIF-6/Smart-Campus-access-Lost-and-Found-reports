@@ -23,7 +23,7 @@ router.route('/')
   .post(
     protect, 
     allowRoles('student', 'admin', 'staff'), 
-    upload.single('image'),
+    upload.lostFound.single('image'),
     [
       body('title', 'Title is required').notEmpty().trim().escape(),
       body('description', 'Description is required').notEmpty().trim().escape(),

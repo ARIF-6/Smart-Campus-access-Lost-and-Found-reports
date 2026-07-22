@@ -51,7 +51,7 @@ class ItemViewScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _buildTypeBadge(isLost),
-                      _buildStatusBadge(item.status),
+                      _buildStatusBadge(item.statusLabel),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -241,9 +241,12 @@ class ItemViewScreen extends StatelessWidget {
 
   Widget _buildStatusBadge(String status) {
     Color color = Colors.grey;
-    if (status.toLowerCase() == 'approved') color = AppConstants.successColor;
-    if (status.toLowerCase() == 'pending') color = AppConstants.accentColor;
-    if (status.toLowerCase() == 'under_ownership_review') color = const Color(0xFFF59E0B);
+    final normalized = status.toLowerCase();
+    if (normalized == 'approved') color = AppConstants.successColor;
+    if (normalized == 'pending') color = AppConstants.accentColor;
+    if (normalized == 'under_ownership_review') color = const Color(0xFFF59E0B);
+    if (normalized == 'returned to you') color = AppConstants.successColor;
+    if (normalized == 'returned') color = Colors.purple;
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -252,7 +255,7 @@ class ItemViewScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        status.toUpperCase(),
+        status,
         style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12),
       ),
     );

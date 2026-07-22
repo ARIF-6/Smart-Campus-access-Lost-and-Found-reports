@@ -328,6 +328,22 @@ const UserManagement = () => {
     }
   };
 
+  const getCreateDefaultRole = () => {
+    switch (currentSection) {
+      case 'students': return 'student';
+      case 'securities': return 'security';
+      case 'cleaners': return 'clean';
+      default: return '';
+    }
+  };
+
+  const getCreateModalRoles = () => {
+    if (currentSection === 'admins') {
+      return availableRoles.filter((r) => ['admin', 'staff', 'superadmin'].includes(r.name.toLowerCase()));
+    }
+    return availableRoles;
+  };
+
   return (
     <AdminLayout title="User Management">
       {/* Redesigned Header Area */}
@@ -957,7 +973,10 @@ const UserManagement = () => {
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onSave={handleSaveCreate}
-        availableRoles={availableRoles}
+        availableRoles={getCreateModalRoles()}
+        defaultRole={getCreateDefaultRole()}
+        showRoleSelector={currentSection === 'admins'}
+        modalTitle={getRegisterButtonLabel()}
       />
       {activeUser && (
         <>

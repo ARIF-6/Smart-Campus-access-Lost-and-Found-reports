@@ -719,7 +719,7 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             _buildTypeBadge(isLost),
-                            _buildStatusBadge(item.status),
+                            _buildStatusBadge(item.statusLabel),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -818,8 +818,11 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
 
   Widget _buildStatusBadge(String status) {
     Color color = Colors.grey;
-    if (status.toLowerCase() == 'approved') color = AppConstants.successColor;
-    if (status.toLowerCase() == 'pending') color = AppConstants.accentColor;
+    final normalized = status.toLowerCase();
+    if (normalized == 'approved') color = AppConstants.successColor;
+    if (normalized == 'pending') color = AppConstants.accentColor;
+    if (normalized == 'returned to you') color = AppConstants.successColor;
+    if (normalized == 'returned') color = Colors.purple;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -828,7 +831,7 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
-        status.toUpperCase(),
+        status,
         style:
             TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
       ),
