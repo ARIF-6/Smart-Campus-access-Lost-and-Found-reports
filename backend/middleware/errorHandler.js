@@ -36,7 +36,7 @@ const errorHandler = (err, req, res, next) => {
     return sendError(res, 'Your token has expired. Please log in again.', err, 401);
   }
 
-  const statusCode = error.status || err.status || 500;
+  const statusCode = error.statusCode || error.status || err.statusCode || err.status || 500;
   const message = error.message || "Server Error";
   
   return sendError(res, message, err, statusCode);

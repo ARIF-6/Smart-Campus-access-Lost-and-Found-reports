@@ -10,7 +10,6 @@ import 'access_logs_screen.dart';
 import 'incidents_screen.dart';
 import 'visitors_screen.dart';
 import 'blacklist_screen.dart';
-import 'shift_screen.dart';
 import 'security_reports_screen.dart';
 
 import '../../services/socket_service.dart';
@@ -251,8 +250,6 @@ class _SecurityDrawerState extends State<_SecurityDrawer>
       _MenuSection(title: 'Management', items: [
         _MenuItem(Icons.gavel_rounded, 'Blacklist',
             const Color(0xFF4E342E), () => requireShift(() => widget.onNav(const BlacklistScreen()))),
-        _MenuItem(Icons.access_time_filled_rounded, 'My Shift',
-            const Color(0xFF2E7D32), () => widget.onNav(const ShiftScreen())),
         _MenuItem(Icons.analytics_rounded, 'Reports',
             const Color(0xFFF57C00), () => requireShift(() => widget.onNav(const SecurityReportsScreen()))),
       ]),

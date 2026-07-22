@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const LostItem = require('../models/LostItem');
 const FoundItem = require('../models/FoundItem');
+const { normalizeLostFoundItemsImages } = require('../utils/imageStorageHelper');
 
 // @desc    Get dashboard statistics
 // @route   GET /api/admin/stats
@@ -50,7 +51,7 @@ exports.getRecentLostItems = async (req, res) => {
     const lostItems = await LostItem.find()
       .sort({ createdAt: -1 })
       .limit(5);
-    res.status(200).json(lostItems);
+    res.status(200).json(normalizeLostFoundItemsImages(lostItems.map((item) => (item.toObject ? item.toObject() : item))));
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
@@ -64,7 +65,7 @@ exports.getRecentFoundItems = async (req, res) => {
     const foundItems = await FoundItem.find()
       .sort({ createdAt: -1 })
       .limit(5);
-    res.status(200).json(foundItems);
+    res.status(200).json(normalizeLostFoundItemsImages(foundItems.map((item) => (item.toObject ? item.toObject() : item))));
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }

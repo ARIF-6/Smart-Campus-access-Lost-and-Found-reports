@@ -318,7 +318,7 @@ class _CampusComplaintScreenState extends State<CampusComplaintScreen> {
         DropdownButtonFormField<String>(
           value: _selectedCampusId,
           decoration: InputDecoration(
-            hintText: 'Select campus where the issue occurred',
+            hintText: 'Select campus',
             prefixIcon: Icon(Icons.location_city_rounded, size: 20, color: themeColor),
             filled: true,
             fillColor: const Color(0xFFF8FAFC),

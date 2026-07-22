@@ -19,6 +19,10 @@ try {
 
 const connectDB = require("./config/db");
 const createAdmin = require("./utils/createAdmin");
+const {
+  assertPermanentStorageConfigured,
+  migrateLostFoundImagesToCloudinary,
+} = require("./utils/imageStorageHelper");
 const { initSocket } = require('./socket');
 const errorHandler = require("./middleware/errorHandler");
 const compression = require("compression");
@@ -197,11 +201,17 @@ const startServer = async () => {
   // Connect to DB first — must be established before any Mongoose operations
   await connectDB();
 
+  assertPermanentStorageConfigured();
+
   // Listen on 0.0.0.0 so mobile devices on the same network can connect
   server.listen(PORT, '0.0.0.0', async () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Mobile devices: http://192.168.20.104:${PORT}`);
     await createAdmin();
+
+    migrateLostFoundImagesToCloudinary().catch((err) => {
+      console.error('[ImageMigration] Background migration failed:', err.message);
+    });
   });
 };
 

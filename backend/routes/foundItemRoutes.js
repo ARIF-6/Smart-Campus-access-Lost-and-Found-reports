@@ -46,7 +46,8 @@ router.route('/:id')
   .get(protect, getFoundItemById)
   .put(
     protect, 
-    allowRoles('admin', 'security', 'staff', 'clean'), 
+    allowRoles('admin', 'security', 'staff', 'clean'),
+    upload.lostFound.single('image'),
     [
       body('title', 'Title is required').optional().notEmpty().trim().escape(),
       body('category', 'Category is required').optional().notEmpty().trim().escape(),

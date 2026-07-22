@@ -8,6 +8,7 @@ const { getIO } = require('../socket');
 const { emitDashboardRefresh, emitNotification } = require('../socket/events/notificationEvents');
 const { checkAndGenerateDailyNoExitReports } = require('../utils/reportHelper');
 const {
+  formatAttendanceTime,
   getStudentCrossCampusAttendance,
   getCampusTodayLog,
   getCampusLiveAttendanceStats,
@@ -215,12 +216,17 @@ exports.scanQRCode = async (req, res) => {
       emitDashboardRefresh('admin');
       await emitStudentAttendanceStatusUpdate(user._id);
 
+      const refreshedAttendance = await getStudentCrossCampusAttendance(user._id, guardCampusId);
+      const exitTimeLabel = formatAttendanceTime(now);
+
       return res.status(200).json(buildScanResponse({
         status: 'Exit Recorded',
         color: 'yellow',
-        message: `Exit recorded for ${studentPayload.name}`,
+        message: `Exit recorded for ${studentPayload.name}${exitTimeLabel ? ` at ${exitTimeLabel}` : ''}`,
         student: studentPayload,
-      }, crossCampusAttendance));
+        recordedAt: now,
+        recordedAtFormatted: exitTimeLabel,
+      }, refreshedAttendance));
     }
 
     // Record first entry at this campus today
@@ -244,12 +250,17 @@ exports.scanQRCode = async (req, res) => {
     emitDashboardRefresh('admin');
     await emitStudentAttendanceStatusUpdate(user._id);
 
+    const refreshedAttendance = await getStudentCrossCampusAttendance(user._id, guardCampusId);
+    const entryTimeLabel = formatAttendanceTime(now);
+
     return res.status(200).json(buildScanResponse({
       status: 'Access Granted',
       color: 'green',
-      message: `Entry recorded for ${studentPayload.name}`,
+      message: `Entry recorded for ${studentPayload.name}${entryTimeLabel ? ` at ${entryTimeLabel}` : ''}`,
       student: studentPayload,
-    }, crossCampusAttendance));
+      recordedAt: now,
+      recordedAtFormatted: entryTimeLabel,
+    }, refreshedAttendance));
 
   } catch (error) {
     console.error('Scan QR Error:', error);

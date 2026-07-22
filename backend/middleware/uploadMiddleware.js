@@ -5,7 +5,10 @@ const createUploader = require('../utils/upload');
 
 // Create specific uploaders for different modules
 const uploadGeneral = createUploader('general');
-const uploadLostFound = createUploader('lost-found');
+const uploadLostFound = createUploader('lost-found', {
+  preferCloudinary: true,
+  cloudinaryFolder: 'campus-access/lost-found',
+});
 const uploadClaims = createUploader('claims');
 const uploadProfiles = createUploader('profiles');
 const uploadSecurity = createUploader('security');

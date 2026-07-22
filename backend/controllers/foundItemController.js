@@ -11,7 +11,7 @@ const APIFeatures = require('../utils/apiFeatures');
 const { createNotification } = require('./notificationController');
 const { emitGlobalEvent } = require('../socket/events/notificationEvents');
 const asyncHandler = require('../middleware/asyncHandler');
-const { resolveStoredImagePath } = require('../utils/imageStorageHelper');
+const { resolveStoredImagePath, normalizeLostFoundItemImages, normalizeLostFoundItemsImages } = require('../utils/imageStorageHelper');
 const { enrichFoundItemForUser, enrichFoundItemsForUser } = require('../utils/itemStatusHelper');
 
 /**
@@ -111,9 +111,9 @@ exports.reportFoundItem = asyncHandler(async (req, res) => {
     console.error('Matching Service Error:', err);
   });
 
-  emitGlobalEvent('foundItem:created', savedItem);
+  emitGlobalEvent('foundItem:created', normalizeLostFoundItemImages(savedItem.toObject ? savedItem.toObject() : savedItem));
 
-  return sendSuccess(res, 'Found item reported successfully', savedItem, 201);
+  return sendSuccess(res, 'Found item reported successfully', normalizeLostFoundItemImages(savedItem.toObject ? savedItem.toObject() : savedItem), 201);
 });
 
 // @desc    Get all found items (with search and filters)
@@ -163,7 +163,7 @@ exports.getAllFoundItems = asyncHandler(async (req, res) => {
   );
 
   return sendSuccess(res, 'Found items fetched successfully', {
-    items: itemsWithClaimStatus,
+    items: normalizeLostFoundItemsImages(itemsWithClaimStatus),
     total,
     page: parseInt(req.query.page) || 1,
     limit: parseInt(req.query.limit) || 10
@@ -178,7 +178,7 @@ exports.getMyFoundItems = asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 })
     .lean();
 
-  return sendSuccess(res, 'My found items fetched successfully', items);
+  return sendSuccess(res, 'My found items fetched successfully', normalizeLostFoundItemsImages(items));
 });
 
 // @desc    Get single found item
@@ -221,7 +221,7 @@ exports.getFoundItemById = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Item not found' });
   }
 
-  return sendSuccess(res, 'Found item fetched successfully', enrichFoundItemForUser(item, req.user?.id));
+  return sendSuccess(res, 'Found item fetched successfully', normalizeLostFoundItemImages(enrichFoundItemForUser(item, req.user?.id)));
 });
 
 // @desc    Update found item
@@ -249,7 +249,11 @@ exports.updateFoundItem = asyncHandler(async (req, res) => {
   item.priority = priority || item.priority;
   item.notes = notes !== undefined ? notes : item.notes;
 
-
+  if (req.file) {
+    const storedImage = await resolveStoredImagePath(req.file, 'campus-access/found-items');
+    item.image = storedImage.image;
+    item.imageUrl = storedImage.imageUrl;
+  }
 
   const updatedItem = await item.save();
 
@@ -275,7 +279,7 @@ exports.updateFoundItem = asyncHandler(async (req, res) => {
     }
   }
 
-  return sendSuccess(res, 'Found item updated successfully', updatedItem);
+  return sendSuccess(res, 'Found item updated successfully', normalizeLostFoundItemImages(updatedItem.toObject ? updatedItem.toObject() : updatedItem));
 });
 
 // @desc    Delete found item
@@ -435,7 +439,7 @@ exports.markItemReturned = asyncHandler(async (req, res) => {
   return sendSuccess(
     res,
     'Item marked as returned',
-    enrichFoundItemForUser(updatedItem.toObject ? updatedItem.toObject() : updatedItem, req.user?.id)
+    normalizeLostFoundItemImages(enrichFoundItemForUser(updatedItem.toObject ? updatedItem.toObject() : updatedItem, req.user?.id))
   );
 });
 
@@ -471,7 +475,7 @@ exports.linkLostItem = asyncHandler(async (req, res) => {
   lostItem.status = 'approved';
   await lostItem.save();
   
-  return sendSuccess(res, 'Items linked and approved successfully', updatedItem);
+  return sendSuccess(res, 'Items linked and approved successfully', normalizeLostFoundItemImages(updatedItem.toObject ? updatedItem.toObject() : updatedItem));
 });
 
 // @desc    Restore soft deleted found item
@@ -548,7 +552,7 @@ exports.getTrashedFoundItems = asyncHandler(async (req, res) => {
     .sort({ deletedAt: -1 })
     .lean();
     
-  return sendSuccess(res, 'Trashed items fetched successfully', items);
+  return sendSuccess(res, 'Trashed items fetched successfully', normalizeLostFoundItemsImages(items));
 });
 
 // @desc    Add comment to found item

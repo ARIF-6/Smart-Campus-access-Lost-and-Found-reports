@@ -1,6 +1,8 @@
 const AccessLog = require('../models/AccessLog');
 const CampusAttendance = require('../models/CampusAttendance');
 
+const CAMPUS_TIMEZONE = process.env.CAMPUS_TIMEZONE || 'Africa/Cairo';
+
 const getTodayBounds = () => {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -76,8 +78,10 @@ async function getCampusLiveAttendanceStats(campusId) {
 const formatAttendanceTime = (date) => {
   if (!date) return null;
   return new Date(date).toLocaleString('en-US', {
+    timeZone: CAMPUS_TIMEZONE,
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
     hour12: true,
   });
 };
@@ -109,16 +113,21 @@ async function getStudentCrossCampusAttendance(userId, guardCampusId = null) {
 
   const records = accessLogs.map((log) => {
     const campusId = log.campus?._id || log.campus || null;
+    const isInside = log.status === 'IN';
+    const entryTimeFormatted = formatAttendanceTime(log.entryTime);
+    const exitTimeFormatted = formatAttendanceTime(log.exitTime);
     return {
       campusId,
       campusName: log.campus?.name || 'Unknown Campus',
       entryTime: log.entryTime,
-      entryTimeFormatted: formatAttendanceTime(log.entryTime),
+      entryTimeFormatted,
       exitTime: log.exitTime || null,
-      exitTimeFormatted: formatAttendanceTime(log.exitTime),
-      status: log.status === 'IN' ? 'Inside' : 'Outside',
+      exitTimeFormatted,
+      status: isInside ? 'Inside' : 'Outside',
       method: log.source || 'Security Guard',
       exitMethod: log.exitSource || null,
+      displayTimeFormatted: isInside ? entryTimeFormatted : (exitTimeFormatted || entryTimeFormatted),
+      displayMethod: isInside ? (log.source || 'Security Guard') : (log.exitSource || log.source || 'Security Guard'),
       isCurrentCampus: Boolean(
         guardCampusId && campusId && String(campusId) === String(guardCampusId)
       ),
@@ -132,16 +141,21 @@ async function getStudentCrossCampusAttendance(userId, guardCampusId = null) {
       (r) => r.campusId && campusId && String(r.campusId) === String(campusId)
     );
     if (!alreadyIncluded) {
+      const isInside = record.status === 'IN';
+      const entryTimeFormatted = formatAttendanceTime(record.entryTime);
+      const exitTimeFormatted = formatAttendanceTime(record.exitTime);
       records.push({
         campusId,
         campusName: record.campusId?.name || 'Unknown Campus',
         entryTime: record.entryTime,
-        entryTimeFormatted: formatAttendanceTime(record.entryTime),
+        entryTimeFormatted,
         exitTime: record.exitTime || null,
-        exitTimeFormatted: formatAttendanceTime(record.exitTime),
-        status: record.status === 'IN' ? 'Inside' : 'Outside',
+        exitTimeFormatted,
+        status: isInside ? 'Inside' : 'Outside',
         method: 'Campus QR Code',
         exitMethod: record.exitTime ? 'Campus QR Code' : null,
+        displayTimeFormatted: isInside ? entryTimeFormatted : (exitTimeFormatted || entryTimeFormatted),
+        displayMethod: isInside ? 'Campus QR Code' : 'Campus QR Code',
         isCurrentCampus: Boolean(
           guardCampusId && campusId && String(campusId) === String(guardCampusId)
         ),
@@ -230,6 +244,8 @@ async function emitStudentAttendanceStatusUpdate(userId) {
 }
 
 module.exports = {
+  CAMPUS_TIMEZONE,
+  formatAttendanceTime,
   getTodayBounds,
   getTodayDateString,
   buildTodayTimeFilter,

@@ -15,9 +15,9 @@ export const getImageUrl = (item) => {
   let path = typeof item === 'string' ? item : (item.imageUrl || item.image || item.photoUrl || item.proofImage || item.evidenceImage || '');
   if (!path) return '';
   
-  // If it's already a browser-ready URL, just return it
-  if (/^(https?:)?\/\//i.test(path) || path.startsWith('data:') || path.startsWith('blob:')) {
-    return path;
+  // If it's already a browser-ready URL (Cloudinary, CDN, etc.), return as-is
+  if (/^(https?:)?\/\//i.test(path) || path.startsWith('data:') || path.startsWith('blob:') || path.includes('res.cloudinary.com')) {
+    return path.startsWith('//') ? `https:${path}` : path;
   }
   
   // Normalize Windows backslashes to forward slashes

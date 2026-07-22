@@ -1,7 +1,7 @@
 name: campus_mobile
 description: "Smart Campus Mobile Application - Security Guard & Cleaner"
 publish_to: 'none'
-version: 1.1.0+12
+version: 1.1.0+14
 
 environment:
   sdk: ^3.5.0

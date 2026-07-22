@@ -37,11 +37,12 @@ class _LostItemsScreenState extends State<LostItemsScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final String path = search != null && search.isNotEmpty 
-          ? '/lost-items?search=$search' 
-          : '/lost-items';
-          
-      final response = await _apiService.get(path);
+      final response = await _apiService.get(
+        '/lost-items',
+        queryParameters: search != null && search.isNotEmpty
+            ? {'keyword': search}
+            : null,
+      );
       
       if (mounted) {
         setState(() {

@@ -5,8 +5,6 @@ import 'package:dio/dio.dart';
 import '../../core/constants.dart';
 import '../../services/api_service.dart';
 import '../../providers/auth_provider.dart';
-
-import '../../providers/shift_provider.dart';
 import '../../services/socket_service.dart';
 
 class BlacklistScreen extends StatefulWidget {
@@ -41,7 +39,12 @@ class _BlacklistScreenState extends State<BlacklistScreen> {
     if (mounted) setState(() => _loading = true);
     try {
       final res = await _api.get('/security/blacklist');
-      if (mounted) setState(() { _list = res.data; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _list = res.data is List ? res.data : [];
+          _loading = false;
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
@@ -59,18 +62,6 @@ class _BlacklistScreenState extends State<BlacklistScreen> {
   }
 
   void _showAddDialog() {
-    final shiftProv = Provider.of<ShiftProvider>(context, listen: false);
-    if (!shiftProv.hasActiveShift) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Operation blocked: You must start your shift first.'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
     final identifierCtrl = TextEditingController();
     final reasonCtrl = TextEditingController();
     bool isSubmitting = false;

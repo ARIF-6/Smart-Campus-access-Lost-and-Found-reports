@@ -5,7 +5,8 @@ const APIFeatures = require('../utils/apiFeatures');
 const { createNotification } = require('./notificationController');
 const { emitGlobalEvent } = require('../socket/events/notificationEvents');
 const asyncHandler = require('../middleware/asyncHandler');
-const { resolveStoredImagePath } = require('../utils/imageStorageHelper');
+const { resolveStoredImagePath, normalizeLostFoundItemImages, normalizeLostFoundItemsImages } = require('../utils/imageStorageHelper');
+const { sendSuccess } = require('../utils/responseHandler');
 
 // @desc    Create lost item report
 // @route   POST /api/lost-items
@@ -63,9 +64,9 @@ exports.reportLostItem = asyncHandler(async (req, res) => {
   // Trigger matching in the background
   findMatchesForLostItem(savedItem._id).catch(err => console.error('Matching Error:', err));
 
-  emitGlobalEvent('lostItem:created', savedItem);
+  emitGlobalEvent('lostItem:created', normalizeLostFoundItemImages(savedItem.toObject ? savedItem.toObject() : savedItem));
 
-  return sendSuccess(res, 'Lost item reported successfully', savedItem, 201);
+  return sendSuccess(res, 'Lost item reported successfully', normalizeLostFoundItemImages(savedItem.toObject ? savedItem.toObject() : savedItem), 201);
 });
 
 // @desc    Get all lost items
@@ -83,7 +84,7 @@ exports.getAllLostItems = asyncHandler(async (req, res) => {
   const total = await LostItem.countDocuments({ isDeleted: { $ne: true }, ...features.filterCriteria });
 
   return sendSuccess(res, 'Lost items fetched successfully', {
-    items,
+    items: normalizeLostFoundItemsImages(items),
     total,
     page: parseInt(req.query.page) || 1,
     limit: parseInt(req.query.limit) || 10
@@ -98,7 +99,7 @@ exports.getMyLostItems = asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 })
     .lean();
 
-  return sendSuccess(res, 'My lost items fetched successfully', items);
+  return sendSuccess(res, 'My lost items fetched successfully', normalizeLostFoundItemsImages(items));
 });
 
 // @desc    Get single lost item
@@ -114,7 +115,7 @@ exports.getLostItemById = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Item not found' });
   }
 
-  return sendSuccess(res, 'Lost item fetched successfully', item);
+  return sendSuccess(res, 'Lost item fetched successfully', normalizeLostFoundItemImages(item));
 });
 
 // @desc    Update lost item
@@ -140,6 +141,12 @@ exports.updateLostItem = asyncHandler(async (req, res) => {
   if (locationLost) item.location = locationLost;
   if (status) item.status = status;
 
+  if (req.file) {
+    const storedImage = await resolveStoredImagePath(req.file, 'campus-access/lost-items');
+    item.image = storedImage.image;
+    item.imageUrl = storedImage.imageUrl;
+  }
+
   const updatedItem = await item.save();
 
   try {
@@ -147,7 +154,7 @@ exports.updateLostItem = asyncHandler(async (req, res) => {
     emitGlobalEvent('lostItem:updated', updatedItem);
   } catch (_) {}
 
-  return sendSuccess(res, 'Lost item updated successfully', updatedItem);
+  return sendSuccess(res, 'Lost item updated successfully', normalizeLostFoundItemImages(updatedItem.toObject ? updatedItem.toObject() : updatedItem));
 });
 
 // @desc    Delete lost item
@@ -261,7 +268,7 @@ exports.getTrashedLostItems = asyncHandler(async (req, res) => {
     .sort({ deletedAt: -1 })
     .lean();
     
-  return sendSuccess(res, 'Trashed items fetched successfully', items);
+  return sendSuccess(res, 'Trashed items fetched successfully', normalizeLostFoundItemsImages(items));
 });
 
 

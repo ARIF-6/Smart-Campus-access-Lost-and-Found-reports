@@ -56,7 +56,7 @@ class AppConstants {
   // Helper for Image URLs (Handles local + Cloudinary)
   static String getImageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
-    if (path.startsWith('http')) return path;
+    if (path.startsWith('http') || path.contains('res.cloudinary.com')) return path;
     String cleanPath = path.replaceAll(RegExp(r'\\+'), '/');
     final RegExp exactMatchRegex = RegExp(r'(?:^|/)(uploads/[^?]*|profiles/[^?]*)');
     final match = exactMatchRegex.firstMatch(cleanPath);

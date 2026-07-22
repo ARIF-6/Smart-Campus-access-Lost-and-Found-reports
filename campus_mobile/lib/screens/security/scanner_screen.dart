@@ -821,8 +821,14 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
                     final item = Map<String, dynamic>.from(record as Map);
                     final campusName = item['campusName']?.toString() ?? 'Unknown Campus';
                     final status = item['status']?.toString() ?? '';
-                    final entryTime = item['entryTimeFormatted']?.toString() ?? '';
-                    final method = item['method']?.toString() ?? 'Security Guard';
+                    final displayTime = item['displayTimeFormatted']?.toString() ??
+                        (status == 'Outside'
+                            ? (item['exitTimeFormatted']?.toString() ?? '')
+                            : (item['entryTimeFormatted']?.toString() ?? ''));
+                    final displayMethod = item['displayMethod']?.toString() ??
+                        (status == 'Outside'
+                            ? (item['exitMethod']?.toString() ?? item['method']?.toString() ?? 'Security Guard')
+                            : (item['method']?.toString() ?? 'Security Guard'));
                     final isInside = status == 'Inside';
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -832,12 +838,12 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
                           Icon(
                             isInside ? Icons.login : Icons.logout,
                             size: 16,
-                            color: isInside ? Colors.green : Colors.grey,
+                            color: isInside ? Colors.green : Colors.orange,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              '$campusName • ${entryTime.isNotEmpty ? entryTime : '—'} • $status • $method',
+                              '$campusName • ${displayTime.isNotEmpty ? displayTime : '—'} • $status • $displayMethod',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[800],

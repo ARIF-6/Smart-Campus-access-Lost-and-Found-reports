@@ -2,7 +2,7 @@ const Item = require('../models/Item');
 const LostItem = require('../models/LostItem');
 const FoundItem = require('../models/FoundItem');
 const { logAction } = require('../utils/auditLogger');
-const { resolveStoredImagePath } = require('../utils/imageStorageHelper');
+const { resolveStoredImagePath, normalizeLostFoundItemImages, normalizeLostFoundItemsImages } = require('../utils/imageStorageHelper');
 const { enrichFoundItemForUser } = require('../utils/itemStatusHelper');
 
 // Helper to find item in any collection
@@ -45,7 +45,7 @@ exports.createItem = async (req, res) => {
     });
 
     await newItem.save();
-    res.status(201).json({ message: "Item created successfully", data: newItem });
+    res.status(201).json({ message: "Item created successfully", data: normalizeLostFoundItemImages(newItem.toObject ? newItem.toObject() : newItem) });
   } catch (error) {
     res.status(500).json({ message: "Server error while creating item", error: error.message });
   }
@@ -116,21 +116,7 @@ exports.getItems = async (req, res) => {
       combined = combined.slice(0, parseInt(req.query.limit));
     }
 
-    // Normalize image URLs for the mobile frontend
-    const protocol = req.protocol || 'http';
-    const host = req.get('host');
-    const baseUrl = `${protocol}://${host}`;
-
-    const normalizedItems = combined.map(item => {
-      if (item.image && typeof item.image === 'string' && !item.image.startsWith('http')) {
-        let path = item.image.replaceAll('\\', '/');
-        // Ensure path starts with uploads/ and has a leading slash
-        if (!path.startsWith('uploads/')) path = `uploads/${path}`;
-        if (!path.startsWith('/')) path = `/${path}`;
-        item.image = `${baseUrl}${path}`;
-      }
-      return item;
-    });
+    const normalizedItems = normalizeLostFoundItemsImages(combined);
 
     res.status(200).json(normalizedItems);
   } catch (error) {
@@ -152,7 +138,7 @@ exports.getItem = async (req, res) => {
       Object.assign(itemData, enrichFoundItemForUser(itemData, req.user?.id));
     }
 
-    res.json(itemData);
+    res.json(normalizeLostFoundItemImages(itemData));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -193,7 +179,7 @@ exports.updateItem = async (req, res) => {
     }
 
     await item.save();
-    res.json(item);
+    res.json(normalizeLostFoundItemImages(item.toObject ? item.toObject() : item));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -241,7 +227,7 @@ exports.getMyItems = async (req, res) => {
     ];
 
     combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    res.status(200).json(combined);
+    res.status(200).json(normalizeLostFoundItemsImages(combined));
   } catch (error) {
     res.status(500).json({ message: 'Server Error fetching my items', error: error.message });
   }
